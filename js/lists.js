@@ -1,6 +1,9 @@
 import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual } from "./colors.js";
-import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml } from "./app-shared.js";
+import {
+  renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
+  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
+} from "./app-shared.js";
 
 renderHeader("lists");
 main();
@@ -28,6 +31,7 @@ async function main() {
   document.getElementById("persona-context").textContent = persona
     ? personaContextLine(store, persona)
     : "Unpersonalized general ranking — the same 12-criterion weighted index shown on the map.";
+  document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
 
   render(store, persona);
 }
@@ -55,15 +59,24 @@ function buildRows(store, persona) {
       const general = store.generalIndex(loc.location_id);
       let fitValue = general ? general.value : null;
       let verdict = null;
+      // null = no persona selected (the question doesn't apply); true = a
+      // real persona-adjusted figure; false = a persona is selected but this
+      // row has no rescore, so the general figure is shown as a fallback —
+      // the page's own promise ("labeled per row") that this flag exists to
+      // honor in the render below.
+      let personaAdjusted = null;
       if (persona) {
         const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
         if (perLoc && perLoc.criteria.size > 0) {
           const idx = store.personaIndex(persona, loc.location_id);
           fitValue = idx ? idx.value : null;
+          personaAdjusted = true;
+        } else {
+          personaAdjusted = false;
         }
         verdict = perLoc?.verdict || null;
       }
-      return { loc, country, general, fitValue, verdict };
+      return { loc, country, general, fitValue, verdict, personaAdjusted };
     });
 }
 
@@ -84,8 +97,11 @@ function render(store, persona) {
   tbody.innerHTML = "";
   for (const row of rows) {
     const tr = document.createElement("tr");
+    const fallbackTag = row.personaAdjusted === false
+      ? ` <span class="scope-tag">(no rescore for this persona yet — general figure shown)</span>`
+      : "";
     const fitCellHtml = row.fitValue != null
-      ? `<span class="fit-swatch" style="background:${scoreToColor(row.fitValue)}"></span> ${row.fitValue.toFixed(1)}/5`
+      ? `<span class="fit-swatch" style="background:${scoreToColor(row.fitValue)}"></span> ${row.fitValue.toFixed(1)}/5${fallbackTag}`
       : `<span class="fit-swatch" style="background:#e2e2e2"></span> not scored`;
 
     let verdictHtml = "";
@@ -96,8 +112,7 @@ function render(store, persona) {
     }
 
     tr.innerHTML = `
-      <td><a href="${withPersona("location.html", { loc: row.loc.location_id })}">${escapeHtml(row.loc.display_name)}</a>
-        <div class="scope-tag">${escapeHtml(row.loc.status)}</div></td>
+      <td><a href="${withPersona("location.html", { loc: row.loc.location_id })}">${escapeHtml(row.loc.display_name)}</a></td>
       <td>${escapeHtml(row.country.name)}</td>
       <td class="rank-fit-cell">${fitCellHtml}</td>
       <td>${verdictHtml}</td>
@@ -134,6 +149,11 @@ function buildBreakdown(store, row, persona) {
   wrap.className = "breakdown-grid";
   const scoreRows = store.scoresByLocation.get(row.loc.location_id);
   const personaFixtures = persona ? store.fixturesByPersona.get(persona)?.get(row.loc.location_id)?.criteria : null;
+  // Capitalized once, reused everywhere this function needs to name the
+  // persona in prose — the same display-name convention every other call
+  // site in this file already applies (personaContextLine, the verdict item
+  // below), rather than rendering the raw lowercase URL-param slug.
+  const displayName = persona ? persona.charAt(0).toUpperCase() + persona.slice(1) : "";
 
   for (const crit of store.criteria) {
     const item = document.createElement("div");
@@ -144,22 +164,22 @@ function buildBreakdown(store, row, persona) {
     let valueText, sourceTag = "";
     if (fixtureRow) {
       valueText = `${fixtureRow.expected}/5`;
-      sourceTag = ` (${persona}'s own fixture)`;
+      sourceTag = ` (${displayName}'s own fixture)`;
     } else if (scoreRow && scoreRow.status === "scored") {
       valueText = `${scoreRow.score}/5`;
     } else if (scoreRow && scoreRow.status === "gap") {
-      valueText = "GAP — not scored";
+      valueText = "Not scored yet";
     } else {
       valueText = "no data";
     }
-    item.innerHTML = `<strong>${escapeHtml(crit.name)}</strong> <span class="scope-tag">(${crit.weight_class})</span><br>${escapeHtml(valueText)}${sourceTag}`;
+    const weightLabel = WEIGHT_CLASS_LABEL[crit.weight_class] || crit.weight_class;
+    item.innerHTML = `<strong>${escapeHtml(crit.name)}</strong> <span class="scope-tag">(${escapeHtml(weightLabel)})</span><br>${escapeHtml(valueText)}${sourceTag}`;
     wrap.appendChild(item);
   }
 
   if (row.verdict) {
     const item = document.createElement("div");
     item.className = "breakdown-item";
-    const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
     item.innerHTML = `<strong>${displayName}'s visa/elimination read</strong><br>${escapeHtml(row.verdict.expected)}`;
     wrap.appendChild(item);
   }

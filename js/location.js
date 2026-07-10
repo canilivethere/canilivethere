@@ -3,6 +3,7 @@ import { scoreToColor, verdictVisual } from "./colors.js";
 import {
   renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, divergenceBadge,
+  FIT_INDEX_DEFINITION,
 } from "./app-shared.js";
 
 renderHeader("location");
@@ -59,10 +60,12 @@ async function main() {
 
 function buildHeader(loc, country) {
   const div = document.createElement("div");
+  // loc.status ("Rescored" for every location, as of this build) is this
+  // project's own internal build-pipeline status, not place data — it
+  // carries no reader-facing meaning and is deliberately not rendered here.
   div.innerHTML = `
     <div class="loc-header">
       <h1>${escapeHtml(loc.display_name)} <span class="scope-tag">(${escapeHtml(country.name)})</span></h1>
-      <span class="loc-status-badge">${escapeHtml(loc.status)}</span>
     </div>
   `;
   return div;
@@ -84,8 +87,9 @@ function buildPersonaPanel(store, loc, persona) {
   div.className = "judgment-note";
   if (hasCriterionFixtures) {
     const idx = store.personaIndex(persona, loc.location_id);
-    div.innerHTML = `<strong>${displayName}'s fit here:</strong> ${idx ? idx.value.toFixed(1) + "/5" : "not enough data"} —
-      re-scored fixture criteria for ${displayName} are shown in the score bar below.`;
+    div.innerHTML = `<strong>${displayName}'s Fit index:</strong> ${idx ? idx.value.toFixed(1) + "/5" : "not enough data"} —
+      re-scored fixture criteria for ${displayName} are shown in the score bar below.
+      <div class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</div>`;
     if (perLoc.verdict) {
       const headline = verdictHeadline(perLoc.verdict.expected);
       const v = verdictVisual(headline);
@@ -100,9 +104,10 @@ function buildPersonaPanel(store, loc, persona) {
       div.innerHTML = `<strong>${displayName}'s visa/elimination read:</strong>
         <span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span><br>
         ${escapeHtml(verdict.expected)}<br>
-        <em>No full criterion rescore exists for this persona yet — the general index
+        <em>No full criterion rescore exists for this persona yet — the general Fit index
         (${general ? general.value.toFixed(1) + "/5" : "not scored"}) is shown below unchanged, not adjusted
-        for ${displayName}. That's "verification pending," not a real personalized score.</em>`;
+        for ${displayName}. That's "verification pending," not a real personalized score.</em>
+        <div class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</div>`;
     } else {
       div.innerHTML = `No verdict fixture on file yet for this persona at this location.`;
     }
@@ -161,7 +166,7 @@ function buildSection(key, facts) {
   section.id = `sec-${key}`;
   const title = SECTION_TITLES[key] || key;
   if (!facts.length) {
-    section.innerHTML = `<h2>${title}</h2><p class="fact-notes">No extracted facts filed under this section yet — a data gap to route to the owning specialist, not a claim that nothing is true here.</p>`;
+    section.innerHTML = `<h2>${title}</h2><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
     return section;
   }
 

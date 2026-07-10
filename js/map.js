@@ -1,6 +1,6 @@
 import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, SCALE_LEGEND, verdictVisual } from "./colors.js";
-import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml } from "./app-shared.js";
+import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 
 // CanILiveThere's own country_id doesn't always equal a real ISO code — see
@@ -93,7 +93,7 @@ async function main() {
     if (persona === "waldo") {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
-      tooltip = `${loc.display_name} (${country.name})\nWaldo's fit index: ${idx ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
+      tooltip = `${loc.display_name} (${country.name})\nWaldo's Fit index: ${idx ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
     } else if (persona === "wenda" || persona === "carmen") {
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
       const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
@@ -113,15 +113,15 @@ async function main() {
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
         const indexLabel = hasCriterionFixtures
-          ? `${displayName}'s own re-scored index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`
-          : `General index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona is verification pending, not yet done.`;
+          ? `${displayName}'s own re-scored Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`
+          : `General Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona is verification pending, not yet done.`;
         tooltip = `${loc.display_name} (${country.name})\n${displayName}'s visa/elimination read: ${verdict.expected}\n(${indexLabel})`;
       } else {
         tooltip = `${loc.display_name} (${country.name}) — no verdict fixture on file for this persona yet.`;
       }
     } else {
       fill = scoreToColor(general ? general.value : null);
-      tooltip = `${loc.display_name} (${country.name})\nGeneral relocation-friendliness index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
+      tooltip = `${loc.display_name} (${country.name})\nGeneral Fit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
     }
 
     const circle = document.createElementNS(svgNS, "circle");
@@ -188,8 +188,8 @@ function renderLegend(el, persona) {
     `;
   }
   el.innerHTML = `
-    <div class="legend-scale">1 ${scaleHtml} 5</div>
-    <span>General/persona fit index (weighted 1–5 average of scored criteria)</span>
+    <div class="legend-scale">1 (weakest fit) ${scaleHtml} 5 (strongest fit)</div>
+    <span>${escapeHtml(FIT_INDEX_DEFINITION)}</span>
     ${extra}
   `;
 }

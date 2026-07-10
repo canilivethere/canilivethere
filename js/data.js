@@ -1,0 +1,290 @@
+// CanILiveThere — derived-data loader.
+//
+// Reads the JSONL snapshot in derived/ directly in the browser (no backend,
+// no build step, no bundler — fetch + JSON.parse, per the "boring,
+// dependency-light" craft standard). Facts are per-country files
+// (derived/facts/{country_id}.jsonl), everything else is one flat file.
+//
+// This module ONLY transports and indexes what's already in derived/. It
+// authors nothing: no scores, no facts, no verdicts. The one computed value
+// it produces — generalIndex() — is a documented, transparent aggregation
+// over already-scored criteria (see the comment on WEIGHT_NUMERIC below),
+// clearly labeled wherever it's shown, not a new fact and not a rules-engine
+// verdict.
+
+const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
+
+async function fetchJsonl(path) {
+  let res;
+  try {
+    res = await fetch(path);
+  } catch (e) {
+    console.warn("Fetch failed for", path, e);
+    return [];
+  }
+  if (!res.ok) {
+    console.warn("Missing or unreadable:", path, res.status);
+    return [];
+  }
+  const text = await res.text();
+  const rows = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      rows.push(JSON.parse(trimmed));
+    } catch (e) {
+      console.warn("Bad JSONL row in", path, trimmed.slice(0, 80));
+    }
+  }
+  return rows;
+}
+
+let _storePromise = null;
+
+export function loadStore(basePath = "derived/") {
+  if (_storePromise) return _storePromise;
+  _storePromise = buildStore(basePath);
+  return _storePromise;
+}
+
+async function fetchJson(path) {
+  try {
+    const res = await fetch(path);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn("Fetch failed for", path, e);
+    return null;
+  }
+}
+
+async function buildStore(basePath) {
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, meta] =
+    await Promise.all([
+      fetchJsonl(basePath + "countries.jsonl"),
+      fetchJsonl(basePath + "locations.jsonl"),
+      fetchJsonl(basePath + "criteria.jsonl"),
+      fetchJsonl(basePath + "scores.jsonl"),
+      fetchJsonl(basePath + "change-events.jsonl"),
+      fetchJsonl(basePath + "profiles.jsonl"),
+      fetchJsonl(basePath + "fixtures.jsonl"),
+      fetchJson(basePath + "meta.json"),
+    ]);
+
+  const factsByCountry = {};
+  await Promise.all(
+    countries.map(async (c) => {
+      factsByCountry[c.country_id] = await fetchJsonl(
+        `${basePath}facts/${c.country_id}.jsonl`
+      );
+    })
+  );
+  const allFacts = Object.values(factsByCountry).flat();
+
+  criteria.sort((a, b) => a.display_order - b.display_order);
+
+  const countriesById = new Map(countries.map((c) => [c.country_id, c]));
+  const locationsById = new Map(locations.map((l) => [l.location_id, l]));
+  const criteriaById = new Map(criteria.map((c) => [c.criterion_id, c]));
+
+  // scoresByLocation: location_id -> criterion_id -> score row
+  const scoresByLocation = new Map();
+  for (const s of scores) {
+    if (!scoresByLocation.has(s.location_id)) scoresByLocation.set(s.location_id, new Map());
+    scoresByLocation.get(s.location_id).set(s.criterion_id, s);
+  }
+
+  // factsByLocation: location_id -> [facts that apply], i.e. its own
+  // location/sub-location facts PLUS its country's country-scoped facts
+  // (this project's own data-model rule: country-level facts are inherited by locations).
+  const factsByLocation = new Map();
+  for (const loc of locations) {
+    const own = allFacts.filter((f) => f.location_id === loc.location_id);
+    const inherited = allFacts.filter(
+      (f) => f.scope === "country" && f.country_id === loc.country_id
+    );
+    factsByLocation.set(loc.location_id, [...inherited, ...own]);
+  }
+
+  // changeEventsByCountry / ByLocation
+  const changeEventsByCountry = new Map();
+  const changeEventsByLocation = new Map();
+  for (const ev of changeEvents) {
+    if (!changeEventsByCountry.has(ev.country_id)) changeEventsByCountry.set(ev.country_id, []);
+    changeEventsByCountry.get(ev.country_id).push(ev);
+    if (ev.location_id) {
+      if (!changeEventsByLocation.has(ev.location_id)) changeEventsByLocation.set(ev.location_id, []);
+      changeEventsByLocation.get(ev.location_id).push(ev);
+    }
+  }
+
+  // fixturesByPersona: persona_id -> location_id -> { criteria: Map(critId->row), verdict: row|null }
+  const fixturesByPersona = new Map();
+  for (const f of fixtures) {
+    if (!fixturesByPersona.has(f.persona_id)) fixturesByPersona.set(f.persona_id, new Map());
+    const perLoc = fixturesByPersona.get(f.persona_id);
+    if (!perLoc.has(f.location_id)) perLoc.set(f.location_id, { criteria: new Map(), verdict: null });
+    const entry = perLoc.get(f.location_id);
+    if (f.criterion_id) entry.criteria.set(f.criterion_id, f);
+    else entry.verdict = f;
+  }
+
+  const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));
+
+  const store = {
+    countries,
+    locations,
+    criteria,
+    scores,
+    changeEvents,
+    profiles,
+    fixtures,
+    countriesById,
+    locationsById,
+    criteriaById,
+    scoresByLocation,
+    factsByLocation,
+    factsByCountry,
+    changeEventsByCountry,
+    changeEventsByLocation,
+    fixturesByPersona,
+    profilesById,
+    meta,
+  };
+
+  store.generalIndex = (locationId) => generalIndex(store, locationId);
+  store.personaIndex = (personaId, locationId) => personaIndex(store, personaId, locationId);
+  return store;
+}
+
+// The unpersonalized "general relocation-friendliness index": a weighted
+// average of every scored (status='scored') criterion for a location,
+// weighted by the scorecard's own High / Medium-High / Medium weight
+// classes (3 / 2 / 1). This weighting formula is a site-build judgment
+// call, not part of the data layer's own contract — flagged as such in
+// the build notes. It
+// operates only on already-judged criterion scores (scores.jsonl), never
+// on raw facts, and skips any criterion in status='gap' rather than
+// silently zero-filling it.
+function generalIndex(store, locationId) {
+  const rows = store.scoresByLocation.get(locationId);
+  if (!rows) return null;
+  let weightedSum = 0;
+  let weightTotal = 0;
+  let gaps = 0;
+  const used = [];
+  for (const crit of store.criteria) {
+    const row = rows.get(crit.criterion_id);
+    if (!row) continue;
+    if (row.status === "gap" || row.score == null) {
+      gaps++;
+      continue;
+    }
+    const w = WEIGHT_NUMERIC[crit.weight_class] || 1;
+    weightedSum += row.score * w;
+    weightTotal += w;
+    used.push(crit.criterion_id);
+  }
+  if (weightTotal === 0) return null;
+  return {
+    value: weightedSum / weightTotal,
+    criteriaUsed: used.length,
+    criteriaTotal: store.criteria.length,
+    gaps,
+  };
+}
+
+// Waldo has real per-criterion fixture overrides for 4 dynamic criteria
+// (income-viability, infrastructure-connectivity, land-property-access,
+// visa-legal-pathway-ease) — swap those into the general-index computation.
+// Wenda/Carmen have ONLY a verdict-shaped fixture (no criterion overrides),
+// per the runbook: rendered as "verification pending", never computed.
+function personaIndex(store, personaId, locationId) {
+  const perLoc = store.fixturesByPersona.get(personaId);
+  const entry = perLoc ? perLoc.get(locationId) : null;
+  if (!entry || entry.criteria.size === 0) {
+    // No numeric override data for this persona (Wenda/Carmen) — fall back
+    // to the general index, but the caller MUST label this as general, not
+    // persona-specific (depth-honesty rule).
+    return { ...generalIndex(store, locationId), personaAdjusted: false };
+  }
+  const rows = store.scoresByLocation.get(locationId);
+  let weightedSum = 0;
+  let weightTotal = 0;
+  let gaps = 0;
+  const used = [];
+  for (const crit of store.criteria) {
+    const fixtureRow = entry.criteria.get(crit.criterion_id);
+    let scoreVal;
+    if (fixtureRow) {
+      scoreVal = Number(fixtureRow.expected);
+    } else {
+      const row = rows ? rows.get(crit.criterion_id) : null;
+      if (!row || row.status === "gap" || row.score == null) {
+        gaps++;
+        continue;
+      }
+      scoreVal = row.score;
+    }
+    const w = WEIGHT_NUMERIC[crit.weight_class] || 1;
+    weightedSum += scoreVal * w;
+    weightTotal += w;
+    used.push(crit.criterion_id);
+  }
+  if (weightTotal === 0) return null;
+  return {
+    value: weightedSum / weightTotal,
+    criteriaUsed: used.length,
+    criteriaTotal: store.criteria.length,
+    gaps,
+    personaAdjusted: true,
+  };
+}
+
+// Verdict fixtures (Wenda/Carmen) are freeform prose, e.g.
+// "Near-miss - Rentista ~$2,000 threshold missed by ~5%; ...". The leading
+// clause before the first " - " is extracted MECHANICALLY (a plain string
+// split, not an interpretation) as the at-a-glance headline; the full
+// string is always shown too. This is deliberately not a synthesized
+// pass/fail enum — see the build notes.
+export function verdictHeadline(expectedText) {
+  const idx = expectedText.indexOf(" - ");
+  if (idx === -1) return expectedText;
+  return expectedText.slice(0, idx);
+}
+
+// Mechanical fact->section bucketing, keyed off which source research file
+// a fact's source_ref names (the six-file set: overview / visa-legal /
+// property / cost-of-living / community-network / red-flags.md). This is a
+// lookup, not a judgment call — every candidate location's research was
+// authored as one of these six files, and the public export preserves the
+// bare filename. Falls back to a criterion_id-based guess only when
+// source_ref is a [GAP] marker (no real file behind it yet).
+const FILE_SECTION_MAP = [
+  ["red-flags.md", "redflags"],
+  ["visa-legal.md", "visa"],
+  ["property.md", "property"],
+  ["cost-of-living.md", "cost"],
+  ["community-network.md", "community"],
+  ["overview.md", "overview"],
+];
+
+const CRITERION_SECTION_FALLBACK = {
+  "visa-legal-pathway-ease": "visa",
+  "land-property-access": "property",
+  "cost-of-living-affordability": "cost",
+  "community-social-fabric": "community",
+  "room-for-others-group-viability": "community",
+};
+
+export function sectionForFact(fact) {
+  const ref = fact.source_ref || "";
+  for (const [needle, section] of FILE_SECTION_MAP) {
+    if (ref.includes(needle)) return section;
+  }
+  if (fact.criterion_id && CRITERION_SECTION_FALLBACK[fact.criterion_id]) {
+    return CRITERION_SECTION_FALLBACK[fact.criterion_id];
+  }
+  return "overview";
+}

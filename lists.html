@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lists — CanILiveThere</title>
+<meta name="description" content="Sortable rankings of every researched relocation destination, general or persona-switched.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <h1>Lists</h1>
+  <p id="persona-context"></p>
+  <div class="filters">
+    <label for="country-filter">Filter by country:</label>
+    <select id="country-filter"></select>
+  </div>
+  <table class="rank-table">
+    <thead>
+      <tr>
+        <th data-sort="name">Location</th>
+        <th data-sort="country">Country</th>
+        <th data-sort="fit">Fit index</th>
+        <th>Persona verdict</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody id="rank-tbody"></tbody>
+  </table>
+  <p class="judgment-note">
+    Not built yet (deliberately, per the launch runbook): the Board — the
+    full spreadsheet-style data grid over every fact. This Lists surface is
+    ranking-only, one row per location.
+  </p>
+</main>
+<script type="module" src="js/lists.js"></script>
+</body>
+</html>

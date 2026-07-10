@@ -48,7 +48,7 @@ function personaContextLine(store, persona) {
   if (anyCriterionFixtures) {
     return `${displayName}'s ranking uses their own re-scored fixture criteria where available; any remaining gaps fall back to the general scorecard, labeled per row.`;
   }
-  return `${displayName}'s visa/elimination verdict is shown per row (a real pass/fail read). No full criterion rescore exists for this persona yet — the fit-index column is the general (unpersonalized) figure, labeled as such, not padded to look persona-specific.`;
+  return `${displayName}'s visa/elimination verdict is shown per row (a real pass/fail read). No full criterion rescore exists for this persona yet — the Fit index column is the general (unpersonalized) figure, labeled as such, not padded to look persona-specific.`;
 }
 
 function buildRows(store, persona) {

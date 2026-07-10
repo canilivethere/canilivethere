@@ -93,6 +93,10 @@ h3 { font-size: 1.05rem; }
 .badge-high { border-color: #2c7fb8; color: #1a4f73; background: #eaf3fa; }
 .badge-medium { border-color: #a1dab4; color: #2f6b45; background: #eef8f0; }
 .badge-speculative { border-color: #e0b04a; color: #7a5c14; background: #fdf3df; }
+/* No explicit confidence field on the fact — distinct from Speculative,
+   which is an earned, explicit tier. Same neutral look as the base .badge
+   (repeated explicitly here so the intent reads in the CSS, not just JS). */
+.badge-neutral { border-color: var(--line); color: var(--muted); background: var(--panel); }
 .badge-gap { border-color: var(--gap-ink); color: var(--gap-ink); background: var(--gap-bg); font-style: italic; }
 .div-match { border-color: #2f6b45; color: #2f6b45; background: #eef8f0; }
 .div-diverge { border-color: #b02a2a; color: #b02a2a; background: #fceaea; }

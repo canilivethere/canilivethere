@@ -172,13 +172,20 @@ function buildSection(key, facts) {
 
   // Group visa-route facts (group_key) into route cards; everything else
   // renders as a plain fact item. Mechanical grouping only (schema §2's
-  // visa_route view), no interpretation of what a route "means".
+  // visa_route view), no interpretation of what a route "means". Facts are
+  // accumulated per group_role as an array, never assigned to a single
+  // slot: a route can legitimately hold several distinct facts sharing one
+  // role (e.g. one "threshold" fact per named sub-category, like Thailand's
+  // five LTR categories or its two O-A/O-X tiers) — collapsing them to one
+  // would silently render a combination the data never actually states.
   const routeGroups = new Map();
   const plain = [];
   for (const f of facts) {
     if (f.group_key) {
-      if (!routeGroups.has(f.group_key)) routeGroups.set(f.group_key, {});
-      routeGroups.get(f.group_key)[f.group_role] = f;
+      if (!routeGroups.has(f.group_key)) routeGroups.set(f.group_key, new Map());
+      const byRole = routeGroups.get(f.group_key);
+      if (!byRole.has(f.group_role)) byRole.set(f.group_role, []);
+      byRole.get(f.group_role).push(f);
     } else {
       plain.push(f);
     }
@@ -187,18 +194,31 @@ function buildSection(key, facts) {
   let html = `<h2>${title}</h2>`;
   if (routeGroups.size) {
     html += `<div class="fact-list">`;
-    for (const [key2, group] of routeGroups) {
-      const t = group.threshold;
-      if (!t) continue;
-      html += `<div class="fact-item">
+    for (const [, byRole] of routeGroups) {
+      const thresholds = byRole.get("threshold") || [];
+      // No threshold fact in this group: nothing to anchor a card on.
+      // Not rendered here — a data-layer coverage gap (route-card
+      // extraction), not something this render pass authors a fix for.
+      if (!thresholds.length) continue;
+      const convertsToPr = byRole.get("converts_to_pr") || [];
+      const acceptsPassive = byRole.get("accepts_passive_income") || [];
+      html += `<div class="fact-item">`;
+      // One label/value/meta block per threshold sub-category — every one
+      // renders, none silently wins over another.
+      html += thresholds.map((t) => `
         <div class="fact-label">${escapeHtml(t.fact_label)}</div>
         <div class="fact-value">${escapeHtml(formatValue(t))}</div>
         <div class="fact-meta">${confidenceBadge(t)} ${divergenceBadge(t)} ${sourceLine(t)}
           <span class="scope-tag">${escapeHtml(t.date || "")}</span></div>
-        ${group.converts_to_pr ? `<div class="fact-notes">Converts to permanent residency: <strong>${escapeHtml(group.converts_to_pr.value_raw)}</strong></div>` : ""}
-        ${group.accepts_passive_income ? `<div class="fact-notes">Accepts passive income: <strong>${escapeHtml(group.accepts_passive_income.value_raw)}</strong></div>` : ""}
         ${t.notes ? `<div class="fact-notes">${escapeHtml(t.notes)}</div>` : ""}
-      </div>`;
+      `).join(thresholds.length > 1 ? "<hr>" : "");
+      // Same for the two route-mechanics lines: when a role holds more than
+      // one fact (e.g. Thailand's LTR "accepts passive income" differs by
+      // sub-category), each one renders under its own fact_label instead of
+      // one generic prefix standing in for facts that disagree.
+      html += convertsToPr.map((c) => `<div class="fact-notes">${convertsToPr.length > 1 ? escapeHtml(c.fact_label) : "Converts to permanent residency"}: <strong>${escapeHtml(c.value_raw)}</strong></div>`).join("");
+      html += acceptsPassive.map((a) => `<div class="fact-notes">${acceptsPassive.length > 1 ? escapeHtml(a.fact_label) : "Accepts passive income"}: <strong>${escapeHtml(a.value_raw)}</strong></div>`).join("");
+      html += `</div>`;
     }
     html += `</div>`;
   }

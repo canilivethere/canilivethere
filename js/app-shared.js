@@ -114,8 +114,15 @@ export function renderFooter(store) {
 
 export function formatValue(fact) {
   if (fact.value_raw === "[GAP]") return "Not yet researched";
-  if (fact.unit) return `${fact.value_raw} ${fact.unit}`;
-  return fact.value_raw;
+  const raw = String(fact.value_raw);
+  // Only append the unit if value_raw doesn't already carry it as text —
+  // some facts' own value_raw already spells out its unit inline (e.g.
+  // "50km coast / 100km border", "49% of building"), and appending the
+  // bare unit again on top of that duplicates it visibly ("...building %").
+  if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) {
+    return `${raw} ${fact.unit}`;
+  }
+  return raw;
 }
 
 const CONF_LABEL = { High: "High confidence", Medium: "Medium confidence", Speculative: "Speculative" };
@@ -145,7 +152,17 @@ export function confidenceBadge(fact) {
   if (fact.confidence) bits.push(CONF_LABEL[fact.confidence] || fact.confidence);
   if (fact.source_count) bits.push(SOURCE_COUNT_LABEL[fact.source_count] || fact.source_count.replace(/-/g, " "));
   const label = bits.length ? bits.join(", ") : "confidence not stated";
-  const cls = fact.confidence === "High" ? "badge-high" : fact.confidence === "Medium" ? "badge-medium" : "badge-speculative";
+  // A fact with no explicit `confidence` field is not the same claim as one
+  // the schema's own authors tagged Speculative — that field being absent
+  // just means no confidence tier was set, and a fact can still carry real
+  // sourcing rigor via `source_count` alone (e.g. cross-corroborated). Only
+  // an explicit "Speculative" value earns the speculative styling; an
+  // absent field gets the same neutral treatment the base .badge class
+  // already gives everything else, never a silent demotion.
+  const cls = fact.confidence === "High" ? "badge-high"
+    : fact.confidence === "Medium" ? "badge-medium"
+    : fact.confidence === "Speculative" ? "badge-speculative"
+    : "badge-neutral";
   return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
 

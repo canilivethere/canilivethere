@@ -1,0 +1,4 @@
+# Data-contract rule: JSONL is UTF-8, LF-only, no exceptions.
+# Force this regardless of any contributor's local core.autocrlf setting.
+*.jsonl text eol=lf
+*.json text eol=lf

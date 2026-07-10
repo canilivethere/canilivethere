@@ -1,0 +1,12 @@
+{"criterion_id":"community-social-fabric","name":"Community & social fabric","weight_class":"High","kind":"continuum","display_order":1}
+{"criterion_id":"nature-water-adjacency","name":"Nature & water-adjacency","weight_class":"High","kind":"continuum","display_order":2}
+{"criterion_id":"income-viability","name":"Income viability","weight_class":"High","kind":"continuum","display_order":3}
+{"criterion_id":"routine-sustainability-pace-of-life","name":"Routine sustainability / pace of life","weight_class":"High","kind":"continuum","display_order":4}
+{"criterion_id":"cost-of-living-affordability","name":"Cost of living / affordability","weight_class":"Medium-High","kind":"continuum","display_order":5}
+{"criterion_id":"visa-legal-pathway-ease","name":"Visa & legal pathway ease","weight_class":"Medium-High","kind":"threshold-shaped","display_order":6}
+{"criterion_id":"safety","name":"Safety","weight_class":"Medium","kind":"continuum","display_order":7}
+{"criterion_id":"climate","name":"Climate","weight_class":"Medium","kind":"continuum","display_order":8}
+{"criterion_id":"infrastructure-connectivity","name":"Infrastructure & connectivity","weight_class":"Medium","kind":"continuum","display_order":9}
+{"criterion_id":"land-property-access","name":"Land/property access","weight_class":"Medium","kind":"threshold-shaped","display_order":10}
+{"criterion_id":"room-for-others-group-viability","name":"Room for others / group viability","weight_class":"Medium-High","kind":"continuum","display_order":11}
+{"criterion_id":"political-institutional-stability","name":"Political & institutional stability","weight_class":"Medium","kind":"continuum","display_order":12}

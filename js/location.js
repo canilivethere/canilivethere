@@ -2,7 +2,7 @@ import { loadStore, sectionForFact, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual } from "./colors.js";
 import {
   renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
-  formatValue, confidenceBadge, sourceLine, divergenceBadge,
+  formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION,
 } from "./app-shared.js";
 
@@ -55,7 +55,42 @@ async function main() {
   }
 
   root.appendChild(buildSourcesSection(facts));
+  root.appendChild(buildVerifyYourself(facts));
   root.appendChild(buildNextBest(store, loc, persona));
+}
+
+// Scope-tag disclosure for country-wide facts (v2 addendum §5.1, part 1 —
+// mechanical, no schema change): every fact rendering with `scope:
+// "country"` gets the same visual pattern already used for sub-location
+// facts, reading "Applies country-wide" instead of leaving a reader to
+// infer that silently. A pure `scope`-field read, zero new claims.
+function scopeTagHtml(fact) {
+  if (fact.scope === "sub-location" && fact.scope_detail) {
+    return ` <span class="scope-tag">(${escapeHtml(fact.scope_detail)})</span>`;
+  }
+  if (fact.scope === "country") {
+    return ` <span class="scope-tag">(Applies country-wide)</span>`;
+  }
+  return "";
+}
+
+// "What to verify yourself" (v2 addendum §5.4): a mechanical filter over
+// this location's own facts (own + inherited) for value_raw === "[GAP]",
+// listing each gap's own already-existing label — the site's honesty about
+// gaps reframed as the visitor's own to-do list, not a buried absence. Zero
+// new claims: every row here is already published as [GAP] somewhere on
+// the page above.
+function buildVerifyYourself(facts) {
+  const div = document.createElement("div");
+  const gaps = facts.filter((f) => f.value_raw === "[GAP]");
+  if (!gaps.length) return div;
+  div.className = "verify-yourself";
+  div.innerHTML = `
+    <h2>What to verify yourself</h2>
+    <p class="fact-notes">This site hasn't researched everything yet. Here's what's still open for this location — worth checking directly if it matters to you:</p>
+    <ul>${gaps.map((f) => `<li>${escapeHtml(f.fact_label)} — not yet researched for this location.</li>`).join("")}</ul>
+  `;
+  return div;
 }
 
 function buildHeader(loc, country) {
@@ -206,10 +241,10 @@ function buildSection(key, facts) {
       // One label/value/meta block per threshold sub-category — every one
       // renders, none silently wins over another.
       html += thresholds.map((t) => `
-        <div class="fact-label">${escapeHtml(t.fact_label)}</div>
+        <div class="fact-label">${escapeHtml(t.fact_label)}${scopeTagHtml(t)}</div>
         <div class="fact-value">${escapeHtml(formatValue(t))}</div>
-        <div class="fact-meta">${confidenceBadge(t)} ${divergenceBadge(t)} ${sourceLine(t)}
-          <span class="scope-tag">${escapeHtml(t.date || "")}</span></div>
+        <div class="fact-meta">${confidenceBadge(t)} ${divergenceBadge(t)}</div>
+        <div class="source-detail">${sourceDetailHtml(t)}</div>
         ${t.notes ? `<div class="fact-notes">${escapeHtml(t.notes)}</div>` : ""}
       `).join(thresholds.length > 1 ? "<hr>" : "");
       // Same for the two route-mechanics lines: when a role holds more than
@@ -225,10 +260,10 @@ function buildSection(key, facts) {
 
   html += `<ul class="fact-list">` + plain.map((f) => `
     <li class="fact-item">
-      <div class="fact-label">${escapeHtml(f.fact_label)}${f.scope === "sub-location" ? ` <span class="scope-tag">(${escapeHtml(f.scope_detail)})</span>` : ""}</div>
+      <div class="fact-label">${escapeHtml(f.fact_label)}${scopeTagHtml(f)}</div>
       <div class="fact-value">${escapeHtml(formatValue(f))}</div>
-      <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)} ${sourceLine(f)}
-        <span class="scope-tag">${escapeHtml(f.date || "")}</span></div>
+      <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)}</div>
+      <div class="source-detail">${sourceDetailHtml(f)}</div>
       ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
     </li>`).join("") + `</ul>`;
 
@@ -249,7 +284,7 @@ function buildSourcesSection(facts) {
   section.innerHTML = `<h2>Sources</h2>` + (rows.length
     ? `<ul class="fact-list">` + rows.map((f) => `
         <li class="fact-item">
-          <div class="fact-value">${sourceLine(f)} ${confidenceBadge(f)} <span class="scope-tag">${escapeHtml(f.date || "")}</span></div>
+          <div class="fact-value">${sourceLine(f)} ${confidenceBadge(f, { interactive: false })} <span class="scope-tag">${escapeHtml(f.date || "")}</span></div>
         </li>`).join("") + `</ul>`
     : `<p class="fact-notes">No sources on file yet.</p>`);
   return section;

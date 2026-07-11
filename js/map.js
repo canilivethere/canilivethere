@@ -1,6 +1,6 @@
-import { loadStore, verdictHeadline } from "./data.js";
-import { scoreToColor, SCALE_LEGEND, verdictVisual } from "./colors.js";
-import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION } from "./app-shared.js";
+import { loadStore, verdictHeadline, topBottomCriteria } from "./data.js";
+import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
+import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION, fitBandWord } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 
 // CanILiveThere's own country_id doesn't always equal a real ISO code — see
@@ -90,10 +90,20 @@ async function main() {
     let fill, radius = 6, tooltip, eliminated = false;
     const general = store.generalIndex(loc.location_id);
 
+    // Tooltip voice (v2 addendum §4): a one-line human
+    // answer leads every tooltip, built only from data already computed —
+    // the existing numeric Fit-index detail below follows it, kept in
+    // full, never removed (disclosure-hierarchy discipline: it recedes to
+    // second line, not to zero).
     if (persona === "waldo") {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
-      tooltip = `${loc.display_name} (${country.name})\nWaldo's Fit index: ${idx ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
+      const tb = topBottomCriteria(store, "waldo", loc.location_id);
+      const band = fitBandWord(idx ? idx.value : null);
+      const headline = tb && tb.top.criterion_id !== tb.bottom.criterion_id
+        ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
+        : `${loc.display_name}, ${country.name} — ${band}.`;
+      tooltip = `${headline}\nWaldo's Fit index: ${idx ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
     } else if (persona === "wenda" || persona === "carmen") {
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
       const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
@@ -108,20 +118,28 @@ async function main() {
       const underlyingValue = idx ? idx.value : (general ? general.value : null);
       fill = scoreToColor(underlyingValue);
       if (verdict) {
-        const headline = verdictHeadline(verdict.expected);
-        const visual = verdictVisual(headline);
+        const vHeadline = verdictHeadline(verdict.expected);
+        const visual = verdictVisual(vHeadline);
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
         const indexLabel = hasCriterionFixtures
           ? `${displayName}'s own re-scored Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`
           : `General Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona is verification pending, not yet done.`;
-        tooltip = `${loc.display_name} (${country.name})\n${displayName}'s visa/elimination read: ${verdict.expected}\n(${indexLabel})`;
+        // §4.2: the fixture's own already-computed verdictHeadline() string,
+        // unchanged — no new text authored, a render-surface change only.
+        const headline = `${loc.display_name}, ${country.name} — ${vHeadline}.`;
+        tooltip = `${headline}\n${displayName}'s visa/elimination read: ${verdict.expected}\n(${indexLabel})`;
       } else {
-        tooltip = `${loc.display_name} (${country.name}) — no verdict fixture on file for this persona yet.`;
+        tooltip = `${loc.display_name}, ${country.name} — no verdict fixture on file for this persona yet.`;
       }
     } else {
       fill = scoreToColor(general ? general.value : null);
-      tooltip = `${loc.display_name} (${country.name})\nGeneral Fit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
+      const tb = topBottomCriteria(store, null, loc.location_id);
+      const band = fitBandWord(general ? general.value : null);
+      const headline = tb && tb.top.criterion_id !== tb.bottom.criterion_id
+        ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
+        : `${loc.display_name}, ${country.name} — ${band}.`;
+      tooltip = `${headline}\nGeneral Fit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
     }
 
     const circle = document.createElementNS(svgNS, "circle");
@@ -175,16 +193,18 @@ async function main() {
 }
 
 function renderLegend(el, persona) {
-  const scaleHtml = SCALE_LEGEND.map(
+  // Re-read the theme-appropriate ramp/colors at render time (not cached),
+  // so this legend is always correct for the current light/dark mode.
+  const scaleHtml = getScaleLegend().map(
     (s) => `<span class="legend-swatch" style="background:${s.color}"></span>`
   ).join("");
   let extra = "";
   if (persona === "wenda" || persona === "carmen") {
     extra = `
-      <span class="legend-item"><span class="legend-swatch" style="background:#1a7a3c"></span> Clears</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:#e07b1a"></span> Near-miss / type-trap</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:${clearsColor()}"></span> Clears</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:${CONDITIONAL_COLOR}"></span> Near-miss / type-trap</span>
       <span class="legend-item"><span class="legend-hatch-demo"></span> Misses / categorical absence</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:#9a9a9a"></span> Unverified</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:${PENDING_COLOR}"></span> Unverified</span>
     `;
   }
   el.innerHTML = `

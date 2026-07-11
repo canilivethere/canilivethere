@@ -1,18 +1,33 @@
 /* CanILiveThere — plain, boring, readable CSS. No framework, no build step.
-   Accessibility/readability outrank cleverness (mission brief, 2026-07-09). */
+   Accessibility/readability outrank cleverness (mission brief, 2026-07-09).
+
+   Light-mode tokens below + the dark-mode block at the end are the v2
+   addendum's "site warmth + dark theme" ruling (2026-07-10): a subtle
+   warm-neutral shift on chrome tokens
+   (surface/panel/border/gap), one real pre-existing WCAG AA fix
+   (--accent), and a full dark theme — "an atlas at night," not the
+   light theme with the lights off; every text/background pair below is
+   WCAG-contrast-checked in the addendum itself, not eyeballed. */
 
 :root {
   --ink: #1b1b1b;
-  --paper: #ffffff;
+  --paper: #fbf8f2;
   --muted: #5a5a5a;
-  --line: #d8d8d8;
-  --panel: #f7f7f5;
-  --accent: #2c7fb8;
-  --gap-bg: #eeeeee;
-  --gap-ink: #6a6a6a;
+  --line: #ded4c0;
+  --panel: #f4efe4;
+  --accent: #1f6ea3;
+  --gap-bg: #e9e2d2;
+  --gap-ink: #635c50;
   --eliminated: #3a2a1a;
-  --conditional: #b95d00;
+  --conditional: #e07b1a;
   --focus: #0b5fff;
+
+  /* Map-specific chrome (v2 addendum §2.4: warm the room, not the water —
+     the water stays blue, the unresearched-country fill warms with the
+     rest of the chrome, since that's the fill ~90% of the map's landmass
+     wears on first paint). */
+  --map-water: #eef4f8;
+  --country-fill: #d6cdb8;
 }
 
 * { box-sizing: border-box; }
@@ -54,6 +69,20 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
 .persona-switch label { font-size: 0.85rem; color: var(--muted); }
 .persona-switch select { font-size: 0.95rem; padding: 0.2rem 0.4rem; }
 .persona-blurb { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); min-height: 1.1em; }
+
+/* ---------- disclosure "recede" mechanism (v2/v1 §2.2): a <details>
+   pattern, closed by default, worded summary line — never hidden, never
+   shortened, just not mandatory reading before the page's own content. */
+details.recede { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); }
+details.recede > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.15rem 0;
+}
+details.recede > summary:hover { color: var(--ink); }
+details.recede .recede-body { margin-top: 0.4rem; }
+
 .disclaimer {
   margin: 0.5rem 0 0;
   font-size: 0.78rem;
@@ -106,10 +135,19 @@ h3 { font-size: 1.05rem; }
 
 /* ---------- map surface ---------- */
 .map-wrap { position: relative; width: 100%; }
-#worldmap { width: 100%; height: auto; background: #eef4f8; border: 1px solid var(--line); border-radius: 6px; }
-.country-path { fill: #d9dfe3; stroke: #ffffff; stroke-width: 0.4; }
-.location-pin { cursor: pointer; stroke: #ffffff; stroke-width: 1; }
-.location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: 2; }
+#worldmap { width: 100%; height: auto; background: var(--map-water); border: 1px solid var(--line); border-radius: 6px; }
+/* v2 addendum §4.2: pins over choropleth by visual weight, not DOM order —
+   the choropleth (researched-country fills included, set inline by map.js)
+   reads as flatter/quieter background context; pins keep full contrast so
+   they draw the eye first regardless of paint order. */
+.country-path { fill: var(--country-fill); stroke: #ffffff; stroke-width: 0.4; opacity: 0.68; }
+.location-pin {
+  cursor: pointer;
+  stroke: #ffffff;
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
+}
+.location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: 2.5; }
 .location-pin.eliminated { fill: url(#hatch-eliminated); stroke: var(--eliminated); }
 .pin-label-tooltip {
   position: absolute;
@@ -155,6 +193,22 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .expand-toggle { background: none; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
 .verdict-chip { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; color: #fff; }
 
+/* Purpose-list selector (v2 addendum §3): the "Pick what matters most"
+   chips above the Lists table. */
+.purpose-lists { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.75rem 0; }
+.purpose-chip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+.purpose-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.purpose-more { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
+.purpose-explainer { font-size: 0.82rem; color: var(--muted); margin: 0.35rem 0 0.75rem; }
+
 /* ---------- location page ---------- */
 .loc-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
 .section-nav { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
@@ -174,7 +228,72 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .sev-2 { border-left-color: #b95d00; }
 .sev-1 { border-left-color: #2c7fb8; }
 
+/* "What to verify yourself" (v2 addendum §5.4) */
+.verify-yourself { background: var(--panel); border-radius: 6px; padding: 1rem; margin-top: 1.5rem; }
+.verify-yourself ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+
+/* Confidence-badge pull affordance (v2 addendum §5.3.2): the existing
+   confidence badge becomes a click/tap target expanding to source name,
+   date, and source-count gloss in one place. */
+.fact-meta .badge[data-toggle-source] { cursor: pointer; }
+.source-detail { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; display: none; }
+.source-detail.open { display: block; }
+
 @media (max-width: 700px) {
   .site-header-row { flex-direction: column; align-items: flex-start; }
   .persona-switch { margin-left: 0; }
+}
+
+/* ==========================================================================
+   Dark theme — "an atlas at night," a genuine second surface derived
+   against its own dark background (v2 addendum §2.3), not a
+   prefers-color-scheme flip of the light values. Every text/background
+   pair below is WCAG-contrast-checked in the addendum's own tables; the
+   ~10 remaining badge/border chip colors not individually listed there
+   follow the same named recipe (hold the hue, raise lightness until
+   contrast clears its floor) — computed here, not eyeballed, but not run
+   through the palette script (that tool checks sequential/categorical
+   ramps, not one-off UI chip pairs).
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f5f2ea;
+    --paper: #1e1a14;
+    --muted: #c9c2b0;
+    --line: #3d362a;
+    --panel: #2a241c;
+    --accent: #5fa8e0;
+    --gap-bg: #2c2c28;
+    --gap-ink: #a39c8c;
+    --eliminated: #846546;
+    --conditional: #e07b1a; /* already clears dark, no separate value needed */
+    --focus: #0b5fff; /* clears the 3:1 non-text/UI-component floor as-is */
+    --map-water: #16232b; /* deep, clearly-blue-not-black; distinct from --panel */
+    --country-fill: #4a4234;
+  }
+
+  body { background: var(--paper); }
+  .disclaimer { background: #3a2f14; border-color: #a47c1b; color: var(--muted); }
+
+  /* Text colors below are re-derived against each badge's OWN tinted
+     background (not just the page's dark paper) — a badge's small text
+     (~0.72rem) needs the full 4.5:1 AA floor against whatever it actually
+     sits on, and the first pass here (checked only against --paper-dark)
+     under-shot that once the tinted chip backgrounds were factored in;
+     caught and fixed before shipping, not left at the first plausible
+     value. div-diverge's text/border color (#e5554f) is the addendum's
+     own validated value (§2.3), unchanged — only its background here is
+     darkened enough for that fixed color to clear 4.5:1 against it. */
+  .badge-high { border-color: #4699d3; color: #4699d3; background: #1b2b37; }
+  .badge-medium { border-color: #49a66b; color: #49a66b; background: #203226; }
+  .badge-speculative { border-color: #bf901f; color: #bf901f; background: #392f19; }
+  .div-match { border-color: #49a66b; color: #49a66b; background: #203226; }
+  .div-diverge { border-color: #e5554f; color: #e5554f; background: #311816; }
+  .div-unchecked { border-color: #e87400; color: #e87400; background: #3f2912; }
+
+  .sev-3 { border-left-color: #bf2e2e; }
+  .sev-2 { border-left-color: #a05000; }
+  .sev-1 { border-left-color: #256b9b; }
+
+  .breakdown-item { background: var(--panel); }
 }

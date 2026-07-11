@@ -8,7 +8,19 @@ import {
 renderHeader("lists");
 main();
 
-let STATE = { sortKey: "fit", sortDir: "desc", country: "" };
+let STATE = { sortKey: "fit", sortDir: "desc", country: "", purposeCriterion: null };
+
+// Purpose lists (v2 addendum §3): "Pick what matters most", built
+// entirely over already-shipped data (criteria.jsonl + scores.jsonl) —
+// no new research, no new facts. The three featured views use a
+// specific requested order, not an arbitrary one: easiest visa, money
+// goes furthest, best property access. The blended Fit index stays the
+// default/first option, not replaced.
+const FEATURED_CRITERIA = [
+  { criterion_id: "visa-legal-pathway-ease", label: "Easiest visa" },
+  { criterion_id: "cost-of-living-affordability", label: "Money goes furthest" },
+  { criterion_id: "land-property-access", label: "Best property access" },
+];
 
 async function main() {
   const store = await loadStore();
@@ -33,7 +45,63 @@ async function main() {
     : "Unpersonalized general ranking — the same 12-criterion weighted index shown on the map.";
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
 
+  renderPurposeSelector(store, persona);
   render(store, persona);
+}
+
+function renderPurposeSelector(store, persona) {
+  const el = document.getElementById("purpose-lists");
+  const featuredIds = new Set(FEATURED_CRITERIA.map((f) => f.criterion_id));
+  // "All twelve, always reachable" (§3.3): the remaining nine criteria,
+  // sorted by the schema's own display_order, not re-ordered here.
+  const moreCriteria = store.criteria.filter((c) => !featuredIds.has(c.criterion_id));
+
+  const chipHtml = (id, label, active) =>
+    `<button type="button" class="purpose-chip${active ? " active" : ""}" data-purpose="${id || ""}">${escapeHtml(label)}</button>`;
+
+  el.innerHTML =
+    chipHtml("", "Blended Fit index", !STATE.purposeCriterion) +
+    FEATURED_CRITERIA.map((f) => chipHtml(f.criterion_id, f.label, STATE.purposeCriterion === f.criterion_id)).join("") +
+    `<select class="purpose-more" id="purpose-more">
+      <option value="">More…</option>
+      ${moreCriteria.map((c) => `<option value="${c.criterion_id}"${STATE.purposeCriterion === c.criterion_id ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+    </select>`;
+
+  el.querySelectorAll(".purpose-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      STATE.purposeCriterion = btn.dataset.purpose || null;
+      renderPurposeSelector(store, persona);
+      render(store, persona);
+    });
+  });
+  el.querySelector("#purpose-more").addEventListener("change", (e) => {
+    STATE.purposeCriterion = e.target.value || null;
+    renderPurposeSelector(store, persona);
+    render(store, persona);
+  });
+
+  updatePurposeExplainer(store);
+}
+
+// One-line explanation per view, template not hand-written per criterion
+// (§3.5): the bracketed clause is picked mechanically off criteria.jsonl's
+// own `kind` field, the same "gloss the field, don't invent content" move
+// as the confidence/weight_class glosses elsewhere on this site.
+function updatePurposeExplainer(store) {
+  const el = document.getElementById("purpose-explainer");
+  const th = document.querySelector('th[data-sort="fit"]');
+  if (!STATE.purposeCriterion) {
+    el.textContent = "Sorted by the blended Fit index — a weighted average across all 12 scored criteria, for every researched location.";
+    if (th) th.textContent = "Fit index";
+    return;
+  }
+  const crit = store.criteriaById.get(STATE.purposeCriterion);
+  if (!crit) return;
+  const clause = crit.kind === "threshold-shaped"
+    ? "how comfortably a place clears this, not just a number"
+    : "how strong this factor is here";
+  el.textContent = `Sorted by ${crit.name} — ${clause}, for every researched location.`;
+  if (th) th.textContent = crit.name;
 }
 
 function personaContextLine(store, persona) {
@@ -76,7 +144,16 @@ function buildRows(store, persona) {
         }
         verdict = perLoc?.verdict || null;
       }
-      return { loc, country, general, fitValue, verdict, personaAdjusted };
+      // Purpose-list score (§3): a straight read of scores.jsonl for the
+      // one criterion currently selected, independent of persona — the
+      // view changes what the table is sorted/shown by, not which rows
+      // exist or how the blended Fit index itself is computed.
+      let purposeScore = null;
+      if (STATE.purposeCriterion) {
+        const row = store.scoresByLocation.get(loc.location_id)?.get(STATE.purposeCriterion);
+        purposeScore = row && row.status === "scored" && row.score != null ? row.score : null;
+      }
+      return { loc, country, general, fitValue, verdict, personaAdjusted, purposeScore };
     });
 }
 
@@ -87,6 +164,11 @@ function render(store, persona) {
     let av, bv;
     if (STATE.sortKey === "name") { av = a.loc.display_name; bv = b.loc.display_name; }
     else if (STATE.sortKey === "country") { av = a.country.name; bv = b.country.name; }
+    // Purpose-list sort (§3.4): the "fit" column's sort key is a straight
+    // sort of the selected criterion's own score, descending, replacing
+    // the blended Fit index as the sort key while a purpose is active —
+    // no locations are filtered out, only the sort/display value changes.
+    else if (STATE.purposeCriterion) { av = a.purposeScore ?? -1; bv = b.purposeScore ?? -1; }
     else { av = a.fitValue ?? -1; bv = b.fitValue ?? -1; }
     if (av < bv) return STATE.sortDir === "asc" ? -1 : 1;
     if (av > bv) return STATE.sortDir === "asc" ? 1 : -1;
@@ -100,8 +182,12 @@ function render(store, persona) {
     const fallbackTag = row.personaAdjusted === false
       ? ` <span class="scope-tag">(no rescore for this persona yet — general figure shown)</span>`
       : "";
-    const fitCellHtml = row.fitValue != null
-      ? `<span class="fit-swatch" style="background:${scoreToColor(row.fitValue)}"></span> ${row.fitValue.toFixed(1)}/5${fallbackTag}`
+    // While a purpose view is active, the column shows that criterion's own
+    // score directly — the whole point of §3 is answering "just the visa
+    // question" (etc.) without opening the breakdown row to find the number.
+    const displayValue = STATE.purposeCriterion ? row.purposeScore : row.fitValue;
+    const fitCellHtml = displayValue != null
+      ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${STATE.purposeCriterion ? "" : fallbackTag}`
       : `<span class="fit-swatch" style="background:#e2e2e2"></span> not scored`;
 
     let verdictHtml = "";

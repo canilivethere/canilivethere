@@ -37,10 +37,16 @@ const PERSONA_LABELS = {
   carmen: "Carmen — tighter-budget roamer, $1,300/mo freelance, renting",
 };
 
-// Pre-click explanation of who the three personas are, built from the same
-// blurb strings shown after selection — one true source for persona text,
-// readable before the dropdown is ever touched.
-const PERSONA_INTRO = "Personas you can view the site as: " + Object.values(PERSONA_LABELS).join(" · ");
+// Persona framing (v2 addendum §6): "someone most like
+// you," not a neutral "Viewing as" — each clause reuses the exact income
+// type/budget/stage figures PERSONA_LABELS already states above, just
+// reframed as a self-recognition question instead of a spec sheet. No new
+// persona facts authored here.
+const PERSONA_CLOSEST_IF = {
+  waldo: "Closest to you if: remote income, ~$2,500/mo, buying around $120k",
+  wenda: "Closest to you if: retired on a pension, ~$1,900/mo, buying around $95k",
+  carmen: "Closest to you if: tighter-budget freelance income, ~$1,300/mo, renting rather than buying",
+};
 
 // One canonical name and definition for the site's central number, reused
 // everywhere a reader meets it (map legend, Lists column, location page).
@@ -49,6 +55,21 @@ const PERSONA_INTRO = "Personas you can view the site as: " + Object.values(PERS
 // that travels with it.
 export const FIT_INDEX_DEFINITION =
   "Fit index: a weighted 1–5 average of scored criteria. Higher is better — 5 is the strongest fit, 1 is the weakest.";
+
+// Tooltip voice (v2 addendum §4.1): a fixed four-tier word
+// mapping off the Fit index value, extending the same endpoints
+// FIT_INDEX_DEFINITION already states ("1 poor fit, 5 strong fit") into
+// intermediate bands — a wording rule, same shape as the change-event
+// severity labels, not a new claim about any specific place. Boundaries are
+// lower-bound inclusive (2.0 itself reads as "a stretch", not "a tough
+// fit") — a mechanical tie-break, not a judgment call per location.
+export function fitBandWord(value) {
+  if (value == null || Number.isNaN(value)) return "not yet scored";
+  if (value < 2) return "a tough fit";
+  if (value < 3) return "a stretch";
+  if (value < 4) return "promising";
+  return "a strong fit";
+}
 
 export function renderHeader(activePage) {
   const persona = getPersona();
@@ -62,7 +83,7 @@ export function renderHeader(activePage) {
         <a href="${withPersona("lists.html")}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
       </nav>
       <div class="persona-switch">
-        <label for="persona-select">Viewing as</label>
+        <label for="persona-select">See it as someone most like you:</label>
         <select id="persona-select">
           <option value="">General (unpersonalized)</option>
           <option value="waldo">${escapeHtml(PERSONA_LABELS.waldo)}</option>
@@ -72,12 +93,14 @@ export function renderHeader(activePage) {
       </div>
     </div>
     <p class="persona-blurb" id="persona-blurb"></p>
-    <p class="disclaimer">
-      Information, not advice. Every figure here carries a source, a
-      last-checked date, and a confidence tier — rules change; confirm
-      anything that matters with the relevant embassy, notary, or
-      accountant before acting on it.
-    </p>
+    <details class="recede">
+      <summary>Information, not advice — read what this site is and isn't</summary>
+      <p class="disclaimer recede-body">
+        Every figure here carries a source, a last-checked date, and a
+        confidence tier — rules change; confirm anything that matters with
+        the relevant embassy, notary, or accountant before acting on it.
+      </p>
+    </details>
   `;
   document.body.prepend(header);
 
@@ -86,8 +109,16 @@ export function renderHeader(activePage) {
   const blurb = header.querySelector("#persona-blurb");
   // Always show something here, before and after a persona is picked — the
   // pre-click intro reuses the exact same blurb strings the post-click line
-  // shows, never new persona facts.
-  blurb.textContent = persona ? PERSONA_LABELS[persona] : PERSONA_INTRO;
+  // shows, never new persona facts. Persona framing (§6): each descriptor
+  // carries its own "Closest to you if..." lead-in, built from the same
+  // figures PERSONA_LABELS already states, not new content.
+  if (persona) {
+    blurb.textContent = `${PERSONA_LABELS[persona]} — ${PERSONA_CLOSEST_IF[persona]}`;
+  } else {
+    blurb.textContent =
+      "Personas you can view the site as: " +
+      Object.entries(PERSONA_LABELS).map(([id, label]) => `${label} — ${PERSONA_CLOSEST_IF[id]}`).join(" · ");
+  }
   select.addEventListener("change", () => {
     const params = new URLSearchParams(location.search);
     if (select.value) params.set("persona", select.value);
@@ -144,7 +175,12 @@ export const WEIGHT_CLASS_LABEL = {
   Medium: "weighted normally in the index",
 };
 
-export function confidenceBadge(fact) {
+// `interactive` defaults true (the §5.3.2 pull-affordance shape, for use
+// inside a `.fact-meta` block with a `.source-detail` sibling). The Sources
+// section already dedicates its own real estate to source name/date, so it
+// renders the same badge without the click affordance — `interactive:
+// false` — rather than leaving an inert, do-nothing tab stop there.
+export function confidenceBadge(fact, { interactive = true } = {}) {
   if (fact.value_raw === "[GAP]") {
     return `<span class="badge badge-gap">Not yet researched</span>`;
   }
@@ -163,7 +199,51 @@ export function confidenceBadge(fact) {
     : fact.confidence === "Medium" ? "badge-medium"
     : fact.confidence === "Speculative" ? "badge-speculative"
     : "badge-neutral";
-  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
+  // Pull-not-push (v2 addendum §5.3.2): this badge is the single click/tap
+  // target for "how do we know this" — see sourceDetailHtml() and the
+  // delegated toggle listener below, which expand it to source name/link
+  // and last-checked date in one place, instead of those living as
+  // separate always-visible elements doing half a job each.
+  if (!interactive) return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
+  return `<span class="badge ${cls}" data-toggle-source tabindex="0" role="button" aria-expanded="false" title="How do we know this? Click for source and date.">${escapeHtml(label)}</span>`;
+}
+
+// The expand content for the confidence-badge pull affordance above —
+// source name/link plus last-checked date, the two pieces that used to
+// render as separate, always-visible elements next to the badge.
+export function sourceDetailHtml(fact) {
+  if (fact.value_raw === "[GAP]") return "";
+  const src = fact.source_url
+    ? `<a href="${escapeHtml(fact.source_url)}" target="_blank" rel="noopener">source link</a>`
+    : "Source noted — no link available yet";
+  const parts = [src];
+  if (fact.date) parts.push(`last checked ${escapeHtml(fact.date)}`);
+  return parts.join(" · ");
+}
+
+// Delegated once, here, so every page gets the toggle just by importing
+// this module — no per-page wiring. The detail panel is expected to be the
+// next sibling element (a `.source-detail`) right after the `.fact-meta`
+// block the clicked badge lives in.
+if (typeof document !== "undefined") {
+  const toggleSourceDetail = (badge) => {
+    const metaRow = badge.closest(".fact-meta");
+    const detail = metaRow ? metaRow.nextElementSibling : null;
+    if (!detail || !detail.classList.contains("source-detail")) return;
+    const open = detail.classList.toggle("open");
+    badge.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  document.addEventListener("click", (e) => {
+    const badge = e.target.closest(".fact-meta .badge[data-toggle-source]");
+    if (badge) toggleSourceDetail(badge);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const badge = e.target.closest(".fact-meta .badge[data-toggle-source]");
+    if (!badge) return;
+    e.preventDefault();
+    toggleSourceDetail(badge);
+  });
 }
 
 export function sourceLine(fact) {

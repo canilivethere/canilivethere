@@ -242,6 +242,39 @@ function personaIndex(store, personaId, locationId) {
   };
 }
 
+// Tooltip voice (v2 addendum §4.1): the location's own
+// highest- and lowest-scoring criteria, over whichever values actually feed
+// its index (a persona's own fixture override where one exists, the general
+// scorecard everywhere else) — the exact same substitution personaIndex()
+// already does, just returning the extremes instead of the weighted
+// average. `personaId=null` gives the plain general-index reading. Purely a
+// max/min over numbers that already exist; authors nothing.
+export function topBottomCriteria(store, personaId, locationId) {
+  const perLoc = personaId ? store.fixturesByPersona.get(personaId)?.get(locationId) : null;
+  const scoreRows = store.scoresByLocation.get(locationId);
+  const entries = [];
+  for (const crit of store.criteria) {
+    const fixtureRow = perLoc?.criteria?.get(crit.criterion_id);
+    let val;
+    if (fixtureRow) {
+      val = Number(fixtureRow.expected);
+    } else {
+      const row = scoreRows ? scoreRows.get(crit.criterion_id) : null;
+      if (!row || row.status === "gap" || row.score == null) continue;
+      val = row.score;
+    }
+    entries.push({ criterion_id: crit.criterion_id, name: crit.name, val });
+  }
+  if (!entries.length) return null;
+  let top = entries[0];
+  let bottom = entries[0];
+  for (const e of entries) {
+    if (e.val > top.val) top = e;
+    if (e.val < bottom.val) bottom = e;
+  }
+  return { top, bottom };
+}
+
 // Verdict fixtures (Wenda/Carmen) are freeform prose, e.g.
 // "Near-miss - Rentista ~$2,000 threshold missed by ~5%; ...". The leading
 // clause before the first " - " is extracted MECHANICALLY (a plain string

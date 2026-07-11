@@ -2,7 +2,7 @@ import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual } from "./colors.js";
 import {
   renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
-  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
+  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL, CRITERIA_NOTE,
 } from "./app-shared.js";
 
 renderHeader("lists");
@@ -44,6 +44,7 @@ async function main() {
     ? personaContextLine(store, persona)
     : "Unpersonalized general ranking — the same 12-criterion weighted index shown on the map.";
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
+  document.getElementById("criteria-note").textContent = CRITERIA_NOTE;
 
   renderPurposeSelector(store, persona);
   render(store, persona);

@@ -56,6 +56,14 @@ const PERSONA_CLOSEST_IF = {
 export const FIT_INDEX_DEFINITION =
   "Fit index: a weighted 1–5 average of scored criteria. Higher is better — 5 is the strongest fit, 1 is the weakest.";
 
+// The healthcare-criterion in-progress disclosure (v3 addendum): a static
+// line, not tied to any selection state, telling a reader who goes looking
+// why a 13th criterion isn't in the scored list yet. Retires — together with
+// the "12 scored criteria" wording in lists.js's updatePurposeExplainer() —
+// the moment healthcare ships scored for every location; not permanent copy.
+export const CRITERIA_NOTE =
+  "A 13th criterion — Healthcare quality & access — is being researched but not yet scored; it'll appear here once every location has a score, not before.";
+
 // Shared "is this a keyboard activation" check for click-equivalent
 // keydown handlers (map pins, source-toggle badges) — one definition of
 // what counts as an activation key, reused instead of re-branched per call

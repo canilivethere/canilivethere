@@ -229,6 +229,15 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .purpose-chip.active { background: var(--chip-active-bg); border-color: var(--chip-active-bg); color: #fff; }
 .purpose-more { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
 .purpose-explainer { font-size: 0.82rem; color: var(--muted); margin: 0.35rem 0 0.75rem; }
+/* Same "what's not here yet, and why" treatment as .judgment-note below —
+   a factual scope disclosure, not an error or warning. */
+.criteria-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-left: 3px solid var(--conditional);
+  padding-left: 0.6rem;
+  margin: 0 0 0.75rem;
+}
 
 /* ---------- location page ---------- */
 .loc-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }

@@ -10,3 +10,4 @@
 {"criterion_id":"land-property-access","name":"Land/property access","weight_class":"Medium","kind":"threshold-shaped","display_order":10}
 {"criterion_id":"room-for-others-group-viability","name":"Room for others / group viability","weight_class":"Medium-High","kind":"continuum","display_order":11}
 {"criterion_id":"political-institutional-stability","name":"Political & institutional stability","weight_class":"Medium","kind":"continuum","display_order":12}
+{"criterion_id":"healthcare-quality-access","name":"Healthcare quality & access","weight_class":"Medium","kind":"continuum","display_order":13}

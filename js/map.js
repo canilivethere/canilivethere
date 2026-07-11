@@ -100,7 +100,7 @@ async function main() {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
       const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
-      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
+      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 13 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);

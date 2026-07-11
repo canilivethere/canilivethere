@@ -2,7 +2,7 @@ import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual } from "./colors.js";
 import {
   renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
-  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL, CRITERIA_NOTE,
+  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
 } from "./app-shared.js";
 
 renderHeader("lists");
@@ -42,9 +42,8 @@ async function main() {
 
   document.getElementById("persona-context").textContent = persona
     ? personaContextLine(store, persona)
-    : "Unpersonalized general ranking — the same 12-criterion weighted index shown on the map.";
+    : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.";
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
-  document.getElementById("criteria-note").textContent = CRITERIA_NOTE;
 
   renderPurposeSelector(store, persona);
   render(store, persona);
@@ -53,7 +52,7 @@ async function main() {
 function renderPurposeSelector(store, persona) {
   const el = document.getElementById("purpose-lists");
   const featuredIds = new Set(FEATURED_CRITERIA.map((f) => f.criterion_id));
-  // "All twelve, always reachable" (§3.3): the remaining nine criteria,
+  // "All thirteen, always reachable" (§3.3): the remaining ten criteria,
   // sorted by the schema's own display_order, not re-ordered here.
   const moreCriteria = store.criteria.filter((c) => !featuredIds.has(c.criterion_id));
 
@@ -92,7 +91,7 @@ function renderPurposeSelector(store, persona) {
 function updatePurposeExplainer(store) {
   const el = document.getElementById("purpose-explainer");
   if (!STATE.purposeCriterion) {
-    el.textContent = "Sorted by the blended Fit index — a weighted average across all 12 scored criteria, for every researched location.";
+    el.textContent = "Sorted by the blended Fit index — a weighted average across all 13 scored criteria, for every researched location.";
     return;
   }
   const crit = store.criteriaById.get(STATE.purposeCriterion);

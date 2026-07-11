@@ -57,7 +57,7 @@ function renderPurposeSelector(store, persona) {
   const moreCriteria = store.criteria.filter((c) => !featuredIds.has(c.criterion_id));
 
   const chipHtml = (id, label, active) =>
-    `<button type="button" class="purpose-chip${active ? " active" : ""}" data-purpose="${id || ""}">${escapeHtml(label)}</button>`;
+    `<button type="button" class="btn-chip purpose-chip${active ? " active" : ""}" data-purpose="${id || ""}">${escapeHtml(label)}</button>`;
 
   el.innerHTML =
     chipHtml("", "Blended Fit index", !STATE.purposeCriterion) +
@@ -67,18 +67,19 @@ function renderPurposeSelector(store, persona) {
       ${moreCriteria.map((c) => `<option value="${c.criterion_id}"${STATE.purposeCriterion === c.criterion_id ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
     </select>`;
 
-  el.querySelectorAll(".purpose-chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      STATE.purposeCriterion = btn.dataset.purpose || null;
-      renderPurposeSelector(store, persona);
-      render(store, persona);
-    });
-  });
-  el.querySelector("#purpose-more").addEventListener("change", (e) => {
-    STATE.purposeCriterion = e.target.value || null;
+  // No-op guard: clicking the already-active chip (or re-selecting the
+  // same "More…" option) shouldn't discard and rebuild this whole subtree
+  // and re-render the table for a selection that hasn't actually changed.
+  const setPurpose = (value) => {
+    if (STATE.purposeCriterion === value) return;
+    STATE.purposeCriterion = value;
     renderPurposeSelector(store, persona);
     render(store, persona);
+  };
+  el.querySelectorAll(".purpose-chip").forEach((btn) => {
+    btn.addEventListener("click", () => setPurpose(btn.dataset.purpose || null));
   });
+  el.querySelector("#purpose-more").addEventListener("change", (e) => setPurpose(e.target.value || null));
 
   updatePurposeExplainer(store);
 }
@@ -89,10 +90,8 @@ function renderPurposeSelector(store, persona) {
 // as the confidence/weight_class glosses elsewhere on this site.
 function updatePurposeExplainer(store) {
   const el = document.getElementById("purpose-explainer");
-  const th = document.querySelector('th[data-sort="fit"]');
   if (!STATE.purposeCriterion) {
     el.textContent = "Sorted by the blended Fit index — a weighted average across all 12 scored criteria, for every researched location.";
-    if (th) th.textContent = "Fit index";
     return;
   }
   const crit = store.criteriaById.get(STATE.purposeCriterion);
@@ -101,7 +100,15 @@ function updatePurposeExplainer(store) {
     ? "how comfortably a place clears this, not just a number"
     : "how strong this factor is here";
   el.textContent = `Sorted by ${crit.name} — ${clause}, for every researched location.`;
-  if (th) th.textContent = crit.name;
+}
+
+// The "fit" column header's own label, owned by render()'s th[data-sort]
+// loop below rather than by updatePurposeExplainer() reaching into markup
+// it doesn't own.
+function fitColumnLabel(store) {
+  if (!STATE.purposeCriterion) return "Fit index";
+  const crit = store.criteriaById.get(STATE.purposeCriterion);
+  return crit ? crit.name : "Fit index";
 }
 
 function personaContextLine(store, persona) {
@@ -179,7 +186,7 @@ function render(store, persona) {
   tbody.innerHTML = "";
   for (const row of rows) {
     const tr = document.createElement("tr");
-    const fallbackTag = row.personaAdjusted === false
+    const fallbackTag = row.personaAdjusted === false && !STATE.purposeCriterion
       ? ` <span class="scope-tag">(no rescore for this persona yet — general figure shown)</span>`
       : "";
     // While a purpose view is active, the column shows that criterion's own
@@ -187,8 +194,8 @@ function render(store, persona) {
     // question" (etc.) without opening the breakdown row to find the number.
     const displayValue = STATE.purposeCriterion ? row.purposeScore : row.fitValue;
     const fitCellHtml = displayValue != null
-      ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${STATE.purposeCriterion ? "" : fallbackTag}`
-      : `<span class="fit-swatch" style="background:#e2e2e2"></span> not scored`;
+      ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}`
+      : `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> not scored`;
 
     let verdictHtml = "";
     if (row.verdict) {
@@ -227,6 +234,7 @@ function render(store, persona) {
     const key = th.dataset.sort;
     th.removeAttribute("aria-sort");
     if (STATE.sortKey === key) th.setAttribute("aria-sort", STATE.sortDir === "asc" ? "ascending" : "descending");
+    if (key === "fit") th.textContent = fitColumnLabel(store);
   });
 }
 

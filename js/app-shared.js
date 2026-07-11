@@ -56,6 +56,14 @@ const PERSONA_CLOSEST_IF = {
 export const FIT_INDEX_DEFINITION =
   "Fit index: a weighted 1–5 average of scored criteria. Higher is better — 5 is the strongest fit, 1 is the weakest.";
 
+// Shared "is this a keyboard activation" check for click-equivalent
+// keydown handlers (map pins, source-toggle badges) — one definition of
+// what counts as an activation key, reused instead of re-branched per call
+// site.
+export function isActivationKey(e) {
+  return e.key === "Enter" || e.key === " ";
+}
+
 // Tooltip voice (v2 addendum §4.1): a fixed four-tier word
 // mapping off the Fit index value, extending the same endpoints
 // FIT_INDEX_DEFINITION already states ("1 poor fit, 5 strong fit") into
@@ -238,7 +246,7 @@ if (typeof document !== "undefined") {
     if (badge) toggleSourceDetail(badge);
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
+    if (!isActivationKey(e)) return;
     const badge = e.target.closest(".fact-meta .badge[data-toggle-source]");
     if (!badge) return;
     e.preventDefault();

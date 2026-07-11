@@ -195,6 +195,34 @@ function generalIndex(store, locationId) {
   };
 }
 
+// Shared per-criterion value resolution (fixture override -> scored
+// fallback -> skip gaps): the one walk over store.criteria that both
+// personaIndex() and topBottomCriteria() reduce over — a weighted average
+// for the former, min/max for the latter — instead of each re-implementing
+// the same fixture-lookup loop independently.
+function resolvedCriterionValues(store, personaId, locationId) {
+  const perLoc = personaId ? store.fixturesByPersona.get(personaId)?.get(locationId) : null;
+  const scoreRows = store.scoresByLocation.get(locationId);
+  const entries = [];
+  let gaps = 0;
+  for (const crit of store.criteria) {
+    const fixtureRow = perLoc?.criteria?.get(crit.criterion_id);
+    let val;
+    if (fixtureRow) {
+      val = Number(fixtureRow.expected);
+    } else {
+      const row = scoreRows ? scoreRows.get(crit.criterion_id) : null;
+      if (!row || row.status === "gap" || row.score == null) {
+        gaps++;
+        continue;
+      }
+      val = row.score;
+    }
+    entries.push({ criterion_id: crit.criterion_id, name: crit.name, weight_class: crit.weight_class, val });
+  }
+  return { entries, gaps };
+}
+
 // Waldo has real per-criterion fixture overrides for 4 dynamic criteria
 // (income-viability, infrastructure-connectivity, land-property-access,
 // visa-legal-pathway-ease) — swap those into the general-index computation.
@@ -206,36 +234,25 @@ function personaIndex(store, personaId, locationId) {
   if (!entry || entry.criteria.size === 0) {
     // No numeric override data for this persona (Wenda/Carmen) — fall back
     // to the general index, but the caller MUST label this as general, not
-    // persona-specific (depth-honesty rule).
-    return { ...generalIndex(store, locationId), personaAdjusted: false };
+    // persona-specific (depth-honesty rule). Stay null when there's no
+    // general index either (e.g. no scored criteria yet) rather than
+    // spreading null into a valueless {personaAdjusted:false} object —
+    // callers rely on `idx ? idx.value : ...` to detect "no data".
+    const general = generalIndex(store, locationId);
+    return general ? { ...general, personaAdjusted: false } : null;
   }
-  const rows = store.scoresByLocation.get(locationId);
+  const { entries, gaps } = resolvedCriterionValues(store, personaId, locationId);
   let weightedSum = 0;
   let weightTotal = 0;
-  let gaps = 0;
-  const used = [];
-  for (const crit of store.criteria) {
-    const fixtureRow = entry.criteria.get(crit.criterion_id);
-    let scoreVal;
-    if (fixtureRow) {
-      scoreVal = Number(fixtureRow.expected);
-    } else {
-      const row = rows ? rows.get(crit.criterion_id) : null;
-      if (!row || row.status === "gap" || row.score == null) {
-        gaps++;
-        continue;
-      }
-      scoreVal = row.score;
-    }
-    const w = WEIGHT_NUMERIC[crit.weight_class] || 1;
-    weightedSum += scoreVal * w;
+  for (const e of entries) {
+    const w = WEIGHT_NUMERIC[e.weight_class] || 1;
+    weightedSum += e.val * w;
     weightTotal += w;
-    used.push(crit.criterion_id);
   }
   if (weightTotal === 0) return null;
   return {
     value: weightedSum / weightTotal,
-    criteriaUsed: used.length,
+    criteriaUsed: entries.length,
     criteriaTotal: store.criteria.length,
     gaps,
     personaAdjusted: true,
@@ -250,21 +267,7 @@ function personaIndex(store, personaId, locationId) {
 // average. `personaId=null` gives the plain general-index reading. Purely a
 // max/min over numbers that already exist; authors nothing.
 export function topBottomCriteria(store, personaId, locationId) {
-  const perLoc = personaId ? store.fixturesByPersona.get(personaId)?.get(locationId) : null;
-  const scoreRows = store.scoresByLocation.get(locationId);
-  const entries = [];
-  for (const crit of store.criteria) {
-    const fixtureRow = perLoc?.criteria?.get(crit.criterion_id);
-    let val;
-    if (fixtureRow) {
-      val = Number(fixtureRow.expected);
-    } else {
-      const row = scoreRows ? scoreRows.get(crit.criterion_id) : null;
-      if (!row || row.status === "gap" || row.score == null) continue;
-      val = row.score;
-    }
-    entries.push({ criterion_id: crit.criterion_id, name: crit.name, val });
-  }
+  const { entries } = resolvedCriterionValues(store, personaId, locationId);
   if (!entries.length) return null;
   let top = entries[0];
   let bottom = entries[0];

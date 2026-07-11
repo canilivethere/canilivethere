@@ -54,8 +54,16 @@ async function main() {
     root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || []));
   }
 
-  root.appendChild(buildSourcesSection(facts));
-  root.appendChild(buildVerifyYourself(facts));
+  // Partitioned once here instead of buildSourcesSection() and
+  // buildVerifyYourself() each independently scanning `facts` for the same
+  // value_raw === "[GAP]" condition.
+  const gapFacts = [];
+  const sourcedFacts = [];
+  for (const f of facts) {
+    (f.value_raw === "[GAP]" ? gapFacts : sourcedFacts).push(f);
+  }
+  root.appendChild(buildSourcesSection(sourcedFacts));
+  root.appendChild(buildVerifyYourself(gapFacts));
   root.appendChild(buildNextBest(store, loc, persona));
 }
 
@@ -74,15 +82,14 @@ function scopeTagHtml(fact) {
   return "";
 }
 
-// "What to verify yourself" (v2 addendum §5.4): a mechanical filter over
-// this location's own facts (own + inherited) for value_raw === "[GAP]",
-// listing each gap's own already-existing label — the site's honesty about
-// gaps reframed as the visitor's own to-do list, not a buried absence. Zero
-// new claims: every row here is already published as [GAP] somewhere on
-// the page above.
-function buildVerifyYourself(facts) {
+// "What to verify yourself" (v2 addendum §5.4): this location's own facts
+// (own + inherited) whose value_raw is "[GAP]" (pre-partitioned by the
+// caller, see main()), listing each gap's own already-existing label — the
+// site's honesty about gaps reframed as the visitor's own to-do list, not a
+// buried absence. Zero new claims: every row here is already published as
+// [GAP] somewhere on the page above.
+function buildVerifyYourself(gaps) {
   const div = document.createElement("div");
-  const gaps = facts.filter((f) => f.value_raw === "[GAP]");
   if (!gaps.length) return div;
   div.className = "verify-yourself";
   div.innerHTML = `
@@ -271,12 +278,11 @@ function buildSection(key, facts) {
   return section;
 }
 
-function buildSourcesSection(facts) {
+function buildSourcesSection(sourcedFacts) {
   const section = document.createElement("section");
   section.id = "sec-sources";
   const seen = new Map();
-  for (const f of facts) {
-    if (f.value_raw === "[GAP]") continue;
+  for (const f of sourcedFacts) {
     const key = f.source_url || `onfile:${f.source_ref || f.fact_label}`;
     if (!seen.has(key)) seen.set(key, f);
   }

@@ -18,12 +18,15 @@ const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"]
 // Boring, dependency-light dark-mode detection: the OS/browser's own
 // `prefers-color-scheme`, no toggle UI, no stored preference — the
 // craft standard's "no framework, no build step" extended to theming.
+// The MediaQueryList is cached (not the boolean): a single map render can
+// call this dozens of times, and `.matches` stays live on the cached
+// object, so caching it just skips redundant matchMedia() construction
+// without needing a 'change' listener to stay in sync.
+let _darkMql = null;
 export function prefersDark() {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  if (!_darkMql) _darkMql = window.matchMedia("(prefers-color-scheme: dark)");
+  return _darkMql.matches;
 }
 
 function currentScaleStops() {
@@ -89,11 +92,15 @@ export function eliminatedColor() {
 export const CONDITIONAL_COLOR = "#e07b1a"; // amber/orange, "possible, painfully" — same value both themes
 export const PENDING_COLOR = "#9a9a9a"; // verification-pending gray — same value both themes
 
-// "Clears" needs its own dark-mode value: the light-mode green
-// (#1a7a3c) fails WCAG AA against the dark paper (3.21:1); #319751
-// clears 4.68:1 (v2 addendum §2.3).
+// "Clears" needs its own dark-mode value. clearsColor()'s only consumer is
+// verdictVisual()'s "clear" branch, whose color is always rendered as a
+// .verdict-chip BACKGROUND under hardcoded white text (never as plain text
+// against the paper) — so the dark value must clear AA as a background
+// under white (needs relative luminance <= ~0.183), not just as text
+// against the dark paper. #319751 (~3.7:1 under white) undershoots that;
+// #1d6b3f clears ~6.5:1.
 const CLEARS_LIGHT = "#1a7a3c";
-const CLEARS_DARK = "#319751";
+const CLEARS_DARK = "#1d6b3f";
 export function clearsColor() {
   return prefersDark() ? CLEARS_DARK : CLEARS_LIGHT;
 }

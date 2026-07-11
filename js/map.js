@@ -1,6 +1,6 @@
 import { loadStore, verdictHeadline, topBottomCriteria } from "./data.js";
-import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
-import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION, fitBandWord } from "./app-shared.js";
+import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
+import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION, fitBandWord, isActivationKey } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 
 // CanILiveThere's own country_id doesn't always equal a real ISO code — see
@@ -33,7 +33,7 @@ async function main() {
   const defs = document.createElementNS(svgNS, "defs");
   defs.innerHTML = `
     <pattern id="hatch-eliminated" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
-      <rect width="4" height="4" fill="#3a2a1a" />
+      <rect width="4" height="4" fill="${eliminatedColor()}" />
       <line x1="0" y1="0" x2="0" y2="4" stroke="#f2e6d8" stroke-width="1.4" />
     </pattern>
   `;
@@ -88,7 +88,6 @@ async function main() {
     const country = store.countriesById.get(loc.country_id);
 
     let fill, radius = 6, tooltip, eliminated = false;
-    const general = store.generalIndex(loc.location_id);
 
     // Tooltip voice (v2 addendum §4): a one-line human
     // answer leads every tooltip, built only from data already computed —
@@ -98,13 +97,10 @@ async function main() {
     if (persona === "waldo") {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
-      const tb = topBottomCriteria(store, "waldo", loc.location_id);
-      const band = fitBandWord(idx ? idx.value : null);
-      const headline = tb && tb.top.criterion_id !== tb.bottom.criterion_id
-        ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
-        : `${loc.display_name}, ${country.name} — ${band}.`;
-      tooltip = `${headline}\nWaldo's Fit index: ${idx ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
+      const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
+      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 12 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
     } else if (persona === "wenda" || persona === "carmen") {
+      const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
       const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
       const verdict = perLoc?.verdict;
@@ -133,12 +129,9 @@ async function main() {
         tooltip = `${loc.display_name}, ${country.name} — no verdict fixture on file for this persona yet.`;
       }
     } else {
+      const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
-      const tb = topBottomCriteria(store, null, loc.location_id);
-      const band = fitBandWord(general ? general.value : null);
-      const headline = tb && tb.top.criterion_id !== tb.bottom.criterion_id
-        ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
-        : `${loc.display_name}, ${country.name} — ${band}.`;
+      const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       tooltip = `${headline}\nGeneral Fit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
     }
 
@@ -156,7 +149,7 @@ async function main() {
 
     const go = () => { location.href = withPersona("location.html", { loc: loc.location_id }); };
     circle.addEventListener("click", go);
-    circle.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
     circle.addEventListener("mouseenter", (e) => showTip(e, tooltip));
     circle.addEventListener("focus", (e) => showTip(e, tooltip));
     circle.addEventListener("mouseleave", hideTip);
@@ -190,6 +183,17 @@ async function main() {
 
   renderLegend(document.getElementById("map-legend"), persona);
   renderJudgmentNote(document.getElementById("map-judgment-note"));
+}
+
+// Tooltip voice (v2 addendum §4): the "strength / catch" headline shared
+// by the Waldo and general pin branches — one call into topBottomCriteria/
+// fitBandWord instead of each branch re-deriving the same string.
+function buildFitHeadline(store, personaId, loc, country, value) {
+  const tb = topBottomCriteria(store, personaId, loc.location_id);
+  const band = fitBandWord(value);
+  return tb && tb.top.criterion_id !== tb.bottom.criterion_id
+    ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
+    : `${loc.display_name}, ${country.name} — ${band}.`;
 }
 
 function renderLegend(el, persona) {

@@ -21,6 +21,28 @@
   --eliminated: #3a2a1a;
   --conditional: #e07b1a;
   --focus: #0b5fff;
+  /* Fixed dark chip, not theme-reactive: this floating tooltip always
+     inverts against whatever the page background is, so it must not
+     resolve from --ink (which flips to near-white in dark mode and would
+     put white text on a white chip). */
+  --tooltip-bg: #1b1b1b;
+  --chip-active-bg: #1f6ea3;
+
+  --badge-high-border: #2c7fb8;
+  --badge-high-text: #1a4f73;
+  --badge-high-bg: #eaf3fa;
+  --badge-medium-border: #a1dab4;
+  --badge-medium-text: #2f6b45;
+  --badge-medium-bg: #eef8f0;
+  --badge-speculative-border: #e0b04a;
+  --badge-speculative-text: #7a5c14;
+  --badge-speculative-bg: #fdf3df;
+  --div-match-ink: #2f6b45;
+  --div-match-bg: #eef8f0;
+  --div-diverge-ink: #b02a2a;
+  --div-diverge-bg: #fceaea;
+  --div-unchecked-ink: #b95d00;
+  --div-unchecked-bg: #fdf0e0;
 
   /* Map-specific chrome (v2 addendum §2.4: warm the room, not the water —
      the water stays blue, the unresearched-country fill warms with the
@@ -119,17 +141,17 @@ h3 { font-size: 1.05rem; }
   background: var(--panel);
   white-space: nowrap;
 }
-.badge-high { border-color: #2c7fb8; color: #1a4f73; background: #eaf3fa; }
-.badge-medium { border-color: #a1dab4; color: #2f6b45; background: #eef8f0; }
-.badge-speculative { border-color: #e0b04a; color: #7a5c14; background: #fdf3df; }
+.badge-high { border-color: var(--badge-high-border); color: var(--badge-high-text); background: var(--badge-high-bg); }
+.badge-medium { border-color: var(--badge-medium-border); color: var(--badge-medium-text); background: var(--badge-medium-bg); }
+.badge-speculative { border-color: var(--badge-speculative-border); color: var(--badge-speculative-text); background: var(--badge-speculative-bg); }
 /* No explicit confidence field on the fact — distinct from Speculative,
    which is an earned, explicit tier. Same neutral look as the base .badge
    (repeated explicitly here so the intent reads in the CSS, not just JS). */
 .badge-neutral { border-color: var(--line); color: var(--muted); background: var(--panel); }
 .badge-gap { border-color: var(--gap-ink); color: var(--gap-ink); background: var(--gap-bg); font-style: italic; }
-.div-match { border-color: #2f6b45; color: #2f6b45; background: #eef8f0; }
-.div-diverge { border-color: #b02a2a; color: #b02a2a; background: #fceaea; }
-.div-unchecked { border-color: #b95d00; color: #b95d00; background: #fdf0e0; }
+.div-match { border-color: var(--div-match-ink); color: var(--div-match-ink); background: var(--div-match-bg); }
+.div-diverge { border-color: var(--div-diverge-ink); color: var(--div-diverge-ink); background: var(--div-diverge-bg); }
+.div-unchecked { border-color: var(--div-unchecked-ink); color: var(--div-unchecked-ink); background: var(--div-unchecked-bg); }
 .source-link { font-size: 0.78rem; }
 .source-onfile { font-size: 0.78rem; color: var(--muted); font-style: italic; }
 
@@ -152,7 +174,7 @@ h3 { font-size: 1.05rem; }
 .pin-label-tooltip {
   position: absolute;
   pointer-events: none;
-  background: var(--ink);
+  background: var(--tooltip-bg);
   color: #fff;
   font-size: 0.8rem;
   padding: 0.4rem 0.6rem;
@@ -190,7 +212,8 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .expand-row td { background: var(--panel); }
 .breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
 .breakdown-item { border: 1px solid var(--line); border-radius: 4px; padding: 0.4rem 0.5rem; background: #fff; font-size: 0.85rem; }
-.expand-toggle { background: none; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+.btn-chip { border: 1px solid var(--line); cursor: pointer; }
+.expand-toggle { background: none; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
 .verdict-chip { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; color: #fff; }
 
 /* Purpose-list selector (v2 addendum §3): the "Pick what matters most"
@@ -198,14 +221,12 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .purpose-lists { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.75rem 0; }
 .purpose-chip {
   background: var(--panel);
-  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 0.3rem 0.75rem;
   font-size: 0.85rem;
-  cursor: pointer;
   color: var(--ink);
 }
-.purpose-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.purpose-chip.active { background: var(--chip-active-bg); border-color: var(--chip-active-bg); color: #fff; }
 .purpose-more { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
 .purpose-explainer { font-size: 0.82rem; color: var(--muted); margin: 0.35rem 0 0.75rem; }
 
@@ -270,26 +291,40 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
     --focus: #0b5fff; /* clears the 3:1 non-text/UI-component floor as-is */
     --map-water: #16232b; /* deep, clearly-blue-not-black; distinct from --panel */
     --country-fill: #4a4234;
+
+    /* Chip-on-white-text roles need their own dark-mode value, distinct
+       from --accent's link-text tuning: #5fa8e0 (right for text against
+       --paper) fails AA as a background under hardcoded white chip text. */
+    --chip-active-bg: #2a6f9e;
+
+    /* Text colors below are re-derived against each badge's OWN tinted
+       background (not just the page's dark paper) — a badge's small text
+       (~0.72rem) needs the full 4.5:1 AA floor against whatever it actually
+       sits on, and the first pass here (checked only against --paper-dark)
+       under-shot that once the tinted chip backgrounds were factored in;
+       caught and fixed before shipping, not left at the first plausible
+       value. div-diverge's text/border color (#e5554f) is the addendum's
+       own validated value (§2.3), unchanged — only its background here is
+       darkened enough for that fixed color to clear 4.5:1 against it. */
+    --badge-high-border: #4699d3;
+    --badge-high-text: #4699d3;
+    --badge-high-bg: #1b2b37;
+    --badge-medium-border: #49a66b;
+    --badge-medium-text: #49a66b;
+    --badge-medium-bg: #203226;
+    --badge-speculative-border: #bf901f;
+    --badge-speculative-text: #bf901f;
+    --badge-speculative-bg: #392f19;
+    --div-match-ink: #49a66b;
+    --div-match-bg: #203226;
+    --div-diverge-ink: #e5554f;
+    --div-diverge-bg: #311816;
+    --div-unchecked-ink: #e87400;
+    --div-unchecked-bg: #3f2912;
   }
 
   body { background: var(--paper); }
   .disclaimer { background: #3a2f14; border-color: #a47c1b; color: var(--muted); }
-
-  /* Text colors below are re-derived against each badge's OWN tinted
-     background (not just the page's dark paper) — a badge's small text
-     (~0.72rem) needs the full 4.5:1 AA floor against whatever it actually
-     sits on, and the first pass here (checked only against --paper-dark)
-     under-shot that once the tinted chip backgrounds were factored in;
-     caught and fixed before shipping, not left at the first plausible
-     value. div-diverge's text/border color (#e5554f) is the addendum's
-     own validated value (§2.3), unchanged — only its background here is
-     darkened enough for that fixed color to clear 4.5:1 against it. */
-  .badge-high { border-color: #4699d3; color: #4699d3; background: #1b2b37; }
-  .badge-medium { border-color: #49a66b; color: #49a66b; background: #203226; }
-  .badge-speculative { border-color: #bf901f; color: #bf901f; background: #392f19; }
-  .div-match { border-color: #49a66b; color: #49a66b; background: #203226; }
-  .div-diverge { border-color: #e5554f; color: #e5554f; background: #311816; }
-  .div-unchecked { border-color: #e87400; color: #e87400; background: #3f2912; }
 
   .sev-3 { border-left-color: #bf2e2e; }
   .sev-2 { border-left-color: #a05000; }

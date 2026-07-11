@@ -11,6 +11,8 @@ import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 const PROJECT_COUNTRY_TO_ISO = {
   GT: "GT", CO: "CO", MX: "MX", AR: "AR", PT: "PT",
   BZ: "BZ", MA: "MA", US: "US", TH: "TH", CR: null,
+  AL: "AL", BG: "BG", EC: "EC", EG: "EG", ES: "ES",
+  ID: "ID", IN: "IN", MY: "MY", PY: "PY", VN: "VN", ZA: "ZA",
 };
 
 renderHeader("map");
@@ -224,17 +226,17 @@ function renderJudgmentNote(el) {
     every location's lat/lon is model-recalled public
     geodata (city-/town-center), not independently checked against a live
     gazetteer — fine for placing a pin on a world map, not survey-grade.
-    Same caveat for all 24, uniformly; there's no per-location confidence
-    field in the schema yet to render one differently from another (a
-    real gap, noted for a future data revision).
+    Same caveat for every location, uniformly; there's no per-location
+    confidence field in the schema yet to render one differently from
+    another (a real gap, noted for a future data revision).
     <br><br>
     <strong>Two more honest limits of this first map build:</strong>
     (1) The world outline is a real, licensed simplified political map, but
-    only 10 of the site's countries are shaded — the rest is neutral
-    context, not "no data implied to exist." Crete (CanILiveThere's "CR")
-    is deliberately left unshaded as a country, since its two researched
-    locations are on the island, not the Greek mainland — see pins, not the
-    Greece polygon.
+    only the site's own researched countries are shaded — the rest is
+    neutral context, not "no data implied to exist." Crete (CanILiveThere's
+    "CR") is deliberately left unshaded as a country, since its two
+    researched locations are on the island, not the Greek mainland — see
+    pins, not the Greece polygon.
     (2) Only Wenda's and Carmen's verdict fixtures give a real
     clears/misses read; Waldo's map has no "eliminated" state to show yet,
     because no hard-constraint pass/fail has been computed for him — only

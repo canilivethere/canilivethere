@@ -22,3 +22,17 @@
 {"location_id":"US-asheville","country_id":"US","display_name":"Asheville, NC","status":"Rescored","lat":35.5951,"lon":-82.5515}
 {"location_id":"US-chattanooga","country_id":"US","display_name":"Chattanooga, TN","status":"Rescored","lat":35.0456,"lon":-85.3097}
 {"location_id":"US-rincon","country_id":"US","display_name":"Rincón, Puerto Rico","status":"Rescored","lat":18.3400,"lon":-67.2500}
+{"location_id":"AL-sarande","country_id":"AL","display_name":"Sarandë","status":"Rescored","lat":39.8756,"lon":20.0053}
+{"location_id":"AL-tirana","country_id":"AL","display_name":"Tirana","status":"Rescored","lat":41.3275,"lon":19.8187}
+{"location_id":"BG-bansko","country_id":"BG","display_name":"Bansko","status":"Rescored","lat":41.8375,"lon":23.4886}
+{"location_id":"BG-velikotarnovo","country_id":"BG","display_name":"Veliko Tarnovo","status":"Rescored","lat":43.0757,"lon":25.6172}
+{"location_id":"EC-cuenca","country_id":"EC","display_name":"Cuenca","status":"Rescored","lat":-2.9006,"lon":-79.0045}
+{"location_id":"EG-dahab","country_id":"EG","display_name":"Dahab","status":"Rescored","lat":28.5091,"lon":34.5136}
+{"location_id":"ES-barcelona","country_id":"ES","display_name":"Barcelona","status":"Rescored","lat":41.3874,"lon":2.1686}
+{"location_id":"ES-valencia","country_id":"ES","display_name":"Valencia","status":"Rescored","lat":39.4699,"lon":-0.3763}
+{"location_id":"ID-bali","country_id":"ID","display_name":"Bali (Canggu/Seminyak focus)","status":"Rescored","lat":-8.6478,"lon":115.1385}
+{"location_id":"IN-goa","country_id":"IN","display_name":"Goa (Anjuna-Assagao focus)","status":"Rescored","lat":15.5806,"lon":73.7593}
+{"location_id":"MY-penang","country_id":"MY","display_name":"Penang (George Town focus)","status":"Rescored","lat":5.4141,"lon":100.3288}
+{"location_id":"PY-asuncion","country_id":"PY","display_name":"Asunción","status":"Rescored","lat":-25.2637,"lon":-57.5759}
+{"location_id":"VN-danang","country_id":"VN","display_name":"Da Nang (An Thuong focus)","status":"Rescored","lat":16.0544,"lon":108.2022}
+{"location_id":"ZA-capetown","country_id":"ZA","display_name":"Cape Town","status":"Rescored","lat":-33.9249,"lon":18.4241}

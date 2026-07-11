@@ -8,3 +8,14 @@
 {"country_id":"MA","name":"Morocco","depth":"scored","status":"active"}
 {"country_id":"US","name":"USA","depth":"scored","status":"active"}
 {"country_id":"TH","name":"Thailand","depth":"scored","status":"active"}
+{"country_id":"AL","name":"Albania","depth":"scored","status":"active"}
+{"country_id":"BG","name":"Bulgaria","bloc":"EU","depth":"scored","status":"active"}
+{"country_id":"EC","name":"Ecuador","depth":"scored","status":"active"}
+{"country_id":"EG","name":"Egypt","depth":"scored","status":"active"}
+{"country_id":"ES","name":"Spain","bloc":"EU","depth":"scored","status":"active"}
+{"country_id":"ID","name":"Indonesia","depth":"scored","status":"active"}
+{"country_id":"IN","name":"India","depth":"scored","status":"active"}
+{"country_id":"MY","name":"Malaysia","depth":"scored","status":"active"}
+{"country_id":"PY","name":"Paraguay","depth":"scored","status":"active"}
+{"country_id":"VN","name":"Vietnam","depth":"scored","status":"active"}
+{"country_id":"ZA","name":"South Africa","depth":"scored","status":"active"}

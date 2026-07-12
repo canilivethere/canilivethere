@@ -5,16 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CanILiveThere — where in the world could you actually live?</title>
 <meta name="description" content="An interactive world map of relocation destinations: sourced, dated, confidence-tiered, honest about the downsides.">
+<!-- v4 addendum R2's own "build note, not a hard ruling": applies a
+     returning visitor's stored dark preference before first paint, so
+     there's no light-then-dark flash while js/app-shared.js's module
+     script (deferred by default) loads. Must be a synchronous classic
+     script (not type=module) to run before paint; the "theme"/"dark"
+     literals below intentionally duplicate app-shared.js's THEME_KEY
+     constant — a module import here wouldn't run early enough to help. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <main>
   <h1>Where in the world could you actually live?</h1>
-  <p>
-    Land on the map, switch who you're viewing it as, click a place for the
-    full picture. Unpersonalized default below: a general relocation
-    friendliness index across every researched location. <a href="lists.html">Prefer a sortable list?</a>
-  </p>
+  <p id="map-intro">Click any place for the full picture, or <a href="lists.html">see every location as a sortable list</a>.</p>
+  <p class="fit-def" id="fit-def-caption"></p>
+  <div id="persona-slot"></div>
   <div id="map-root"></div>
   <div class="map-legend" id="map-legend"></div>
   <p class="judgment-note" id="map-judgment-note"></p>

@@ -79,28 +79,96 @@ export function fitBandWord(value) {
   return "a strong fit";
 }
 
-export function renderHeader(activePage) {
-  const persona = getPersona();
-  const header = document.createElement("header");
-  header.className = "site-header";
-  header.innerHTML = `
-    <div class="site-header-row">
-      <a class="brand" href="${withPersona("index.html")}">CanILiveThere</a>
-      <nav class="site-nav">
-        <a href="${withPersona("index.html")}" class="${activePage === "map" ? "active" : ""}">Map</a>
-        <a href="${withPersona("lists.html")}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
-      </nav>
-      <div class="persona-switch">
-        <label for="persona-select">See it as someone most like you:</label>
-        <select id="persona-select">
-          <option value="">General (unpersonalized)</option>
-          <option value="waldo">${escapeHtml(PERSONA_LABELS.waldo)}</option>
-          <option value="wenda">${escapeHtml(PERSONA_LABELS.wenda)}</option>
-          <option value="carmen">${escapeHtml(PERSONA_LABELS.carmen)}</option>
-        </select>
-      </div>
+// ---------------------------------------------------------------------
+// Theme (v4 addendum R2): light default, unconditional, for every visitor
+// regardless of OS — a stored, explicit toggle is the only way to reach
+// dark. Replaces the old bare `prefers-color-scheme` auto-flip (colors.js's
+// former prefersDark(), now isDarkTheme(), reads this same attribute
+// instead of matchMedia). No third "auto" state — ruled out, see the
+// addendum's own reasoning (R2, "Auto (follow-OS)").
+// ---------------------------------------------------------------------
+const THEME_KEY = "theme";
+
+// Must run before renderTopBar() on every page (the addendum's own
+// sequencing rule), so a returning dark-mode visitor's toggle state is set
+// before the top bar (and its button's aria-pressed) render.
+export function applyStoredTheme() {
+  if (localStorage.getItem(THEME_KEY) === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  // Anything else (absent, "light") => default light, no attribute — the
+  // whole point of this ruling: no OS read, ever, as a default.
+}
+
+function toggleTheme() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  if (dark) {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem(THEME_KEY, "light");
+  } else {
+    document.documentElement.setAttribute("data-theme", "dark");
+    localStorage.setItem(THEME_KEY, "dark");
+  }
+  // NOT done here, deliberately: re-recoloring already-rendered inline SVG
+  // pin fills / list fit-swatches (computed once by scoreToColor() at
+  // render time, cached as static attributes/inline styles) to match the
+  // freshly toggled theme. That's the addendum's own explicitly EXCLUDED
+  // "live-recolor no-reload fix" — CSS-variable-driven chrome (paper/ink/
+  // panel/badges/etc.) updates instantly on toggle; map pins and list
+  // swatches catch up on the next full page load/navigation in the
+  // meantime. Flagged here so it reads as a recorded decision, not a bug.
+}
+
+// ---------------------------------------------------------------------
+// Header (v4 addendum R4): split into a top bar (brand/nav/theme toggle,
+// unchanged position — first thing on the page) and a persona block
+// (moved below each page's own H1/orientation — see renderPersonaSlot /
+// renderPersonaBlock below). Replaces the old single renderHeader(), which
+// put the persona ask before the page said what it even does.
+// ---------------------------------------------------------------------
+export function renderTopBar(activePage) {
+  const bar = document.createElement("div");
+  bar.className = "site-topbar";
+  bar.innerHTML = `
+    <a class="brand" href="${withPersona("index.html")}">CanILiveThere</a>
+    <nav class="site-nav">
+      <a href="${withPersona("index.html")}" class="${activePage === "map" ? "active" : ""}">Map</a>
+      <a href="${withPersona("lists.html")}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
+    </nav>
+    <button type="button" id="theme-toggle" aria-pressed="false">Dark mode</button>
+  `;
+  document.body.prepend(bar);
+
+  const btn = bar.querySelector("#theme-toggle");
+  const syncButton = () => {
+    const dark = document.documentElement.dataset.theme === "dark";
+    btn.setAttribute("aria-pressed", dark ? "true" : "false");
+    btn.classList.toggle("active", dark);
+  };
+  syncButton();
+  btn.addEventListener("click", () => {
+    toggleTheme();
+    syncButton();
+  });
+}
+
+// The persona-block + disclaimer markup shared by both placement
+// mechanisms below — one template, not duplicated per page. "General"
+// option copy and the unselected-state blurb are the addendum's own R4
+// strings, verbatim; the selected-state blurb is unchanged from before
+// (still reads clearly, not a failure site — v2 addendum §6).
+function personaSlotInnerHtml() {
+  return `
+    <div class="persona-block">
+      <label for="persona-select">Pick whichever of these three example relocators is closest to you:</label>
+      <select id="persona-select">
+        <option value="">General — see every location's own score, unfiltered</option>
+        <option value="waldo">${escapeHtml(PERSONA_LABELS.waldo)}</option>
+        <option value="wenda">${escapeHtml(PERSONA_LABELS.wenda)}</option>
+        <option value="carmen">${escapeHtml(PERSONA_LABELS.carmen)}</option>
+      </select>
+      <p class="persona-blurb" id="persona-blurb"></p>
     </div>
-    <p class="persona-blurb" id="persona-blurb"></p>
     <details class="recede">
       <summary>Information, not advice — read what this site is and isn't</summary>
       <p class="disclaimer recede-body">
@@ -110,22 +178,21 @@ export function renderHeader(activePage) {
       </p>
     </details>
   `;
-  document.body.prepend(header);
+}
 
-  const select = header.querySelector("#persona-select");
+function wirePersonaSlot(container, persona) {
+  const select = container.querySelector("#persona-select");
   select.value = persona || "";
-  const blurb = header.querySelector("#persona-blurb");
-  // Always show something here, before and after a persona is picked — the
-  // pre-click intro reuses the exact same blurb strings the post-click line
-  // shows, never new persona facts. Persona framing (§6): each descriptor
-  // carries its own "Closest to you if..." lead-in, built from the same
-  // figures PERSONA_LABELS already states, not new content.
+  const blurb = container.querySelector("#persona-blurb");
+  // Default (nothing selected) is now a one-line pointer, not the old
+  // three-descriptor wall — the descriptors already live individually as
+  // the <select>'s own option text, not duplicated a second time (R4
+  // §4.2). Selected-persona state is unchanged (§6's own framing).
   if (persona) {
     blurb.textContent = `${PERSONA_LABELS[persona]} — ${PERSONA_CLOSEST_IF[persona]}`;
   } else {
     blurb.textContent =
-      "Personas you can view the site as: " +
-      Object.entries(PERSONA_LABELS).map(([id, label]) => `${label} — ${PERSONA_CLOSEST_IF[id]}`).join(" · ");
+      "Every score below is shown as-is — pick a name above to see it adjusted for someone in their situation instead.";
   }
   select.addEventListener("change", () => {
     const params = new URLSearchParams(location.search);
@@ -134,6 +201,30 @@ export function renderHeader(activePage) {
     const qs = params.toString();
     location.search = qs ? `?${qs}` : "";
   });
+}
+
+// index.html / lists.html: a static `<div id="persona-slot"></div>`
+// already sits in each page's own HTML, positioned after the H1 — this
+// fills it in place, matching the existing #map-legend/#purpose-lists
+// static-placeholder convention (R4 §4.2) rather than DOM-traversal
+// insertion.
+export function renderPersonaSlot(el, persona) {
+  el.innerHTML = personaSlotInnerHtml();
+  wirePersonaSlot(el, persona);
+}
+
+// location.html: no static H1 exists at parse time (it's built inside
+// location.js's own render, from the location's data) — so no static
+// placeholder id is possible here. Caller passes the just-created <h1>
+// element as the insertion anchor; this builds the block fresh and
+// inserts it immediately after that anchor (R4 §4.3's one named
+// exception to the drop-in-copy shape the other two pages share).
+export function renderPersonaBlock(persona, anchorEl) {
+  const wrap = document.createElement("div");
+  wrap.id = "persona-slot";
+  wrap.innerHTML = personaSlotInnerHtml();
+  anchorEl.insertAdjacentElement("afterend", wrap);
+  wirePersonaSlot(wrap, persona);
 }
 
 export function renderFooter(store) {

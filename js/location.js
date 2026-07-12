@@ -1,12 +1,14 @@
 import { loadStore, sectionForFact, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual } from "./colors.js";
 import {
-  renderHeader, renderFooter, getPersona, withPersona, escapeHtml,
+  applyStoredTheme, renderTopBar, renderPersonaBlock,
+  renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION,
 } from "./app-shared.js";
 
-renderHeader("location");
+applyStoredTheme();
+renderTopBar("location");
 main();
 
 const SECTION_TITLES = {
@@ -36,7 +38,16 @@ async function main() {
   const country = store.countriesById.get(loc.country_id);
   document.title = `${loc.display_name} (${country.name}) — CanILiveThere`;
 
-  root.appendChild(buildHeader(loc, country));
+  const headerDiv = buildHeader(loc, country);
+  root.appendChild(headerDiv);
+  // v4 addendum R4 §4.3: the one branch that isn't a drop-in copy of
+  // index.html/lists.html's static-placeholder shape — this page's H1 is
+  // built dynamically (the location's own name), so there's no pre-parsed
+  // #persona-slot id to target; the just-created H1 is the insertion
+  // anchor instead. This is the site-wide persona SWITCHER; buildPersonaPanel
+  // below is a different, location-specific component (the "does this work
+  // for me" read) — kept distinct on purpose, not merged.
+  renderPersonaBlock(persona, headerDiv.querySelector("h1"));
   root.appendChild(buildPersonaPanel(store, loc, persona));
   root.appendChild(buildScoreBar(store, loc, persona));
   root.appendChild(buildChangeEvents(store, loc, country));

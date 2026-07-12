@@ -5,11 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lists — CanILiveThere</title>
 <meta name="description" content="Sortable rankings of every researched relocation destination, general or persona-switched.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <main>
   <h1>Lists</h1>
+  <div id="persona-slot"></div>
   <p id="persona-context"></p>
   <div class="purpose-lists" id="purpose-lists"></div>
   <p class="purpose-explainer" id="purpose-explainer"></p>

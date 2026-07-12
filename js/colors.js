@@ -15,22 +15,19 @@
 const SCALE_STOPS_LIGHT = ["#c3a774", "#a7833b", "#856214", "#614500", "#402d02"];
 const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"];
 
-// Boring, dependency-light dark-mode detection: the OS/browser's own
-// `prefers-color-scheme`, no toggle UI, no stored preference — the
-// craft standard's "no framework, no build step" extended to theming.
-// The MediaQueryList is cached (not the boolean): a single map render can
-// call this dozens of times, and `.matches` stays live on the cached
-// object, so caching it just skips redundant matchMedia() construction
-// without needing a 'change' listener to stay in sync.
-let _darkMql = null;
-export function prefersDark() {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  if (!_darkMql) _darkMql = window.matchMedia("(prefers-color-scheme: dark)");
-  return _darkMql.matches;
+// Theme detection (v4 addendum R2): reads the `data-theme` attribute
+// app-shared.js's applyStoredTheme()/toggleTheme() set on <html>, not the
+// OS/browser's `prefers-color-scheme` — light is the unconditional
+// default, dark only via an explicit, persisted toggle. Formerly
+// prefersDark() (a cached MediaQueryList read); renamed, same call-site
+// contract (every caller below is unchanged), no OS read left anywhere.
+export function isDarkTheme() {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.dataset.theme === "dark";
 }
 
 function currentScaleStops() {
-  return prefersDark() ? SCALE_STOPS_DARK : SCALE_STOPS_LIGHT;
+  return isDarkTheme() ? SCALE_STOPS_DARK : SCALE_STOPS_LIGHT;
 }
 
 function hexToRgb(hex) {
@@ -54,7 +51,7 @@ export function scoreToColor(value) {
   // patch (a builder color choice, not run through the palette
   // validator — same class of minor, unspecced fill decision as the
   // map's own dark water tone, see the v2 addendum §2.4).
-  if (value == null || Number.isNaN(value)) return prefersDark() ? "#4a4640" : "#e2e2e2";
+  if (value == null || Number.isNaN(value)) return isDarkTheme() ? "#4a4640" : "#e2e2e2";
   const stops = currentScaleStops();
   const clamped = Math.max(1, Math.min(5, value));
   const pos = clamped - 1; // 0..4
@@ -87,7 +84,7 @@ export const ELIMINATED_FILL = "url(#hatch-eliminated)";
 export const ELIMINATED_STROKE = "#3a2a1a";
 const ELIMINATED_STROKE_DARK = "#846546"; // v2 addendum §2.3, 3.24:1 vs dark paper, non-text floor
 export function eliminatedColor() {
-  return prefersDark() ? ELIMINATED_STROKE_DARK : ELIMINATED_STROKE;
+  return isDarkTheme() ? ELIMINATED_STROKE_DARK : ELIMINATED_STROKE;
 }
 export const CONDITIONAL_COLOR = "#e07b1a"; // amber/orange, "possible, painfully" — same value both themes
 export const PENDING_COLOR = "#9a9a9a"; // verification-pending gray — same value both themes
@@ -102,7 +99,7 @@ export const PENDING_COLOR = "#9a9a9a"; // verification-pending gray — same va
 const CLEARS_LIGHT = "#1a7a3c";
 const CLEARS_DARK = "#1d6b3f";
 export function clearsColor() {
-  return prefersDark() ? CLEARS_DARK : CLEARS_LIGHT;
+  return isDarkTheme() ? CLEARS_DARK : CLEARS_LIGHT;
 }
 
 // Wenda/Carmen verdict-headline -> visual treatment. Mechanical keyword

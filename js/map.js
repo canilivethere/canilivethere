@@ -1,6 +1,10 @@
 import { loadStore, verdictHeadline, topBottomCriteria } from "./data.js";
 import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
-import { renderHeader, renderFooter, getPersona, withPersona, escapeHtml, FIT_INDEX_DEFINITION, fitBandWord, isActivationKey } from "./app-shared.js";
+import {
+  applyStoredTheme, renderTopBar, renderPersonaSlot,
+  renderFooter, getPersona, withPersona, escapeHtml,
+  FIT_INDEX_DEFINITION, fitBandWord, isActivationKey,
+} from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 
 // CanILiveThere's own country_id doesn't always equal a real ISO code — see
@@ -15,12 +19,15 @@ const PROJECT_COUNTRY_TO_ISO = {
   ID: "ID", IN: "IN", MY: "MY", PY: "PY", VN: "VN", ZA: "ZA",
 };
 
-renderHeader("map");
+applyStoredTheme();
+renderTopBar("map");
+renderPersonaSlot(document.getElementById("persona-slot"), getPersona());
 main();
 
 async function main() {
   const store = await loadStore();
   renderFooter(store);
+  document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
 
   const root = document.getElementById("map-root");
   const persona = getPersona();
@@ -89,7 +96,9 @@ async function main() {
     const cy = PROJECTION.y(loc.lat);
     const country = store.countriesById.get(loc.country_id);
 
-    let fill, radius = 6, tooltip, eliminated = false;
+    // v4 addendum R3 §3.4: radius 6 -> 7, a small proportional bump — the
+    // halo ring itself is CSS-only (.location-pin's stroke, style.css).
+    let fill, radius = 7, tooltip, eliminated = false;
 
     // Tooltip voice (v2 addendum §4): a one-line human
     // answer leads every tooltip, built only from data already computed —

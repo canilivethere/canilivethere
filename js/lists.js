@@ -343,12 +343,15 @@ function renderRow(store, row, persona, tbody) {
   // real place tourist facts already live (the flat visa section) — only
   // when a persona is locked, uniform across every band (not only
   // negative ones).
+  // v7 no-JS fallback: link to the prerendered l/<id>.html page, not
+  // location.html?loc=<id> — real static content exists there for
+  // crawlers/no-JS visitors (tools/prerender-locations.mjs).
   const visitLink = persona
-    ? `<a class="visit-link" href="${withPersona("location.html", { loc: row.loc.location_id })}#sec-visa">Just visiting instead?</a>`
+    ? `<a class="visit-link" href="${withPersona(`/l/${row.loc.location_id}.html`)}#sec-visa">Just visiting instead?</a>`
     : "";
 
   tr.innerHTML = `
-    <td><a href="${withPersona("location.html", { loc: row.loc.location_id })}">${escapeHtml(row.loc.display_name)}</a></td>
+    <td><a href="${withPersona(`/l/${row.loc.location_id}.html`)}">${escapeHtml(row.loc.display_name)}</a></td>
     <td>${escapeHtml(row.country.name)}</td>
     <td class="rank-fit-cell">${fitCellHtml}</td>
     <td>${verdictHtml}${visitLink}</td>

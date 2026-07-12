@@ -1,9 +1,9 @@
-import { loadStore, verdictHeadline, topBottomCriteria } from "./data.js";
+import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
-  FIT_INDEX_DEFINITION, fitBandWord, isActivationKey,
+  FIT_INDEX_DEFINITION, buildFitHeadline, isActivationKey,
   BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
@@ -129,10 +129,11 @@ async function main() {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
       const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
-      // v6 plain-language pass, item 2: "fixtures"/"scorecard" (dev/vault
-      // terms) drop; "recalculated for Waldo"/"use the general score" name
-      // the same fact in reader-facing words.
-      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 13 criteria are recalculated for Waldo; the rest use the general score)`;
+      // v7 Part 4: the "(4 of 13 criteria are recalculated...)" mechanism
+      // parenthetical is cut — it lives in full on the location page's
+      // verdict block now, one click away (law 1), not required reading
+      // on every hover.
+      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5`;
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
@@ -161,15 +162,27 @@ async function main() {
         // subject-verb disagreement would trade one readability problem for
         // another on a page this project's own craft standard holds to
         // plain, correct language.
-        const indexLabel = hasCriterionFixtures
-          ? `${displayName}'s own re-scored Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`
-          : `General Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona hasn't been checked yet, so this is the general number.`;
+        // v7 Part 4: both mechanism clauses ("criterion-level rescoring
+        // hasn't been checked yet..." / "own re-scored fixture") are cut
+        // to just the number — the "why does this number look like that"
+        // answer already lives on the location page's verdict block and
+        // score-breakdown chapter, one click away (law 1).
+        const indexLabel = `Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`;
         // §4.2: the fixture's own already-computed verdictHeadline() string,
         // unchanged — no new text authored, a render-surface change only.
         // v6 plain-language pass, item 4: "visa/elimination read" ->
         // "visa check" — drops "elimination" and "read"-as-noun.
         const headline = `${loc.display_name}, ${country.name} — ${vHeadline}.`;
-        tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})`;
+        // v5 §3.2 no-bare-no, folded into this cycle (v7 §7.2): for the
+        // one hard-no class (eliminated), append the fixed instead-line —
+        // the pin click-through is unchanged, this just names why
+        // clicking through is still worth it. Amber (typetrap/nearmiss)
+        // verdicts are conditional, not hard nos, so they get no added
+        // line — one wouldn't misstate a narrower option as a refusal.
+        const insteadLine = visual.kind === "eliminated"
+          ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
+          : "";
+        tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})${insteadLine}`;
       } else {
         // v6 plain-language pass, item 3: "no verdict fixture on file for
         // this persona yet" -> "not checked yet for this persona" — the
@@ -177,11 +190,28 @@ async function main() {
         // fourth phrasing for the same state.
         tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
+    } else if (persona) {
+      // v7 §7.1 item 2: the five newly-widened personas (Adira, Noa,
+      // Marek, Marguerite, Teo) have no fixture data yet — previously
+      // this fell into the plain "else" branch below and silently
+      // behaved as if no persona were selected at all. Now it gets the
+      // general fill (nothing else to color by) plus the same canonical
+      // "not checked yet for this persona" line the Wenda/Carmen
+      // no-verdict branch above already uses (BAND_LABEL["not-checked"]
+      // in that string's own wording) — zero new copy, reused in a spot
+      // it didn't reach before.
+      const general = store.generalIndex(loc.location_id);
+      fill = scoreToColor(general ? general.value : null);
+      tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
     } else {
       const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
       const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
-      tooltip = `${headline}\nGeneral Fit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}${general ? ` (weighted average of ${general.criteriaUsed}/${general.criteriaTotal} scored criteria)` : ""}`;
+      // v7 Part 4: the "(weighted average of N/13 scored criteria)"
+      // parenthetical is cut — mechanism detail, not the hook; it still
+      // lives in full on the location page's verdict block and score-
+      // breakdown chapter (one click away, law 1).
+      tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
     }
 
     const circle = document.createElementNS(svgNS, "circle");
@@ -196,7 +226,12 @@ async function main() {
     circle.dataset.tooltip = tooltip;
     circle.dataset.loc = loc.location_id;
 
-    const go = () => { location.href = withPersona("location.html", { loc: loc.location_id }); };
+    // v7 no-JS fallback: pin click-through now targets the prerendered
+    // per-location page (l/<id>.html), not location.html?loc=<id> — real,
+    // crawlable static content exists at that URL (see
+    // tools/prerender-locations.mjs); the query-string route still works
+    // as a legacy fallback (location.js reads both).
+    const go = () => { location.href = withPersona(`/l/${loc.location_id}.html`); };
     circle.addEventListener("click", go);
     circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
     circle.addEventListener("mouseenter", (e) => showTip(e, tooltip));
@@ -325,17 +360,6 @@ function renderOrmenLange(svg, svgNS) {
   svg.appendChild(g);
 }
 
-// Tooltip voice (v2 addendum §4): the "strength / catch" headline shared
-// by the Waldo and general pin branches — one call into topBottomCriteria/
-// fitBandWord instead of each branch re-deriving the same string.
-function buildFitHeadline(store, personaId, loc, country, value) {
-  const tb = topBottomCriteria(store, personaId, loc.location_id);
-  const band = fitBandWord(value);
-  return tb && tb.top.criterion_id !== tb.bottom.criterion_id
-    ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
-    : `${loc.display_name}, ${country.name} — ${band}.`;
-}
-
 // v6 addendum R2's color-for-band lookup for the persona legend — the
 // hatch-demo swatch (doesn't-clear/eliminated) is a distinct markup shape
 // from the plain color swatches, so it's branched below rather than
@@ -384,15 +408,18 @@ function renderLegend(el, persona) {
 }
 
 function renderJudgmentNote(el) {
-  // v6 Amendment 1, §A1: plain-language rewrite of the coordinate-
-  // confidence note — drops "model-recalled public geodata," "gazetteer,"
-  // "survey-grade," "schema" (dev/vault vocabulary a stranger reading this
-  // page has no reason to know). Same claim, same "every location gets the
-  // same treatment" honesty, no new fact asserted.
+  // v7 §4.1: re-ruling, ground-truthed — v1 §2.2.1 asked for this to
+  // recede behind a <details>, but it was never actually built that way;
+  // index.html now wraps this element in <details class="recede"> with
+  // the six-word summary ("Pin locations are approximate") as the one
+  // small findable line law 6 asks for. The lead sentence that used to
+  // open this element's own innerHTML moves to that <summary> (in
+  // index.html, not authored twice) — this function now fills only the
+  // body: the two longer caveats, unchanged in wording, one click away.
   el.innerHTML = `
-    <strong>Pin locations are approximate</strong> — good enough to place a
-    dot on the map, not for door-to-door navigation. Every location gets
-    the same treatment; more precision may come later.
+    Good enough to place a dot on the map, not for door-to-door
+    navigation. Every location gets the same treatment; more precision
+    may come later.
     <br><br>
     <strong>Two more honest limits of this first map build:</strong>
     (1) The world outline is a real, licensed simplified political map, but

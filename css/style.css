@@ -18,7 +18,11 @@
   --accent: #1f6ea3;
   --gap-bg: #e9e2d2;
   --gap-ink: #635c50;
-  --eliminated: #3a2a1a;
+  /* v6 addendum §2.2: aubergine, brown retired (was #3a2a1a) — clears
+     10.9-16.3:1 against all three map surfaces, ΔE 27.2 from the ramp's
+     own weakest stop (#330063) — same dark violet-purple family, staying
+     distinct (reviewed as a "coherence check, met"). */
+  --eliminated: #370036;
   --conditional: #e07b1a;
   --focus: #0b5fff;
   /* Fixed dark chip, not theme-reactive: this floating tooltip always
@@ -55,6 +59,15 @@
      addendum asked for — unchanged). */
   --map-water: #e7f4f5;
   --country-fill: #d6cdb8;
+  /* v6 addendum R3 §3.1: sand-tone, thinner, translucent — retires the
+     hardcoded #ffffff "municipal overlay" white grid flagged in review
+     ("less of these straight lines... an exciting map, not a municipal
+     overlay"). VALIDATED: 2.07:1 against the landmass (soft, visible, no
+     crisp white line), 2.90:1 where borders meet water. No dark-mode
+     override defined here — out of scope this pass, not validated against
+     the dark landmass fill; carries over as-is until a future pass checks
+     it (named, not silently assumed fine). */
+  --country-border: #a58a66;
 }
 
 * { box-sizing: border-box; }
@@ -189,7 +202,13 @@ h3 { font-size: 1.05rem; }
    the choropleth (researched-country fills included, set inline by map.js)
    reads as flatter/quieter background context; pins keep full contrast so
    they draw the eye first regardless of paint order. */
-.country-path { fill: var(--country-fill); stroke: #ffffff; stroke-width: 0.4; opacity: 0.68; }
+/* v6 addendum R3 §3.1: --country-border (sand-tone) replaces the hardcoded
+   white stroke; thinner (0.4 -> 0.25) and translucent (new stroke-opacity)
+   on top of a color that already clears contrast alone. --line was
+   checked and rejected for this role (1.08:1 against the landmass,
+   functionally invisible) — right for paper hairlines, not warm-on-warm
+   map fill. */
+.country-path { fill: var(--country-fill); stroke: var(--country-border); stroke-width: 0.25; stroke-opacity: 0.65; opacity: 0.68; }
 /* v4 addendum R3 §3.4: friendlier, not new geometry — radius bumped in
    map.js (6 -> 7); the halo ring here uses the theme's own --paper token
    (not a hardcoded white) so it reads correctly in both themes without a
@@ -217,10 +236,21 @@ h3 { font-size: 1.05rem; }
   display: none;
 }
 .map-legend { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 0.75rem; font-size: 0.85rem; }
-.legend-scale { display: flex; align-items: center; gap: 2px; }
+.legend-scale { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+/* v6 addendum R2 §2.3: one named step (swatch + name) per ramp stop,
+   replacing the old unlabeled swatch strip (.legend-swatch alone, still
+   used bare by the persona legend items below). */
+.legend-step { display: inline-flex; align-items: center; gap: 0.3rem; }
 .legend-swatch { width: 18px; height: 14px; display: inline-block; border: 1px solid var(--line); }
 .legend-item { display: flex; align-items: center; gap: 0.35rem; }
 .legend-hatch-demo { width: 18px; height: 14px; display: inline-block; border: 1px solid var(--eliminated); background: repeating-linear-gradient(45deg, var(--eliminated), var(--eliminated) 2px, #fff 2px, #fff 5px); }
+
+/* v6 addendum R4: Ormen Lange — monochrome border-ink line-art, never a
+   click/focus target (non-interactive by construction, see map.js's own
+   comment; pointer-events:none lives here, not inline, per this file's
+   convention). */
+.ormen-lange { pointer-events: none; }
+.ormen-lange path { fill: none; stroke: var(--country-border); stroke-opacity: 0.55; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
 
 .judgment-note {
   font-size: 0.8rem;
@@ -336,7 +366,10 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
     --accent: #5fa8e0;
     --gap-bg: #2c2c28;
     --gap-ink: #a39c8c;
-    --eliminated: #846546;
+    /* v6 addendum §2.2: aubergine (was #846546, brown) — clears 3.19:1
+       against dark paper, matching brown's old floor. See colors.js's own
+       ELIMINATED_STROKE_DARK comment for the full coherence caveat. */
+    --eliminated: #984f92;
     --conditional: #e07b1a; /* already clears dark, no separate value needed */
     --focus: #0b5fff; /* clears the 3:1 non-text/UI-component floor as-is */
     --map-water: #16232b; /* deep, clearly-blue-not-black; distinct from --panel */

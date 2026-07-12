@@ -4,8 +4,16 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, fitBandWord, isActivationKey,
+  BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
+
+// v6 addendum R1/R4: one shared radius/halo pair, read by both the pin loop
+// below (the actual rendered circle) and computeMapViewBox() (the padding
+// floor) — a single source so the two can never silently drift apart the
+// way the spec's own "7+2=9" arithmetic assumes they won't.
+const PIN_RADIUS = 7;
+const PIN_HALO = 2;
 
 // CanILiveThere's own country_id doesn't always equal a real ISO code — see
 // worldmap-data.js's header comment. CR (Crete, an island region of Greece)
@@ -35,7 +43,10 @@ async function main() {
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("id", "worldmap");
-  svg.setAttribute("viewBox", WORLD_VIEWBOX);
+  // v6 addendum R1: framed to the pin extent, not the whole world — see
+  // computeMapViewBox() below. #worldmap keeps height:auto (style.css), no
+  // aspect forced here, so the box's own shape drives the rendered ratio.
+  svg.setAttribute("viewBox", computeMapViewBox(store));
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", "World map, location pins colored by relocation fit");
 
@@ -85,6 +96,13 @@ async function main() {
     svg.appendChild(path);
   }
 
+  // v6 addendum R4: the site's first pure ornament — Ormen Lange, open
+  // North Atlantic, ahead of the pin layer so a pin can never render under
+  // it even though their coordinates don't collide today. Not an input to
+  // computeMapViewBox() above (ornament, not a location) and not part of
+  // the persona-branch loop below (never interactive, never re-colored).
+  renderOrmenLange(svg, svgNS);
+
   // Pin layer: exact per-location placement (real lat/lon), colored/marked
   // by fit. This is the layer that actually carries persona/elimination
   // meaning, since only Wenda/Carmen's verdict fixtures give us a real
@@ -98,7 +116,9 @@ async function main() {
 
     // v4 addendum R3 §3.4: radius 6 -> 7, a small proportional bump — the
     // halo ring itself is CSS-only (.location-pin's stroke, style.css).
-    let fill, radius = 7, tooltip, eliminated = false;
+    // PIN_RADIUS is the same constant computeMapViewBox() pads against
+    // above, so the two can't silently drift apart.
+    let fill, radius = PIN_RADIUS, tooltip, eliminated = false;
 
     // Tooltip voice (v2 addendum §4): a one-line human
     // answer leads every tooltip, built only from data already computed —
@@ -109,7 +129,10 @@ async function main() {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
       const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
-      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 13 criteria are his own re-scored fixtures; the rest are the general scorecard)`;
+      // v6 plain-language pass, item 2: "fixtures"/"scorecard" (dev/vault
+      // terms) drop; "recalculated for Waldo"/"use the general score" name
+      // the same fact in reader-facing words.
+      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5 (4 of 13 criteria are recalculated for Waldo; the rest use the general score)`;
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
@@ -129,15 +152,30 @@ async function main() {
         const visual = verdictVisual(vHeadline);
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
+        // v6 plain-language pass, item 5: "verification pending, not yet
+        // done" retired — it collided with the unrelated confidence tier
+        // "Unverified" (v1 §3.3's already-named collision class). One word
+        // flagged as a deliberate, non-silent deviation from the addendum's
+        // own quoted fragment: "hasn't" not "haven't" — the subject here
+        // ("criterion-level rescoring") is singular, and shipping a
+        // subject-verb disagreement would trade one readability problem for
+        // another on a page this project's own craft standard holds to
+        // plain, correct language.
         const indexLabel = hasCriterionFixtures
           ? `${displayName}'s own re-scored Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`
-          : `General Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona is verification pending, not yet done.`;
+          : `General Fit index shown underneath: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — criterion-level rescoring for this persona hasn't been checked yet, so this is the general number.`;
         // §4.2: the fixture's own already-computed verdictHeadline() string,
         // unchanged — no new text authored, a render-surface change only.
+        // v6 plain-language pass, item 4: "visa/elimination read" ->
+        // "visa check" — drops "elimination" and "read"-as-noun.
         const headline = `${loc.display_name}, ${country.name} — ${vHeadline}.`;
-        tooltip = `${headline}\n${displayName}'s visa/elimination read: ${verdict.expected}\n(${indexLabel})`;
+        tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})`;
       } else {
-        tooltip = `${loc.display_name}, ${country.name} — no verdict fixture on file for this persona yet.`;
+        // v6 plain-language pass, item 3: "no verdict fixture on file for
+        // this persona yet" -> "not checked yet for this persona" — the
+        // canonical band word (v4 §1.2 / BAND_LABEL["not-checked"]), not a
+        // fourth phrasing for the same state.
+        tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
     } else {
       const general = store.generalIndex(loc.location_id);
@@ -196,6 +234,97 @@ async function main() {
   renderJudgmentNote(document.getElementById("map-judgment-note"));
 }
 
+// v6 addendum R1: the map's viewBox, framed to the current pin extent
+// instead of the whole world — a touch more within reach, no
+// Greenland/North Pole dead space above the northernmost real candidate.
+// Reads the FULL 38-location set every call, unfiltered by persona, so the
+// crop never shifts on a persona pick (§R1.1) — and this is also the
+// literal mechanism by which a future Longyearbyen pin (~78N) widens the
+// frame on its own next render, no code change beyond the new location
+// row (the addendum's own "waiting is free" claim).
+function computeMapViewBox(store) {
+  const pts = store.locations
+    .filter((l) => l.lat != null && l.lon != null)
+    .map((l) => ({ x: PROJECTION.x(l.lon), y: PROJECTION.y(l.lat) }));
+  // Degenerate fallback only — never expected with real data (38/38
+  // locations carry lat/lon today), but a bare crash on an empty set would
+  // be worse than falling back to the full world.
+  if (!pts.length) return WORLD_VIEWBOX;
+
+  const minX = Math.min(...pts.map((p) => p.x));
+  const maxX = Math.max(...pts.map((p) => p.x));
+  const minY = Math.min(...pts.map((p) => p.y));
+  const maxY = Math.max(...pts.map((p) => p.y));
+
+  // §R1.3: pad every edge by at least the largest pin's radius+halo x 3
+  // (pins never sit flush to the edge) PLUS a term proportional to the
+  // box's own span, so a small future cluster still gets breathing room —
+  // the spec leaves the exact percentage to builder judgment. 6% chosen:
+  // generous enough that a tight regional cluster (e.g. today's Guatemala
+  // pair) doesn't feel cropped, small enough that it doesn't reintroduce
+  // real dead space at the box's current ~519x209-unit size. Additive, not
+  // a max() with the fixed floor — "at least X plus Y" read as both terms
+  // always applying, not one superseding the other.
+  const FIXED_PAD = (PIN_RADIUS + PIN_HALO) * 3;
+  const PROPORTIONAL_PAD_PCT = 0.06;
+  const spanX = maxX - minX, spanY = maxY - minY;
+  const padX = FIXED_PAD + spanX * PROPORTIONAL_PAD_PCT;
+  const padY = FIXED_PAD + spanY * PROPORTIONAL_PAD_PCT;
+
+  let boxMinX = minX - padX, boxMaxX = maxX + padX;
+  let boxMinY = minY - padY, boxMaxY = maxY + padY;
+
+  // §R1.4: clamp to WORLD_VIEWBOX — always a strict subset, never wider
+  // than the world the underlying map asset actually draws.
+  const [wx, wy, ww, wh] = WORLD_VIEWBOX.split(/\s+/).map(Number);
+  const worldMinX = wx, worldMaxX = wx + ww, worldMinY = wy, worldMaxY = wy + wh;
+  boxMinX = Math.max(worldMinX, boxMinX);
+  boxMinY = Math.max(worldMinY, boxMinY);
+  boxMaxX = Math.min(worldMaxX, boxMaxX);
+  boxMaxY = Math.min(worldMaxY, boxMaxY);
+
+  return `${boxMinX} ${boxMinY} ${boxMaxX - boxMinX} ${boxMaxY - boxMinY}`;
+}
+
+// v6 addendum R4: Ormen Lange — the site's first pure ornament, asserting
+// no fact, citing no source, carrying no confidence tier (exempt from
+// the why/instead render contract by construction, since that contract
+// governs hard verdicts and this ship claims nothing). Reviewed and
+// cleared as non-blocking: "a rounder
+// hull, no visible shields" — a voyaging silhouette, not the historical
+// warship's dragon-prow/shield-rack read, since this flock carries spirits
+// specifically fleeing armed conflict.
+function renderOrmenLange(svg, svgNS) {
+  const g = document.createElementNS(svgNS, "g");
+  g.setAttribute("class", "ormen-lange");
+  // aria-hidden, no role/tabindex, no <title>/data-tooltip, no fill — pure
+  // decoration per the render contract; pointer-events:none lives in CSS
+  // (style.css), not inline, matching this file's own styling convention.
+  g.setAttribute("aria-hidden", "true");
+
+  // Placement: open North Atlantic, west of the Iberian pin cluster, south
+  // of the British Isles — no coastline crossing at this resolution, and
+  // inside R1's post-crop viewBox for the current pin set (verified:
+  // computeMapViewBox() above returns roughly x:[118,721] y:[390,653] for
+  // today's 38 locations; this point sits well inside both ranges).
+  const cx = PROJECTION.x(-20);
+  const cy = PROJECTION.y(45);
+
+  // Line-art longship, drawn in a local 0..40 x 0..20 box then centered on
+  // (cx, cy) via translate — hull (closed outline, stroked not filled),
+  // one mast, one short yard; no dragon head, no shield rack.
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("d",
+    "M2,14 Q4,18 11,16.5 Q20,18.5 29,16.5 Q36,18 38,14 " +
+    "Q35,11.5 29,12.5 Q20,10.5 11,12.5 Q4,11.5 2,14 Z " +
+    "M20,12.5 L20,2 M14,5 L26,5"
+  );
+  path.setAttribute("fill", "none");
+  g.appendChild(path);
+  g.setAttribute("transform", `translate(${cx - 20}, ${cy - 10})`);
+  svg.appendChild(g);
+}
+
 // Tooltip voice (v2 addendum §4): the "strength / catch" headline shared
 // by the Waldo and general pin branches — one call into topBottomCriteria/
 // fitBandWord instead of each branch re-deriving the same string.
@@ -207,37 +336,63 @@ function buildFitHeadline(store, personaId, loc, country, value) {
     : `${loc.display_name}, ${country.name} — ${band}.`;
 }
 
+// v6 addendum R2's color-for-band lookup for the persona legend — the
+// hatch-demo swatch (doesn't-clear/eliminated) is a distinct markup shape
+// from the plain color swatches, so it's branched below rather than
+// forced into this map.
+const BAND_LEGEND_COLOR = {
+  clears: () => clearsColor(),
+  "near-miss": () => CONDITIONAL_COLOR,
+  "not-checked": () => PENDING_COLOR,
+};
+
 function renderLegend(el, persona) {
   // Re-read the theme-appropriate ramp/colors at render time (not cached),
   // so this legend is always correct for the current light/dark mode.
+  //
+  // v6 addendum §2.3: five named, ordinally-labeled steps replace the old
+  // unlabeled swatch strip — each stop gets its own `.legend-step` (swatch
+  // + name); in dark mode getScaleLegend() withholds `name` (see that
+  // function's own comment), so the step renders swatch-only there rather
+  // than a wrong color word.
   const scaleHtml = getScaleLegend().map(
-    (s) => `<span class="legend-swatch" style="background:${s.color}"></span>`
+    (s) => `<span class="legend-step"><span class="legend-swatch" style="background:${s.color}"></span>${s.name ? ` ${escapeHtml(s.name)}` : ""}</span>`
   ).join("");
   let extra = "";
   if (persona === "wenda" || persona === "carmen") {
-    extra = `
-      <span class="legend-item"><span class="legend-swatch" style="background:${clearsColor()}"></span> Clears</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:${CONDITIONAL_COLOR}"></span> Near-miss / type-trap</span>
-      <span class="legend-item"><span class="legend-hatch-demo"></span> Misses / categorical absence</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:${PENDING_COLOR}"></span> Unverified</span>
-    `;
+    // v6 plain-language pass, item 1: "Near-miss / type-trap" and
+    // "Misses / categorical absence" were internal vocabulary leaking to a
+    // reader — reusing the shipped BAND_LABEL registry (app-shared.js,
+    // moved here from lists.js by this same addendum) retires both and
+    // keeps this legend's words identical to the Lists page's own group
+    // headers for the same states. "unclassified" is deliberately excluded
+    // — a build-time registry-gap signal, never a reader-facing legend
+    // entry (v4 §1.3 / v5 §3.8).
+    extra = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
+      if (band === "doesnt-clear") {
+        return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
+      }
+      const color = BAND_LEGEND_COLOR[band]();
+      return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
+    }).join("");
   }
   el.innerHTML = `
-    <div class="legend-scale">1 (weakest fit) ${scaleHtml} 5 (strongest fit)</div>
+    <div class="legend-scale">1 — weakest fit ${scaleHtml} 5 — strongest fit</div>
     <span>${escapeHtml(FIT_INDEX_DEFINITION)}</span>
     ${extra}
   `;
 }
 
 function renderJudgmentNote(el) {
+  // v6 Amendment 1, §A1: plain-language rewrite of the coordinate-
+  // confidence note — drops "model-recalled public geodata," "gazetteer,"
+  // "survey-grade," "schema" (dev/vault vocabulary a stranger reading this
+  // page has no reason to know). Same claim, same "every location gets the
+  // same treatment" honesty, no new fact asserted.
   el.innerHTML = `
-    <strong>Coordinate confidence (every pin, not a tooltip):</strong>
-    every location's lat/lon is model-recalled public
-    geodata (city-/town-center), not independently checked against a live
-    gazetteer — fine for placing a pin on a world map, not survey-grade.
-    Same caveat for every location, uniformly; there's no per-location
-    confidence field in the schema yet to render one differently from
-    another (a real gap, noted for a future data revision).
+    <strong>Pin locations are approximate</strong> — good enough to place a
+    dot on the map, not for door-to-door navigation. Every location gets
+    the same treatment; more precision may come later.
     <br><br>
     <strong>Two more honest limits of this first map build:</strong>
     (1) The world outline is a real, licensed simplified political map, but

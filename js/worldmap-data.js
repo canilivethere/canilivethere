@@ -11,6 +11,30 @@
 // Timor-Leste) — none are CanILiveThere candidates, so they're simply absent
 // rather than guessed at.
 //
+// v6 addendum R3 §3.3, measure-first call (builder's own initiative, not specced):
+// checked whether upgrading to Natural Earth's 1:50m-resolution country
+// boundaries (the "50m geometry" the addendum names but doesn't rule on)
+// is worth adopting — SKIPPED, on measurement, not appetite:
+//   - The standard 50m distribution (world-atlas@2's countries-50m.json,
+//     the common static-bundle source for it) is a TopoJSON file
+//     documented at roughly 800KB raw — confirmed via a live fetch this
+//     session that truncated past 500KB before completing, consistent
+//     with that figure, not just assumed from memory. This file today is
+//     ~47.9KB. A "50m" swap would be a >15x jump in the single largest
+//     static asset this site ships, on a "boring, dependency-light"
+//     mission brief that already treats this file's own size as worth a
+//     provenance comment.
+//   - It isn't just a data swap: this file's own PROJECTION is a
+//     least-squares fit calibrated against THIS source map's specific
+//     (undocumented) projection — a different geometry source needs its
+//     own recalibration, not a drop-in replacement. And rendering real
+//     TopoJSON arcs needs a decoder + geo-path generator this project
+//     doesn't currently ship (no d3-geo, no topojson-client) — a new
+//     runtime dependency, which the "no CDN, no runtime dependency" rule
+//     two paragraphs below was written specifically to avoid.
+// Both reasons independently fail the budget; named here rather than
+// silently promised or silently dropped, per this pass's own instruction.
+//
 // JUDGMENT CALL (flagged in the build notes): this dataset
 // is real-world political geography. CanILiveThere's own "country_id" "CR"
 // means *Crete* (an island region of Greece), not the ISO code CR (Costa

@@ -4,6 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
+  verdictBand, BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 
 applyStoredTheme();
@@ -25,28 +26,11 @@ const FEATURED_CRITERIA = [
   { criterion_id: "land-property-access", label: "Best property access" },
 ];
 
-// Persona verdict-first banding (v4 addendum R1 §1.2): exact headline
-// string -> band, unknown string fails loud (verdictBand() below), never
-// guessed. The two judgment calls (type-trap rows) are argued in the
-// addendum itself, not asserted here — see §1.2's table.
-const VERDICT_BAND = {
-  "Clears": "clears",
-  "Near-miss": "near-miss",
-  "Clears the number, fails the type": "near-miss",
-  "Misses": "doesnt-clear",
-  "Categorical absence": "doesnt-clear",
-  "One door opens, leads nowhere": "doesnt-clear",
-  "Unverified": "not-checked",
-};
-function verdictBand(headline) {
-  return Object.prototype.hasOwnProperty.call(VERDICT_BAND, headline)
-    ? VERDICT_BAND[headline] : "unclassified";
-}
-const BAND_ORDER = ["clears", "near-miss", "doesnt-clear", "not-checked", "unclassified"];
-const BAND_LABEL = {
-  clears: "Clears", "near-miss": "Near-miss", "doesnt-clear": "Doesn't clear",
-  "not-checked": "Not checked yet", unclassified: "Unclassified — needs attention",
-};
+// Persona verdict-first banding (v4 addendum R1 §1.2): VERDICT_BAND/
+// verdictBand/BAND_ORDER/BAND_LABEL moved to app-shared.js by v6
+// addendum §2.3 so map.js's legend reuses the exact same registry
+// instead of forking its own labels — imported above, not redefined
+// here.
 
 async function main() {
   const store = await loadStore();
@@ -125,7 +109,7 @@ function updatePurposeExplainer(store) {
   // vocabulary the page actually renders — the group headers read
   // Clears/Near-miss/Doesn't clear/Not checked yet and the coverage
   // sentence above already calls them groups; "band" had no visible
-  // referent on the page (C3-gate finding). Minimal referent-word change
+  // referent on the page (review finding). Minimal referent-word change
   // only, meaning intact — flagged for the spec author's ratification.
   const doesntClause = persona
     ? "it doesn't decide the groups below — that's a separate, persona-specific read, unaffected by this sort"

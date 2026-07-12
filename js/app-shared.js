@@ -53,8 +53,12 @@ const PERSONA_CLOSEST_IF = {
 // The name itself ("Fit index") is already the literal text of the Lists
 // column header and every tooltip/label below — this is the definition
 // that travels with it.
+// v6 plain-language pass, item 6: "a weighted 1-5 average of scored
+// criteria" -> "a 1-5 score combining every researched factor" — same
+// meaning, shorter, drops "weighted"/"average"/"criteria" as load-bearing
+// vocabulary a first-time reader has to parse.
 export const FIT_INDEX_DEFINITION =
-  "Fit index: a weighted 1–5 average of scored criteria. Higher is better — 5 is the strongest fit, 1 is the weakest.";
+  "Fit index: a 1–5 score combining every researched factor. Higher is better — 5 is the strongest fit, 1 is the weakest.";
 
 // Shared "is this a keyboard activation" check for click-equivalent
 // keydown handlers (map pins, source-toggle badges) — one definition of
@@ -272,6 +276,35 @@ export const WEIGHT_CLASS_LABEL = {
   High: "weighted heavily in the index",
   "Medium-High": "weighted above average in the index",
   Medium: "weighted normally in the index",
+};
+
+// ---------------------------------------------------------------------
+// Persona verdict-first banding (v4 addendum R1 §1.2, moved here from
+// lists.js by v6 addendum §2.3 so map.js's legend can import the exact
+// same registry instead of forking its own hardcoded labels — the same
+// drift class verdictVisual()'s color grouping and headline prose once
+// disagreed on, per that section's own citation). Exact headline string
+// -> band; unknown strings fail loud into "unclassified" (verdictBand()
+// below), never guessed. The two judgment calls (type-trap rows) are
+// argued in the v4 addendum itself, not asserted here.
+// ---------------------------------------------------------------------
+export const VERDICT_BAND = {
+  "Clears": "clears",
+  "Near-miss": "near-miss",
+  "Clears the number, fails the type": "near-miss",
+  "Misses": "doesnt-clear",
+  "Categorical absence": "doesnt-clear",
+  "One door opens, leads nowhere": "doesnt-clear",
+  "Unverified": "not-checked",
+};
+export function verdictBand(headline) {
+  return Object.prototype.hasOwnProperty.call(VERDICT_BAND, headline)
+    ? VERDICT_BAND[headline] : "unclassified";
+}
+export const BAND_ORDER = ["clears", "near-miss", "doesnt-clear", "not-checked", "unclassified"];
+export const BAND_LABEL = {
+  clears: "Clears", "near-miss": "Near-miss", "doesnt-clear": "Doesn't clear",
+  "not-checked": "Not checked yet", unclassified: "Unclassified — needs attention",
 };
 
 // `interactive` defaults true (the §5.3.2 pull-affordance shape, for use

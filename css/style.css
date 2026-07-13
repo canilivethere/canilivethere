@@ -456,6 +456,12 @@ h3 { font-size: 1.05rem; }
 /* "Visible but foggy, not hidden" — the map keeps rendering underneath,
    just de-emphasized, while the door is open. */
 #map-root.map-fogged { opacity: 0.4; filter: blur(2px); pointer-events: none; transition: opacity 0.2s ease, filter 0.2s ease; }
+
+/* Click-and-drag panning (js/map.js "Entry point 2b") — the cursor is
+   the only cue that the map is grabbable, since there's no other visible
+   affordance for it; swaps to "grabbing" for the live drag itself. */
+#map-root svg { cursor: grab; }
+#map-root.map-panning svg { cursor: grabbing; }
 #perspective-door {
   position: fixed;
   inset: 0;

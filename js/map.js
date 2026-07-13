@@ -573,6 +573,40 @@ function wireMapInteractions(store, lenses) {
     applyZoom(store, lenses, e.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, focal);
   }, { passive: false });
 
+  // Entry point 2b: click-and-drag panning — flagged live, 2026-07-14,
+  // "we can't move around on a zoomed-in map." There was previously no
+  // way to pan except the arrow keys. Tracked in plain screen-pixel
+  // fractions against the viewBox captured at drag-start (not the live
+  // DOM, which gets replaced wholesale by every renderMap() call — see
+  // this function's own header comment) so the map tracks the cursor
+  // 1:1 regardless of how many renders happen mid-drag. Left mouse
+  // button only; doesn't preventDefault on mousedown/mouseup, so a plain
+  // click (no movement) still reaches pins'/clusters' own click handlers
+  // unchanged — only an actual drag repositions the view.
+  let panStart = null; // { clientX, clientY, box: {x,y,w,h}, rectW, rectH }
+  root.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const svgEl = root.querySelector("svg");
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    panStart = { clientX: e.clientX, clientY: e.clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height };
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!panStart) return;
+    e.preventDefault();
+    root.classList.add("map-panning");
+    // Dragging right/down should reveal what's to the left/above, i.e.
+    // the map content follows the cursor (the standard "grab the map"
+    // convention) — the opposite sign from the keyboard arrows above,
+    // which pan the *viewport* rather than drag the *content*.
+    const dx = -((e.clientX - panStart.clientX) / panStart.rectW) * panStart.box.w;
+    const dy = -((e.clientY - panStart.clientY) / panStart.rectH) * panStart.box.h;
+    STATE.viewBox = clampViewBox({ x: panStart.box.x + dx, y: panStart.box.y + dy, w: panStart.box.w, h: panStart.box.h });
+    renderMap(store, lenses);
+  });
+  window.addEventListener("mouseup", () => { panStart = null; root.classList.remove("map-panning"); });
+
   // Known limitation flagged in Part 9: trackpad-pinch (wheel+ctrlKey) and
   // real mobile touch-pinch are distinct mechanisms — the wheel listener
   // above covers the former (trackpads fire synthetic ctrlKey wheel
@@ -581,14 +615,26 @@ function wireMapInteractions(store, lenses) {
   // already work.
   let pinchStartDist = null;
   let pinchStartBox = null;
-  function touchDistance(t1, t2) {
-    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
+  // Single-finger touch panning — the exact same gap as the mouse drag
+  // above, on the input method where a map that only pinch-zooms is even
+  // less usable (no arrow-key fallback on a touchscreen). Same
+  // fixed-at-gesture-start math as the drag handler; kept as a separate
+  // start/box pair from pinchStartDist/pinchStartBox since a 1-finger
+  // touch and a 2-finger pinch are mutually exclusive gestures.
+  let touchPanStart = null;
+  function touchRootRect() {
+    const svgEl = root.querySelector("svg");
+    return svgEl ? svgEl.getBoundingClientRect() : null;
   }
   root.addEventListener("touchstart", (e) => {
     if (e.touches.length === 2) {
       pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
       pinchStartBox = { ...(STATE.viewBox || homeViewBox(store)) };
+      touchPanStart = null;
+    } else if (e.touches.length === 1) {
+      const rect = touchRootRect();
+      if (!rect || rect.width === 0 || rect.height === 0) return;
+      touchPanStart = { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height };
     }
   }, { passive: true });
   root.addEventListener("touchmove", (e) => {
@@ -603,11 +649,22 @@ function wireMapInteractions(store, lenses) {
       const focal = clientToWorld(svgEl, midX, midY, boxCenter(pinchStartBox));
       STATE.viewBox = pinchStartBox; // pivot from the gesture's own start each move, not the last frame
       applyZoom(store, lenses, factor, focal);
+    } else if (e.touches.length === 1 && touchPanStart) {
+      e.preventDefault();
+      const dx = -((e.touches[0].clientX - touchPanStart.clientX) / touchPanStart.rectW) * touchPanStart.box.w;
+      const dy = -((e.touches[0].clientY - touchPanStart.clientY) / touchPanStart.rectH) * touchPanStart.box.h;
+      STATE.viewBox = clampViewBox({ x: touchPanStart.box.x + dx, y: touchPanStart.box.y + dy, w: touchPanStart.box.w, h: touchPanStart.box.h });
+      renderMap(store, lenses);
     }
   }, { passive: false });
   root.addEventListener("touchend", (e) => {
     if (e.touches.length < 2) { pinchStartDist = null; pinchStartBox = null; }
+    if (e.touches.length < 1) { touchPanStart = null; }
   });
+  function touchDistance(t1, t2) {
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
 
   // Entry point 3: keyboard, scoped to when focus is somewhere inside
   // #map-root (a pin, a cluster badge, or the zoom buttons) — a global,

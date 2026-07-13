@@ -19,32 +19,25 @@
     }
   } catch (e) {}
 </script>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <main>
   <h1>Where in the world could you actually live?</h1>
-  <p id="map-intro">Click any place for the full picture, or <a href="/lists.html">see every location as a sortable list</a>.</p>
+  <p id="map-intro">Click any place for the full picture, or <a href="lists.html">see every location as a sortable list</a>.</p>
   <!-- v6 Amendment 1 §A2: same position, same canonical FIT_INDEX_DEFINITION
        string set by map.js (script unchanged, same element id) — only
        placement changes, behind the existing .recede/.recede-body
        disclosure mechanism (style.css) instead of always-visible. -->
   <details class="recede">
-    <summary>What this number means, and its limits</summary>
+    <summary>How scoring works</summary>
     <p class="fit-def recede-body" id="fit-def-caption"></p>
   </details>
   <div id="persona-slot"></div>
   <div id="map-root"></div>
   <div class="map-legend" id="map-legend"></div>
-  <!-- v7 §4.1: re-ruling, finally built — this used to be a bare <p>,
-       mandatory reading before the map itself. Now recedes behind the
-       same details.recede mechanism already live one element above,
-       with a six-word summary stating the real limit without a click. -->
-  <details class="recede judgment-note">
-    <summary>Pin locations are approximate</summary>
-    <p class="recede-body" id="map-judgment-note"></p>
-  </details>
+  <p class="judgment-note" id="map-judgment-note"></p>
 </main>
-<script type="module" src="/js/map.js"></script>
+<script type="module" src="js/map.js"></script>
 </body>
 </html>

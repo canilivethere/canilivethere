@@ -1,15 +1,14 @@
-# Self-hosted fonts — real build gap, named plainly
+# Self-hosted fonts
 
 `css/style.css`'s `@font-face` rules (v7, "The Explorer's Atlas") expect
-six files in this directory. **They are not here yet.** This session's
-build sandbox had no outbound network access (`curl` denied, and the
-web-fetch tool available can't return binary files) — the CSS is wired
-correctly for these files, but nobody has actually downloaded them.
+six files in this directory. **All six are present** (added 2026-07-12,
+same day as the build): static latin-subset WOFF2 instances downloaded
+from Google Fonts' own serving endpoints, named exactly as the CSS
+expects. Both families are SIL OFL-licensed; self-hosting the files
+(not a CDN `<link>`) is what law 7 asks for.
 
-Until they land, every font-family in `style.css` falls back to a bare
-CSS generic (`serif` / `sans-serif`), never a named system font — so the
-site still doesn't violate the "no system fonts by name" rule, it just
-renders in the browser's own default serif/sans in the meantime.
+If a file is ever lost or a weight is added, the recipe below
+reproduces them.
 
 ## Files needed, exact names
 

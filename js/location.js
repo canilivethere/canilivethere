@@ -7,6 +7,7 @@ import {
   FIT_INDEX_DEFINITION, buildFitHeadline,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
+import { siteUrl } from "./site-root.js";
 
 applyStoredTheme();
 renderTopBar("location");
@@ -39,7 +40,7 @@ async function main() {
   const loc = store.locationsById.get(locId);
 
   if (!loc) {
-    root.innerHTML = `<p>No location matches <code>${escapeHtml(locId || "")}</code>. <a href="${withPersona("/lists.html")}">Back to the list</a>.</p>`;
+    root.innerHTML = `<p>No location matches <code>${escapeHtml(locId || "")}</code>. <a href="${withPersona(siteUrl("lists.html"))}">Back to the list</a>.</p>`;
     return;
   }
   const country = store.countriesById.get(loc.country_id);
@@ -442,8 +443,8 @@ function buildNextBest(store, loc, persona) {
     .slice(0, 5);
   const personaLabel = persona ? ` for ${persona.charAt(0).toUpperCase() + persona.slice(1)}` : "";
   div.innerHTML = `<h2>Where now?</h2><p>Ranked next-best alternatives${personaLabel}:</p>
-    <ul>${candidates.map((c) => `<li><a href="${withPersona(`/l/${c.l.location_id}.html`)}">
+    <ul>${candidates.map((c) => `<li><a href="${withPersona(siteUrl(`l/${c.l.location_id}.html`))}">
       ${escapeHtml(c.l.display_name)}</a> — ${c.val.toFixed(1)}/5</li>`).join("")}</ul>
-    <p><a href="${withPersona("/lists.html")}">Back to the full list</a> · <a href="${withPersona("/index.html")}">Back to the map</a></p>`;
+    <p><a href="${withPersona(siteUrl("lists.html"))}">Back to the full list</a> · <a href="${withPersona(siteUrl("index.html"))}">Back to the map</a></p>`;
   return div;
 }

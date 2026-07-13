@@ -6,6 +6,7 @@ import {
   FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
+import { siteUrl } from "./site-root.js";
 
 applyStoredTheme();
 renderTopBar("lists");
@@ -347,11 +348,11 @@ function renderRow(store, row, persona, tbody) {
   // location.html?loc=<id> — real static content exists there for
   // crawlers/no-JS visitors (tools/prerender-locations.mjs).
   const visitLink = persona
-    ? `<a class="visit-link" href="${withPersona(`/l/${row.loc.location_id}.html`)}#sec-visa">Just visiting instead?</a>`
+    ? `<a class="visit-link" href="${withPersona(siteUrl(`l/${row.loc.location_id}.html`))}#sec-visa">Just visiting instead?</a>`
     : "";
 
   tr.innerHTML = `
-    <td><a href="${withPersona(`/l/${row.loc.location_id}.html`)}">${escapeHtml(row.loc.display_name)}</a></td>
+    <td><a href="${withPersona(siteUrl(`l/${row.loc.location_id}.html`))}">${escapeHtml(row.loc.display_name)}</a></td>
     <td>${escapeHtml(row.country.name)}</td>
     <td class="rank-fit-cell">${fitCellHtml}</td>
     <td>${verdictHtml}${visitLink}</td>

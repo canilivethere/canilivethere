@@ -25,12 +25,26 @@ but `/l/<id>.html` is now the real, indexable URL every internal link
 points to). Re-run this script any time `derived/` or `js/portraits.js`
 changes, before publishing.
 
-**Path convention:** every internal link, stylesheet, and script tag
-uses a root-absolute path (`/css/style.css`, `/l/GT-antigua.html`), not
-a relative one — required so the same shared JS (`app-shared.js`,
-`data.js`) resolves assets correctly whether the including page lives
-at the site root or one level down in `l/`. This assumes the site is
-served from its domain root (`canilivethere.info`), not a subpath.
+**Path convention: deployment-agnostic, not root-absolute.** Every
+internal link, stylesheet, and script tag is a plain relative path from
+top-level pages (`css/style.css`, `lists.html`) or a `../`-prefixed one
+from `l/*.html` (one directory down, emitted by
+`tools/prerender-locations.mjs`, which knows its own depth). Shared JS
+that renders links/fetches from both depths (`app-shared.js`,
+`data.js`, `lists.js`, `location.js`, `map.js`) resolves them via
+`js/site-root.js`'s `siteUrl()`, computed from that module's own script
+URL (`import.meta.url`) rather than the including page's path or any
+hardcoded prefix — so the same build works unmodified both at a GitHub
+Pages project-site subpath (`https://canilivethere.github.io/canilivethere/`)
+and at a future custom-domain root (`canilivethere.info`), with no code
+change at cutover. A root-absolute path (`/css/style.css`) only works
+when the site is mounted at a domain root — under a subpath mount it
+resolves to the domain root instead and 404s, which is exactly what
+shipped and broke on first launch (see git history: the v7 push and its
+rollback). `sitemap.xml`/`robots.txt` are the one deliberate exception —
+crawlers need real absolute URLs, so those carry the recorded canonical
+domain (`https://canilivethere.info/...`) regardless of where the site
+happens to be mounted today.
 
 **Fonts: a real, unfilled gap.** `css/style.css`'s `@font-face` rules
 expect two self-hosted WOFF2 families (Fraunces, Work Sans) in

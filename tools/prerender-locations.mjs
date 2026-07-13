@@ -283,9 +283,16 @@ for (const loc of locations) {
     .filter((c) => c.val >= 0)
     .sort((a, b) => b.val - a.val)
     .slice(0, 5);
+  // Deployment-agnostic paths, not root-absolute: this page always lives
+  // one directory below the site root (l/<location_id>.html), so a sibling
+  // l/ page is a bare relative link (same directory) and everything else
+  // one level up is "../"-prefixed — works unmodified at both the GitHub
+  // Pages project-site subpath and the future custom-domain root, no code
+  // change needed at cutover (see js/site-root.js's own header comment for
+  // the client-side JS half of this same fix).
   const nextBestHtml = `<div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
-    <ul>${candidates.map((c) => `<li><a href="/l/${c.l.location_id}.html">${escapeHtml(c.l.display_name)}</a> — ${c.val.toFixed(1)}/5</li>`).join("")}</ul>
-    <p><a href="/lists.html">Back to the full list</a> · <a href="/index.html">Back to the map</a></p></div>`;
+    <ul>${candidates.map((c) => `<li><a href="${c.l.location_id}.html">${escapeHtml(c.l.display_name)}</a> — ${c.val.toFixed(1)}/5</li>`).join("")}</ul>
+    <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -295,12 +302,12 @@ for (const loc of locations) {
 <title>${escapeHtml(loc.display_name)} (${escapeHtml(country.name)}) — CanILiveThere</title>
 <meta name="description" content="${escapeHtml(`${loc.display_name}, ${country.name}: sourced, dated relocation research — visa routes, property, cost of living, community, and red flags.`)}">
 ${THEME_SCRIPT}
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="../css/style.css">
 </head>
 <body data-loc-id="${escapeHtml(loc.location_id)}">
 <div class="site-topbar">
-  <a class="brand" href="/index.html">CanILiveThere</a>
-  <nav class="site-nav"><a href="/index.html">Map</a><a href="/lists.html">Lists</a></nav>
+  <a class="brand" href="../index.html">CanILiveThere</a>
+  <nav class="site-nav"><a href="../index.html">Map</a><a href="../lists.html">Lists</a></nav>
 </div>
 <main>
   <div id="loc-root">
@@ -317,8 +324,8 @@ ${THEME_SCRIPT}
     ${nextBestHtml}
   </div>
 </main>
-<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="/l/${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p></footer>
-<script type="module" src="/js/location.js"></script>
+<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p></footer>
+<script type="module" src="../js/location.js"></script>
 </body>
 </html>
 `;

@@ -7,6 +7,7 @@ import {
   BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
+import { siteUrl } from "./site-root.js";
 
 // v6 addendum R1/R4: one shared radius/halo pair, read by both the pin loop
 // below (the actual rendered circle) and computeMapViewBox() (the padding
@@ -231,7 +232,7 @@ async function main() {
     // crawlable static content exists at that URL (see
     // tools/prerender-locations.mjs); the query-string route still works
     // as a legacy fallback (location.js reads both).
-    const go = () => { location.href = withPersona(`/l/${loc.location_id}.html`); };
+    const go = () => { location.href = withPersona(siteUrl(`l/${loc.location_id}.html`)); };
     circle.addEventListener("click", go);
     circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
     circle.addEventListener("mouseenter", (e) => showTip(e, tooltip));

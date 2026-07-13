@@ -12,6 +12,8 @@
 // clearly labeled wherever it's shown, not a new fact and not a rules-engine
 // verdict.
 
+import { siteUrl } from "./site-root.js";
+
 const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
 
 async function fetchJsonl(path) {
@@ -42,11 +44,15 @@ async function fetchJsonl(path) {
 
 let _storePromise = null;
 
-// v7 no-JS fallback: root-absolute default (not "derived/") so the same
-// call works correctly from a page one level down (l/<location_id>.html)
-// as well as from the site root — a relative "derived/" from l/ would
-// resolve to l/derived/, which doesn't exist.
-export function loadStore(basePath = "/derived/") {
+// v7 no-JS fallback: resolved via siteUrl() (site-root.js), not a bare
+// relative "derived/" or a root-absolute "/derived/" — the same call needs
+// to work correctly from a page one level down (l/<location_id>.html) as
+// well as from the site root, and under both a domain-root mount and a
+// project-site subpath mount, with no code change at cutover. A bare
+// relative "derived/" from l/ resolves to l/derived/, which doesn't exist;
+// a root-absolute "/derived/" resolves to the domain root, which 404s
+// under a subpath mount.
+export function loadStore(basePath = siteUrl("derived/")) {
   if (_storePromise) return _storePromise;
   _storePromise = buildStore(basePath);
   return _storePromise;

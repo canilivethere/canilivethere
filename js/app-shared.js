@@ -3,6 +3,7 @@
 // directly by the browser.
 
 import { topBottomCriteria } from "./data.js";
+import { siteUrl } from "./site-root.js";
 
 export function escapeHtml(str) {
   if (str == null) return "";
@@ -160,15 +161,16 @@ function toggleTheme() {
 export function renderTopBar(activePage) {
   const bar = document.createElement("div");
   bar.className = "site-topbar";
-  // v7 no-JS fallback: root-absolute paths (not "index.html") so this
-  // same bar renders correct links whether the page including it lives
-  // at the site root or one level down (l/<location_id>.html, the
-  // prerendered per-location pages) — see tools/prerender-locations.mjs.
+  // v7 no-JS fallback: siteUrl()-resolved paths (not a bare "index.html")
+  // so this same bar renders correct links whether the page including it
+  // lives at the site root or one level down (l/<location_id>.html, the
+  // prerendered per-location pages) — see tools/prerender-locations.mjs —
+  // and under either a domain-root or project-site-subpath deployment.
   bar.innerHTML = `
-    <a class="brand" href="${withPersona("/index.html")}">CanILiveThere</a>
+    <a class="brand" href="${withPersona(siteUrl("index.html"))}">CanILiveThere</a>
     <nav class="site-nav">
-      <a href="${withPersona("/index.html")}" class="${activePage === "map" ? "active" : ""}">Map</a>
-      <a href="${withPersona("/lists.html")}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
+      <a href="${withPersona(siteUrl("index.html"))}" class="${activePage === "map" ? "active" : ""}">Map</a>
+      <a href="${withPersona(siteUrl("lists.html"))}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
     </nav>
     <button type="button" id="theme-toggle" aria-pressed="false">Dark mode</button>
   `;

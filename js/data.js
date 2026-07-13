@@ -42,7 +42,11 @@ async function fetchJsonl(path) {
 
 let _storePromise = null;
 
-export function loadStore(basePath = "derived/") {
+// v7 no-JS fallback: root-absolute default (not "derived/") so the same
+// call works correctly from a page one level down (l/<location_id>.html)
+// as well as from the site root — a relative "derived/" from l/ would
+// resolve to l/derived/, which doesn't exist.
+export function loadStore(basePath = "/derived/") {
   if (_storePromise) return _storePromise;
   _storePromise = buildStore(basePath);
   return _storePromise;

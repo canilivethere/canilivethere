@@ -1,4 +1,8 @@
-/* CanILiveThere — plain, boring, readable CSS. No framework, no build step.
+/* CanILiveThere — plain, boring, readable CSS. Runtime stays framework-
+   and build-free (fetch + JSON.parse, plain DOM); a small Node prerender
+   step now runs before publish for the no-JS static fallback (see
+   tools/prerender-locations.js) — that step is offline/local, not a
+   runtime dependency.
    Accessibility/readability outrank cleverness (mission brief, 2026-07-09).
 
    Light-mode tokens below + the dark-mode block at the end are the v2
@@ -7,16 +11,32 @@
    (surface/panel/border/gap), one real pre-existing WCAG AA fix
    (--accent), and a full dark theme — "an atlas at night," not the
    light theme with the lights off; every text/background pair below is
-   WCAG-contrast-checked in the addendum itself, not eyeballed. */
+   WCAG-contrast-checked in the addendum itself, not eyeballed.
+
+   v7 ("The Explorer's Atlas", 2026-07-12): parchment/oxblood palette,
+   replacing the v2 near-white/blue pair below — every new pairing
+   re-checked (WCAG relative-luminance contrast) against the new
+   parchment ground, not carried over on the old numbers. Dark theme is
+   explicitly out of scope this pass (same caution v4/v6 used for map
+   water/the dark ramp before extending them later) — the dark tokens at
+   the end of this file are untouched. */
 
 :root {
   --ink: #1b1b1b;
-  --paper: #fbf8f2;
+  --paper: #F2E8D5;
   --muted: #5a5a5a;
-  --line: #ded4c0;
-  --panel: #f4efe4;
-  --accent: #1f6ea3;
-  --gap-bg: #e9e2d2;
+  /* v7 §1.2: reuses --country-border's own hex — one ink family for both
+     UI hairlines and the map's own border stroke, not two. 2.69:1 vs
+     paper (decorative divider, not a text pairing — the 4.5:1 text floor
+     doesn't apply). */
+  --line: #a58a66;
+  /* "Pasted card" surface — deliberately close in luminance to --paper
+     itself (1.06:1); the border+shadow contract (see .panel-card below)
+     does the separating, not a ground-contrast gap. Still holds real
+     TEXT contrast: 15.96:1 ink-on-it, 6.39:1 muted-on-it. */
+  --panel: #FBF6E9;
+  --accent: #8C2F1B;
+  --gap-bg: #E4D8BC;
   --gap-ink: #635c50;
   /* v6 addendum §2.2: aubergine, brown retired (was #3a2a1a) — clears
      10.9-16.3:1 against all three map surfaces, ΔE 27.2 from the ramp's
@@ -70,16 +90,99 @@
   --country-border: #a58a66;
 }
 
+/* v7 §1.4: self-hosted Fraunces (headings/verdict/portrait) + Work Sans
+   (body/tables/UI chrome) — law 7 bans system fonts by name (Inter,
+   Roboto, Arial); the old body stack named three of them directly.
+   REAL BUILD GAP, named plainly, not silently worked around: this
+   session's sandbox has no outbound network access (Bash `curl`
+   denied, WebFetch can't return binary font files) — I could not
+   actually download the real WOFF2 subsets tonight. The @font-face
+   rules below are wired correctly for when the files land (see
+   fonts/README.md for the exact acquisition steps); until then every
+   fallback below is a bare CSS generic (serif / sans-serif) — NEVER a
+   named system font — so the banned-name rule holds even in this
+   degraded state. Visually this means the site currently renders in
+   the browser's own default serif/sans, not Fraunces/Work Sans, until
+   the two files are dropped into fonts/. Flagged as a fast-follow
+   browser errand, not fixed by writing a fake binary. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("../fonts/fraunces-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("../fonts/fraunces-latin-700.woff2") format("woff2");
+  font-weight: 650 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("../fonts/fraunces-latin-italic-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Work Sans";
+  src: url("../fonts/work-sans-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Work Sans";
+  src: url("../fonts/work-sans-latin-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Work Sans";
+  src: url("../fonts/work-sans-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 * { box-sizing: border-box; }
 
 html { font-size: 16px; }
 
 body {
   margin: 0;
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  position: relative;
+  font-family: "Work Sans", sans-serif;
   color: var(--ink);
   background: var(--paper);
   line-height: 1.5;
+}
+
+/* v7 §1.5.1: procedural paper grain — one feTurbulence+feColorMatrix SVG
+   filter, encoded once as a data URI and reused everywhere (body here,
+   .panel-card below), no external asset, no JS. feColorMatrix reduces
+   the noise to alpha-only output (R'/G'/B' held at 0, A' = luminance),
+   so this is a pure darkening mask, not a colored texture — applied via
+   mix-blend-mode:multiply at low opacity so it only ever darkens, never
+   lightens or shifts hue. baseFrequency/opacity are a starting-guess
+   craft call (untested rendered, per the spec's own flag) — tune by eye
+   before shipping if it reads too subtle or too muddy on real text. */
+:root {
+  --grain-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix in='noise' type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.2126 0.7152 0.0722 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29'/%3E%3C/svg%3E");
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: var(--grain-svg);
+  background-repeat: repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 999;
 }
 
 a { color: var(--accent); }
@@ -145,8 +248,12 @@ details.recede .recede-body { margin-top: 0.4rem; }
   margin: 0.5rem 0 0;
   font-size: 0.78rem;
   color: var(--muted);
-  background: #fff8e6;
-  border: 1px solid #f0dca0;
+  /* v7 §1.2, flag 2: the old fill (#fff8e6) nearly vanished against the
+     new parchment (1.15:1, measured) — deepened rather than left to the
+     border alone, a same-hue-family darkening (still reads as "pale
+     warning yellow," not a new color concept). */
+  background: #f5e9be;
+  border: 1px solid #d8b862;
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
 }
@@ -162,13 +269,17 @@ details.recede .recede-body { margin-top: 0.4rem; }
 
 main { max-width: 1200px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
 
-/* v4 addendum R3 §3.5: headings only get a web-safe serif stack (zero new
-   assets, zero network request) — body text, tables, and all data-bearing
-   UI stay on the existing sans stack, legibility there isn't a warmth
-   trade. h3 deliberately excluded, per the ruling's own "h1, h2 only". */
-h1 { font-size: 1.6rem; font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif; }
-h2 { font-size: 1.2rem; margin-top: 2rem; font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif; }
+/* v7 §1.4: Fraunces replaces the v4 web-safe serif stack entirely — h1/h2
+   only, weight 600, upright (h3 deliberately excluded, same "h1, h2 only"
+   scoping the v4 ruling used). Body/tables/UI stay on Work Sans (above),
+   legibility there isn't a warmth trade. */
+h1 { font-size: 1.6rem; font-family: "Fraunces", serif; font-weight: 600; }
+h2 { font-size: 1.2rem; margin-top: 2rem; font-family: "Fraunces", serif; font-weight: 600; }
 h3 { font-size: 1.05rem; }
+
+/* v7 §2.2/§1.4: the verdict block's headline and any callout-weight text
+   — heavier Fraunces than a plain h1/h2, per the weight contract. */
+.callout-weight { font-family: "Fraunces", serif; font-weight: 700; }
 
 /* ---------- badges ---------- */
 .badge {
@@ -195,6 +306,44 @@ h3 { font-size: 1.05rem; }
 .source-link { font-size: 0.78rem; }
 .source-onfile { font-size: 0.78rem; color: var(--muted); font-style: italic; }
 
+/* v7 §1.5.2: "card-as-pasted-in-plate" — a contract, not a color. Every
+   panel/card surface gets --panel bg (already close in luminance to
+   --paper by design, see the --panel token comment above; the border +
+   shadow do the separating), a 1px --line border, a warm oxblood-family
+   shadow (not generic gray), and a flatter, smaller corner radius than
+   the old "modern app" 6px. Applies to the existing panel surfaces
+   (.judgment-note, .next-best, .verify-yourself) and the new §2 chapter/
+   verdict/portrait shells below — one class, applied by selector list so
+   every current and future "pasted plate" stays visually consistent. */
+.judgment-note, .next-best, .verify-yourself, .chapter, .verdict-block, .portrait-block {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(140, 47, 27, 0.08);
+  padding: 0.85rem 1rem;
+  margin: 0.9rem 0;
+}
+/* The stronger grain pass promised in §1.5.1 — same filter, higher
+   opacity than the body-wide overlay, so "pasted plate" surfaces read as
+   slightly more textured paper than the page ground around them. */
+.judgment-note::after, .next-best::after, .verify-yourself::after, .chapter::after, .verdict-block::after, .portrait-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--grain-svg);
+  background-repeat: repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.08;
+  pointer-events: none;
+}
+/* .judgment-note keeps its own left-accent flag color on top of the
+   shared plate treatment (semantic "watch this" marker, unchanged
+   meaning from v2 §1.3) — a plate with one colored edge, not two
+   competing visual languages. */
+.judgment-note { border-left: 3px solid var(--conditional); font-size: 0.8rem; color: var(--muted); }
+
 /* ---------- map surface ---------- */
 .map-wrap { position: relative; width: 100%; }
 #worldmap { width: 100%; height: auto; background: var(--map-water); border: 1px solid var(--line); border-radius: 6px; }
@@ -217,7 +366,11 @@ h3 { font-size: 1.05rem; }
    below — verdict affordance, none of it warmed by this ruling. */
 .location-pin {
   cursor: pointer;
-  stroke: var(--paper);
+  /* v7 §1.3: halo stops resolving from --paper (drops the weakest ramp
+     stop's margin against the new parchment to 3.01:1) and uses --panel
+     instead — a dedicated "elevated" tone giving that same stop 3.39:1,
+     closer to its old margin. No ramp hex touched. */
+  stroke: var(--panel);
   stroke-width: 2;
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
 }
@@ -251,14 +404,6 @@ h3 { font-size: 1.05rem; }
    convention). */
 .ormen-lange { pointer-events: none; }
 .ormen-lange path { fill: none; stroke: var(--country-border); stroke-opacity: 0.55; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
-
-.judgment-note {
-  font-size: 0.8rem;
-  color: var(--muted);
-  border-left: 3px solid var(--conditional);
-  padding-left: 0.6rem;
-  margin: 0.75rem 0;
-}
 
 /* ---------- lists ---------- */
 .fit-def { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--muted); padding: 0 0 0.4rem; }
@@ -310,6 +455,51 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
    keeps the ruling's literal DOM placement, fixes the visual consequence
    it would otherwise have in this page's particular flex context. */
 .loc-header #persona-slot { flex-basis: 100%; }
+
+/* v7 §2.2: the verdict block — headline-first, replaces the old always-
+   verbose persona panel. Plate treatment from the shared contract above;
+   this block's own rules are typography/layout only. */
+.verdict-headline { font-family: "Fraunces", serif; font-weight: 700; font-size: 1.1rem; margin: 0 0 0.4rem; }
+.verdict-block .verdict-chip { font-size: 0.85rem; padding: 0.15rem 0.65rem; }
+.verdict-block .verdict-prose { font-size: 0.95rem; color: var(--ink); max-width: 40em; margin: 0.4rem 0; }
+.redflag-pointer { display: inline-block; margin-top: 0.4rem; font-weight: 600; }
+.fit-link-line { font-size: 0.82rem; margin-top: 0.5rem; }
+.fit-link-line a { font-weight: 600; }
+
+/* v7 §2.3: the portrait — a narrative-copy slot. Fraunces italic marks
+   this as VOICE, not data, per the spec's own "no new color/label
+   needed" reasoning. Empty when no copy exists yet (hard placeholder
+   rule — location.js renders nothing at all in that case, this rule is
+   dormant/never-matched until real copy lands, not a visible stub). */
+.portrait-block { font-family: "Fraunces", serif; font-style: italic; font-weight: 400; font-size: 1.02rem; line-height: 1.6; }
+/* The hook+number "teaser" line — Work Sans, not italic, deliberately
+   visually distinct from the portrait paragraph above it (data-flavored
+   despite living inside the voice slot) — a builder's own placement
+   reading of an interpretation already flagged as uncertain upstream,
+   not a settled spec ruling; see location.js's own comment. */
+.portrait-teaser { font-family: "Work Sans", sans-serif; font-style: normal; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
+
+/* v7 §2.4: chapters — <details class="chapter">, closed by default, every
+   location, no exceptions. Reuses the plate contract; adds <summary>
+   styling so a reader scanning closed headers can still tell what each
+   chapter is and (for Red Flags) that it's the heavier one. */
+.chapter > summary { cursor: pointer; font-size: 1.1rem; font-family: "Fraunces", serif; font-weight: 600; list-style: none; }
+.chapter > summary::-webkit-details-marker { display: none; }
+.chapter > summary::before { content: "▸ "; color: var(--muted); }
+.chapter[open] > summary::before { content: "▾ "; }
+.chapter > summary:hover { color: var(--accent); }
+.chapter .chapter-intro { font-size: 0.88rem; color: var(--muted); margin: 0.5rem 0 0.75rem; }
+/* Red Flags keeps its stronger heading treatment even while collapsed —
+   the <summary> itself carries the weight now that nothing stays open by
+   default (v1 §2.1.1's left-border-accent + tint, moved onto the
+   <details> element itself). */
+/* div-diverge-bg (warning-red family, already used for the divergence
+   badge's own "doesn't match practice" state) is the right semantic
+   fit here — NOT --gap-bg, which means "unresearched," the opposite of
+   what a Red Flags chapter is (thoroughly researched, alarming). */
+.chapter-redflags { border-left: 3px solid var(--div-diverge-ink); background: var(--div-diverge-bg); }
+.chapter-redflags > summary { color: var(--div-diverge-ink); }
+
 .section-nav { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
 .section-nav a { text-decoration: none; font-size: 0.9rem; }
 .fact-list { list-style: none; margin: 0; padding: 0; }
@@ -321,14 +511,18 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .scope-tag { font-size: 0.72rem; color: var(--muted); font-style: italic; }
 .criterion-scorebar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.75rem 0; }
 .criterion-chip { border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; }
-.next-best { background: var(--panel); border-radius: 6px; padding: 1rem; margin-top: 2rem; }
+/* .next-best's own plate treatment (bg/border/radius/shadow) comes from
+   the shared panel-card contract above — margin-top kept here since it's
+   a spacing need specific to this module's position on the page. */
+.next-best { margin-top: 2rem; }
 .change-event { border-left: 3px solid var(--line); padding-left: 0.6rem; margin-bottom: 0.6rem; }
 .sev-3 { border-left-color: #b02a2a; }
 .sev-2 { border-left-color: #b95d00; }
 .sev-1 { border-left-color: #2c7fb8; }
 
-/* "What to verify yourself" (v2 addendum §5.4) */
-.verify-yourself { background: var(--panel); border-radius: 6px; padding: 1rem; margin-top: 1.5rem; }
+/* "What to verify yourself" (v2 addendum §5.4) — plate treatment shared,
+   see panel-card contract above. */
+.verify-yourself { margin-top: 1.5rem; }
 .verify-yourself ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
 
 /* Confidence-badge pull affordance (v2 addendum §5.3.2): the existing

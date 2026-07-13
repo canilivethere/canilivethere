@@ -1,35 +1,36 @@
 // CanILiveThere — color logic for the map, lists, and score chips.
 //
-// Light-mode Fit-index scale (v6 addendum R2.1, 2026-07-12, "pins
-// recolored, brown retired"): the honey-gold single-hue ramp this
-// comment used to describe survived the site's warmth pass but was
-// a live-site "coffee stains" complaint — replaced with a
-// five-step, quantized, multi-hue ramp (violet weakest -> yellow
-// strongest, bright = strong), lightness-monotone across hues, the same
-// CVD-safety mechanism a single-hue ordinal ramp uses, extended per the
-// most recent live-site palette review. Run through the dataviz skill's palette validator
-// (Python port, Node unavailable — same method as every prior pass)
-// against this project's own three surfaces (landmass/water/paper) PLUS
-// Machado-2009 CVD and a categorical --pairs-all check (a multi-hue
-// ramp sits outside the validator's two documented shapes, so both ran);
-// full numbers in the addendum. One named exception trusted over its own
-// proxy: green->yellow-green's raw lightness delta (0.055) reads just
-// under the ordinal heuristic's floor, but the pair's real CVD
-// separation (ΔE 14.9/20.9) clears the 12.0 target with room, so the
-// direct measurement won under the proxy it approximates.
-//
-// Dark-mode ramp: UNCHANGED, out of scope this pass (same caution v4 R3
-// used for map water before extending it later) — still the honey-gold
-// scale from the 2026-07-10 revision, value 1 (poor fit) -> value 5
-// (strong fit), dark->light in dark mode ("flips anchor in dark" per the
-// project's color-formula method), validated then, not re-validated now.
-const SCALE_STOPS_LIGHT = ["#330063", "#002d88", "#006726", "#596e00", "#ae7d00"];
+// Light-mode Fit-index scale. **v7 Part 16 (2026-07-13) supersedes v6
+// R2.1's own "stays unchanged" ruling — it does not stay unchanged.**
+// Tone instruction, verbatim: "same kinda shades as
+// were used already." Three of five stops are the exact hexes already
+// shipped and already CVD/contrast-validated (v6) — only their POSITION
+// on the ramp moves; #006726/#596e00/#ae7d00 are reused verbatim, not
+// re-derived. Two new stops (#7a2213 Red, #a35a0e Orange) replace the
+// old violet/blue worst-end, checked this session against parchment
+// (#F2E8D5) with the same WCAG relative-luminance math the rest of this
+// palette uses as its stand-in for the still-unresolved dataviz skill:
+// #7a2213 8.36:1, #a35a0e 4.29:1 — both clear the 3:1 non-text floor
+// with real margin. Hue check, computed not eyeballed: 7.8°→30.6°→
+// 43.1°→71.4°→142.2°, a clean monotonic red-to-green progression, muted/
+// dark-saturated throughout, no stop reads neon or primary-traffic-light.
+// **Named open gap, an explicit deferral, not silently
+// dropped:** no lightness/saturation CVD accommodation this pass — a
+// hue-only red-to-green ramp is the single worst-case failure mode for
+// red-green colorblindness (deuteranopia/protanopia, ~8% of men), and
+// this ships anyway on direct instruction; the Machado-2009 CVD
+// simulation that validated the PRIOR ramp's hues against each other
+// was not re-run against this one. Revisit in a dedicated later color
+// pass, not decided here.
+const SCALE_STOPS_LIGHT = ["#7a2213", "#a35a0e", "#ae7d00", "#596e00", "#006726"];
 const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"];
-// v6 §2.1 names, light ramp only — paired with SCALE_STOPS_LIGHT by index.
-// getScaleLegend() below withholds names in dark mode rather than
-// mislabeling an unrelated honey-gold swatch "Violet"/"Yellow" (see that
-// function's own comment).
-const SCALE_STOP_NAMES_LIGHT = ["Violet", "Blue", "Green", "Yellow-green", "Yellow"];
+// v7 Part 16 names, light ramp only — paired with SCALE_STOPS_LIGHT by
+// index, red (weakest) -> green (strongest). getScaleLegend() below
+// withholds names in dark mode rather than mislabeling an unrelated
+// honey-gold swatch "Red"/"Green" (see that function's own comment) —
+// dark-mode ramp is UNCHANGED, out of scope this pass (same v6 R2.1
+// caution), still the honey-gold scale from the 2026-07-10 revision.
+const SCALE_STOP_NAMES_LIGHT = ["Red", "Orange", "Yellow", "Yellow-green", "Green"];
 
 // Theme detection (v4 addendum R2): reads the `data-theme` attribute
 // app-shared.js's applyStoredTheme()/toggleTheme() set on <html>, not the
@@ -83,14 +84,15 @@ export function scoreToColor(value) {
 // current theme at render time — call sites re-read this each render,
 // same as scoreToColor.
 //
-// v6 addendum §2.3: each stop now carries its own `name` (Violet/Blue/
+// v6 addendum §2.3 / v7 Part 16: each stop carries its own `name` (Red/
+// Orange/Yellow/Yellow-green/Green as of Part 16 — was Violet/Blue/
 // Green/Yellow-green/Yellow) so the legend can label steps instead of
 // showing an unlabeled swatch strip. Light-mode only, deliberately: the
-// dark ramp is explicitly out of scope this pass (R2.1) and stays the
-// old honey-gold hues, so naming it "Violet"..."Yellow" would put a
-// wrong color name on an unrelated swatch — a scoped extension of the
-// addendum's own dark-ramp exclusion, not a contradiction of it (flagged
-// for the record, not silently decided).
+// dark ramp is explicitly out of scope this pass (R2.1, still true post-
+// Part-16) and stays the old honey-gold hues, so naming it "Red"..."Green"
+// would put a wrong color name on an unrelated swatch — a scoped
+// extension of the addendum's own dark-ramp exclusion, not a
+// contradiction of it (flagged for the record, not silently decided).
 export function getScaleLegend() {
   const stops = currentScaleStops();
   const dark = isDarkTheme();
@@ -113,14 +115,22 @@ export function getScaleLegend() {
 export const ELIMINATED_FILL = "url(#hatch-eliminated)";
 // v6 addendum §2.2: aubergine, brown retired here too (was #3a2a1a light /
 // #846546 dark). Light aubergine clears 10.9-16.3:1 against all three
-// surfaces and reads as the same dark violet-purple family as the ramp's
-// own weakest stop (#330063, ΔE 27.2 — reviewed as a "coherence check,
-// met") while staying distinct from every other frozen verdict color
-// (ΔE 66-98). Dark aubergine clears 3.19:1 against dark paper, matching
-// brown's old floor — not yet provably "same family" as a violet ramp end
-// the way the light one is, since the dark general ramp is still
-// honey-gold with no dark violet anchor (a named, carried-over caveat,
-// stated here verbatim rather than re-argued).
+// surfaces and stays distinct from every other frozen verdict color
+// (ΔE 66-98) — that distinctness check still holds today, untouched by
+// Part 16. **Stale as of v7 Part 16, flagged rather than silently left
+// asserting a now-false claim:** the "same dark violet-purple family as
+// the ramp's own weakest stop" coherence read (ΔE 27.2 against the old
+// #330063) no longer applies — Part 16 moved the ramp's weakest stop to
+// #7a2213 (red), so this color and the ramp's low end are no longer the
+// same hue family. Not re-derived here (out of this change's own scope,
+// which Part 16 explicitly named as ramp-hexes-and-legend-names only) —
+// a real, named gap for whoever next tunes ELIMINATED_STROKE, not a
+// contradiction quietly left standing. Dark aubergine clears 3.19:1
+// against dark paper, matching brown's old floor — was never provably
+// "same family" as a ramp end even before Part 16, since the dark
+// general ramp is still honey-gold with no dark violet/red anchor (a
+// named, carried-over caveat, stated here verbatim rather than
+// re-argued).
 export const ELIMINATED_STROKE = "#370036";
 const ELIMINATED_STROKE_DARK = "#984f92";
 export function eliminatedColor() {

@@ -189,6 +189,18 @@ function buildVerdictBlock(store, loc, country, persona) {
     ? `<a class="redflag-pointer" href="#sec-redflags">${redFlagFacts.length} red flag${redFlagFacts.length === 1 ? "" : "s"} noted &#9656;</a>`
     : "";
   const breakdownLink = `<p class="fit-link-line"><a href="#sec-breakdown">See the full score breakdown</a></p>`;
+  // v7 Part 12 (a live-render review of the Marguerite persona found
+  // this sequencing problem): the "no verdict fixture" branch below
+  // discloses that its own red-flag count and breakdown
+  // link both lead to the same general, persona-blind figures the box
+  // just told her haven't been checked against her specifically — only
+  // THAT branch gets the scope-disclosed label; the real-verdict and
+  // no-persona branches are unaffected, unchanged, still using the two
+  // plain variables above.
+  const redFlagBadgeGeneral = redFlagFacts.length
+    ? `<a class="redflag-pointer" href="#sec-redflags">${redFlagFacts.length} red flag${redFlagFacts.length === 1 ? "" : "s"} noted (general figures) &#9656;</a>`
+    : "";
+  const breakdownLinkGeneral = `<p class="fit-link-line"><a href="#sec-breakdown">See the general score breakdown</a></p>`;
 
   if (persona) {
     const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
@@ -213,13 +225,40 @@ function buildVerdictBlock(store, loc, country, persona) {
         ${breakdownLink}
       `;
     } else {
-      // v5 §3.4 amended copy (folded into this cycle) — same meaning as
-      // the old bare sentence, now carrying its own why + instead; covers
-      // Waldo's criterion-only shape and any "neither" persona uniformly.
+      // v7 Part 12 (amends v5 §3.4/the original two-piece box: a
+      // review found an honesty admission immediately followed by an
+      // unweighted alarm count, both exits looping back into the same
+      // unvetted material the box just flagged as unvetted). Three
+      // pieces now, in this fixed order — solid ground before any alarm:
+      // (1) the existing honest line, unchanged verbatim, now carrying
+      // a "verdict" term-of-art gloss on its own first use in this box
+      // (a smaller finding from the same review, not a project-wide
+      // restyle); (2) NEW — the general Fit-index one-liner, the exact
+      // zero-new-authorship mechanism the "no persona selected" branch
+      // below already uses (buildFitHeadline()), transported into this
+      // new render position — the same string a reader may already have
+      // seen on this location's own map pin; (3) the red-flag badge, if
+      // any, with a scope-disclosed label so she isn't led to think it
+      // was checked against her specifically. Both exit links disclose
+      // the same thing, before she clicks, not after.
+      //
+      // Correction found on a later pass over this same branch, before
+      // it ever shipped: item (2)'s own Fit-index line is the same
+      // general/unchecked-for-her category as the red-flag badge in (3)
+      // — it needs the identical "(general figures)" disclosure suffix,
+      // not just the badge. Appended directly here rather than inside
+      // buildFitHeadline() itself, since that shared function is also
+      // used by the "no persona selected" branch below (and the map pin
+      // tooltip), where the same string is correctly UNqualified —
+      // there, no persona is in play at all, so there's no "checked for
+      // someone specific" expectation to disclose against.
+      const general = store.generalIndex(loc.location_id);
+      const generalHeadline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       div.innerHTML = `
-        <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict. The general figures below apply unchanged.</p>
-        ${redFlagBadge}
-        ${breakdownLink}
+        <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures below apply unchanged.</p>
+        <p class="verdict-headline">${escapeHtml(generalHeadline)} (general figures)</p>
+        ${redFlagBadgeGeneral}
+        ${breakdownLinkGeneral}
       `;
     }
   } else {
@@ -310,6 +349,77 @@ function buildSectionNav() {
   return div;
 }
 
+// v7 Part 14: illegal-but-practiced routes. Governs how a
+// `mechanism_legality: prohibited-enforced` fact renders, wherever it
+// has actually been filed (Thailand's nominee-company property
+// workaround is the one worked example documented in the data schema;
+// NOT yet exported into this repo's own derived/ snapshot as of this
+// build — this function renders nothing today, same empty-state
+// discipline as the rest of this page, and that's confirmed by a live
+// dry run, not assumed). Zero new facts authored here — render-shape
+// only, built against the section's own already-loaded fact list.
+//
+// Field-mapping judgment call, named plainly (not settled by a schema
+// ruling this build can point to): the one real worked example on file
+// (the schema documentation's own Thailand nominee-arrangement example)
+// shows the practice's own plain description and its sourced legal
+// consequence BOTH living on the sibling `mechanism`-role fact (same
+// group_key, same group_role_detail) — fact_label for (a), notes for
+// (c) — not on the `mechanism_legality` fact itself, which mostly just
+// asserts the token and an enforcement-trend note. This function reads
+// it that way, falling back to the mechanism_legality fact's own
+// fact_label/notes only if no sibling `mechanism` fact exists. A
+// different reasonable reader could map these fields differently; this
+// is an open judgment call, not a certainty — named here plainly rather
+// than presented as settled.
+function buildIllegalRoutesHtml(facts) {
+  const illegalFacts = facts.filter(
+    (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
+  );
+  if (!illegalFacts.length) return "";
+
+  const rows = illegalFacts.map((legalityFact) => {
+    const groupFacts = facts.filter((f) => f.group_key === legalityFact.group_key);
+    const mechanismFact = groupFacts.find(
+      (f) => f.group_role === "mechanism" && f.group_role_detail === legalityFact.group_role_detail
+    );
+    // (a) the practice, plain language, verbatim from the researched
+    // fact, never softened or dramatized — never authored here.
+    const practice = mechanismFact ? mechanismFact.fact_label : legalityFact.fact_label;
+    // (c) the real, sourced consequence if researched, GAP-marked
+    // honestly if not — never a severity invented to fill the gap.
+    const consequence = (mechanismFact && mechanismFact.notes) || legalityFact.notes || "";
+    // v5 why+instead: a sibling `mechanism` fact in the same group whose
+    // own legality sibling reads "legitimate" is a real lawful
+    // alternative already rendered elsewhere in this same chapter (the
+    // plain fact list above) — named and pointed to, never invented when
+    // none exists.
+    const lawfulAlternatives = groupFacts.filter((f) => {
+      if (f.group_role !== "mechanism" || f.group_role_detail === legalityFact.group_role_detail) return false;
+      const sibling = groupFacts.find(
+        (g) => g.group_role === "mechanism_legality" && g.group_role_detail === f.group_role_detail
+      );
+      return sibling && sibling.value_raw === "legitimate";
+    });
+    const insteadHtml = lawfulAlternatives.length
+      ? `<div class="fact-notes">Lawful alternative in this same section: ${lawfulAlternatives.map((a) => escapeHtml(a.fact_label)).join(", ")}.</div>`
+      : `<div class="fact-notes">No lawful alternative is recorded in this section yet — a gap, not a claim that none exists.</div>`;
+    return `
+      <div class="illegal-route-row">
+        <div class="fact-label">${escapeHtml(practice)}</div>
+        <div class="fact-value"><strong>Illegal</strong></div>
+        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "Not yet researched"}</div>
+        ${insteadHtml}
+      </div>
+    `;
+  }).join("");
+
+  // Heading + label strings ("Illegal but sometimes practiced", "Illegal")
+  // are fixed template copy, ruled by v7 Part 14 item 2/3 (confirmed in
+  // Part 17) — transported verbatim here, not reworded.
+  return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
+}
+
 // v7 §2.4: each fact section is now a <details class="chapter">, closed
 // by default, every location, no exceptions — including Overview, which
 // gets no silent default-open exemption (the verdict block + portrait
@@ -395,6 +505,16 @@ function buildSection(key, facts) {
       <div class="source-detail">${sourceDetailHtml(f)}</div>
       ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
     </li>`).join("") + `</ul>`;
+
+  // v7 Part 14: reads this SAME section's own already-loaded `facts`
+  // array (before the routeGroups/plain split above), since a
+  // `mechanism_legality` fact carries a group_key and would otherwise
+  // only ever reach the routeGroups branch — which silently drops any
+  // group with no `threshold` role fact (see the comment above), meaning
+  // it would never render at all without this dedicated pass. Renders
+  // nothing (empty string) until a real prohibited-enforced fact exists
+  // in this section's facts.
+  bodyHtml += buildIllegalRoutesHtml(facts);
 
   details.innerHTML = `<summary>${title}</summary>${bodyHtml}`;
   return details;

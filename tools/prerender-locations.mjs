@@ -181,6 +181,48 @@ function sectionForFact(fact) {
   return "overview";
 }
 
+// v7 Part 14: illegal-but-practiced routes — the Node-side twin of
+// js/location.js's buildIllegalRoutesHtml() (same reason this file
+// already duplicates generalIndex()/sectionForFact() rather than sharing
+// them: this script runs in Node, that one in the browser). Field-
+// mapping judgment call and empty-state discipline both identical to
+// that function's own comment — see it for the full reasoning, not
+// re-argued here. Renders nothing until a real prohibited-enforced fact
+// exists in derived/.
+function buildIllegalRoutesHtml(facts) {
+  const illegalFacts = facts.filter(
+    (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
+  );
+  if (!illegalFacts.length) return "";
+  const rows = illegalFacts.map((legalityFact) => {
+    const groupFacts = facts.filter((f) => f.group_key === legalityFact.group_key);
+    const mechanismFact = groupFacts.find(
+      (f) => f.group_role === "mechanism" && f.group_role_detail === legalityFact.group_role_detail
+    );
+    const practice = mechanismFact ? mechanismFact.fact_label : legalityFact.fact_label;
+    const consequence = (mechanismFact && mechanismFact.notes) || legalityFact.notes || "";
+    const lawfulAlternatives = groupFacts.filter((f) => {
+      if (f.group_role !== "mechanism" || f.group_role_detail === legalityFact.group_role_detail) return false;
+      const sibling = groupFacts.find(
+        (g) => g.group_role === "mechanism_legality" && g.group_role_detail === f.group_role_detail
+      );
+      return sibling && sibling.value_raw === "legitimate";
+    });
+    const insteadHtml = lawfulAlternatives.length
+      ? `<div class="fact-notes">Lawful alternative in this same section: ${lawfulAlternatives.map((a) => escapeHtml(a.fact_label)).join(", ")}.</div>`
+      : `<div class="fact-notes">No lawful alternative is recorded in this section yet — a gap, not a claim that none exists.</div>`;
+    return `
+      <div class="illegal-route-row">
+        <div class="fact-label">${escapeHtml(practice)}</div>
+        <div class="fact-value"><strong>Illegal</strong></div>
+        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "Not yet researched"}</div>
+        ${insteadHtml}
+      </div>
+    `;
+  }).join("");
+  return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
+}
+
 const SECTION_TITLES = {
   overview: "Overview", visa: "Visa & residency", property: "Property",
   cost: "Cost of living", community: "Community", redflags: "Red flags",
@@ -261,7 +303,7 @@ for (const loc of locations) {
         <div class="fact-value">${escapeHtml(formatValue(f))}</div>
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`).join("");
-    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul></details>`;
+    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}</details>`;
   }).join("");
 
   const sourcedFacts = facts.filter((f) => f.value_raw !== "[GAP]" && (f.source_url || f.source_ref));

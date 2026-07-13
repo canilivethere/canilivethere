@@ -16,8 +16,12 @@ export function escapeHtml(str) {
 
 // v7 §7.1: widened from 3 to all 8 locked personas (Amendment 1 §A1.2's
 // own widening trigger applies to the whole switcher, not just the three
-// that had fixture data first).
-const VALID_PERSONAS = ["waldo", "wenda", "carmen", "adira", "noa", "marek", "marguerite", "teo"];
+// that had fixture data first). Exported (v7 Part 10/11): the
+// perspective-door tiles and the top-of-page switcher both read this one
+// array, in this one order, so the two surfaces can never disagree about
+// who exists or what order they come in (Part 11's "one true source, two
+// renderings").
+export const VALID_PERSONAS = ["waldo", "wenda", "carmen", "adira", "noa", "marek", "marguerite", "teo"];
 export function getPersona() {
   const params = new URLSearchParams(location.search);
   const p = params.get("persona");
@@ -72,6 +76,22 @@ const PERSONA_LABELS = {
 // rewrite; the base sentence is unchanged verbatim.
 export const FIT_INDEX_DEFINITION =
   "Fit index: a 1–5 score combining every researched factor. Higher is better — 5 is the strongest fit, 1 is the weakest. It's a sort key, not a verdict on its own.";
+
+// v7 Part 10: the perspective door needs the switcher's own descriptor
+// string split into its two rendering halves — a first name (shown at
+// larger weight on each tile) and the descriptor sentence itself (shown
+// verbatim underneath) — where the switcher's own <option> needs the
+// whole "Name — sentence" string unchanged. One mechanical split
+// function, not a second hand-copied string: strips only the FIRST
+// " — " (several descriptors carry a second one mid-sentence, e.g.
+// Noa's own two extra em dashes, so a naive single split() would
+// truncate her sentence). Zero new authorship — same source string,
+// same order, per Part 11.
+export function personaDescriptorSentence(id) {
+  const full = PERSONA_LABELS[id] || "";
+  const idx = full.indexOf(" — ");
+  return idx === -1 ? full : full.slice(idx + 3);
+}
 
 // Shared "is this a keyboard activation" check for click-equivalent
 // keydown handlers (map pins, source-toggle badges) — one definition of
@@ -159,6 +179,20 @@ function toggleTheme() {
 // put the persona ask before the page said what it even does.
 // ---------------------------------------------------------------------
 export function renderTopBar(activePage) {
+  // Bug fix: prerendered location pages (tools/prerender-
+  // locations.mjs) ship a real, static .site-topbar for no-JS visitors —
+  // it lives directly in <body>, outside #loc-root, so location.js's own
+  // "clear #loc-root, then rebuild" reset never reaches it. Once this
+  // script runs, the page is JS-hydrated: the static bar's own job is
+  // done (and it never carried a working Dark mode button anyway, since
+  // toggling needs JS to run at all), so it's removed here — replaced,
+  // not stacked alongside, by the one this function builds. Fixed at the
+  // source rather than trying to keep two independently-authored copies
+  // of "the top bar" in permanent lockstep, which is exactly the
+  // duplication class this project's own build notes warn about
+  // elsewhere (generalIndex()/sectionForFact()'s Node-vs-browser twins).
+  const existing = document.querySelector(".site-topbar");
+  if (existing) existing.remove();
   const bar = document.createElement("div");
   bar.className = "site-topbar";
   // v7 no-JS fallback: siteUrl()-resolved paths (not a bare "index.html")
@@ -279,6 +313,17 @@ export function renderPersonaBlock(persona, anchorEl) {
 }
 
 export function renderFooter(store) {
+  // Same duplication class as renderTopBar()'s own fix above, found
+  // during this build's own dry run (not in the original two-bug ask,
+  // fixed anyway since it's the identical root cause I'd just fixed one
+  // function up): tools/prerender-locations.mjs ships a real, static
+  // .site-footer for no-JS visitors, a sibling of <main> in <body> — this
+  // function used to just document.body.appendChild() a second one
+  // alongside it rather than replacing it, so a JS-hydrated prerendered
+  // page showed two different footer paragraphs stacked on top of each
+  // other.
+  const existing = document.querySelector(".site-footer");
+  if (existing) existing.remove();
   const footer = document.createElement("footer");
   footer.className = "site-footer";
   const meta = store && store.meta;

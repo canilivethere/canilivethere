@@ -226,9 +226,27 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
 
 /* ---------- persona block (v4 addendum R4 §4.2/4.3): now lives inside
    <main>, after each page's own H1/orientation, not in the top bar. */
-.persona-block { margin: 0.75rem 0 0.25rem; }
-.persona-block label { font-size: 0.85rem; color: var(--muted); margin-right: 0.5rem; }
-.persona-block select { font-size: 0.95rem; padding: 0.2rem 0.4rem; }
+.persona-block { margin: 0.75rem 0 0.25rem; max-width: 100%; }
+/* Bug fix: v7 §7.1 widened every <option> to a full multi-
+   sentence descriptor (~350-500 chars); a bare native <select> has no
+   intrinsic width cap, so some browsers size its closed box to fit the
+   longest/currently-selected option's raw text, pushing it past the
+   viewport edge. width:100% (bounded by .persona-block's own max-width,
+   in turn bounded by <main>'s) plus the ellipsis treatment below fixes
+   this for ANY option length, not just today's specific strings — a
+   future-content-length-proof fix, not a one-off truncation number. The
+   full sentence stays fully readable in .persona-blurb below (unchanged
+   otherwise); this only stops the closed <select> box itself from
+   overflowing. */
+.persona-block select {
+  font-size: 0.95rem;
+  padding: 0.2rem 0.4rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .persona-blurb { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); min-height: 1.1em; }
 
 /* ---------- disclosure "recede" mechanism (v2/v1 §2.2): a <details>
@@ -371,11 +389,40 @@ h3 { font-size: 1.05rem; }
      instead — a dedicated "elevated" tone giving that same stop 3.39:1,
      closer to its old margin. No ramp hex touched. */
   stroke: var(--panel);
-  stroke-width: 2;
+  /* v7 Part 9 item 3: constant on-screen stroke width across zoom levels.
+     map.js sets --pin-stroke per-circle (PIN_HALO / current zoom scale);
+     the var()'s own fallback (2) matches the pre-zoom fixed value exactly,
+     so nothing changes for any code path that doesn't set it. A CSS
+     custom property (not a plain inline style) so the :hover/:focus rule
+     below can still scale its own thicker value off the same per-element
+     base, instead of an inline style silently overriding hover feedback. */
+  stroke-width: var(--pin-stroke, 2);
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
 }
-.location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: 2.5; }
+.location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: calc(var(--pin-stroke, 2) * 1.25); }
 .location-pin.eliminated { fill: url(#hatch-eliminated); stroke: var(--eliminated); }
+/* v7 Part 9 item 2: cluster badges share the pin's own stroke/cursor/
+   hover language (same class) but never a ramp hue fill (set inline by
+   map.js, PENDING_COLOR) — the count numeral inside is plain white,
+   readable against that neutral gray at every ramp position. */
+.cluster-badge-count { fill: #fff; font-family: "Work Sans", sans-serif; font-weight: 600; }
+
+/* v7 Part 9 item 1: zoom controls, fixed bottom-right of the map itself
+   (.map-wrap is already position:relative) — one of three redundant
+   entry points, the other two (scroll/pinch, keyboard) have no visible
+   chrome by nature. */
+.zoom-controls { position: absolute; right: 0.6rem; bottom: 0.6rem; display: flex; gap: 0.3rem; z-index: 10; }
+.zoom-btn {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.zoom-btn:hover { border-color: var(--accent); }
 .pin-label-tooltip {
   position: absolute;
   pointer-events: none;
@@ -404,6 +451,93 @@ h3 { font-size: 1.05rem; }
    convention). */
 .ormen-lange { pointer-events: none; }
 .ormen-lange path { fill: none; stroke: var(--country-border); stroke-opacity: 0.55; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- perspective door (v7 Part 10, js/perspective-door.js) ---------- */
+/* "Visible but foggy, not hidden" — the map keeps rendering underneath,
+   just de-emphasized, while the door is open. */
+#map-root.map-fogged { opacity: 0.4; filter: blur(2px); pointer-events: none; transition: opacity 0.2s ease, filter 0.2s ease; }
+#perspective-door {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(27, 27, 27, 0.4);
+  overflow-y: auto;
+}
+.door-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  max-width: 920px;
+  width: 100%;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+}
+.door-welcome {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 1.1rem;
+  max-width: 46em;
+  margin: 0 0 1.25rem;
+}
+.door-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.door-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.75rem 0.6rem;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+.door-tile:hover, .door-tile:focus { border-color: var(--accent); }
+/* Neutral stub (Part 17): visible even with no portrait file present —
+   never a broken-image icon (perspective-door.js removes a failed <img>
+   on error, leaving this background showing through). */
+.door-portrait {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--gap-bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.door-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.door-name { font-family: "Fraunces", serif; font-weight: 700; font-size: 1rem; }
+.door-descriptor { font-size: 0.8rem; color: var(--muted); }
+/* The escape hatch (Part 10): plain-text, deliberately less weighted
+   than the eight tiles (no card chrome, no portrait) but not
+   apologetic — same underline-link treatment as any other text link. */
+.door-escape {
+  display: block;
+  margin: 0 auto;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
 
 /* ---------- lists ---------- */
 .fit-def { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--muted); padding: 0 0 0.4rem; }
@@ -499,6 +633,25 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
    what a Red Flags chapter is (thoroughly researched, alarming). */
 .chapter-redflags { border-left: 3px solid var(--div-diverge-ink); background: var(--div-diverge-bg); }
 .chapter-redflags > summary { color: var(--div-diverge-ink); }
+
+/* v7 Part 14: illegal-but-practiced routes — reuses the exact same
+   left-accent + tint pattern as .chapter-redflags above (no new chrome
+   language), scoped to a single row inside whichever chapter a
+   `mechanism_legality: prohibited-enforced` fact's own section maps to.
+   Never route-card chrome (Part 14 item 1) — deliberately not built on
+   .fact-list/.fact-item. Dormant CSS until location.js actually renders
+   one of these (see that file's own comment) — same empty-state
+   discipline as every other rule on this page. */
+.illegal-routes { margin-top: 1rem; }
+.illegal-routes h3 { font-size: 0.95rem; color: var(--div-diverge-ink); margin: 0 0 0.5rem; }
+.illegal-route-row {
+  border-left: 3px solid var(--div-diverge-ink);
+  background: var(--div-diverge-bg);
+  border-radius: 3px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.illegal-route-row .fact-value strong { color: var(--div-diverge-ink); }
 
 .section-nav { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
 .section-nav a { text-decoration: none; font-size: 0.9rem; }

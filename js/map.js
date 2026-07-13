@@ -8,11 +8,12 @@ import {
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 import { siteUrl } from "./site-root.js";
+import { initPerspectiveDoor } from "./perspective-door.js";
 
 // v6 addendum R1/R4: one shared radius/halo pair, read by both the pin loop
-// below (the actual rendered circle) and computeMapViewBox() (the padding
-// floor) — a single source so the two can never silently drift apart the
-// way the spec's own "7+2=9" arithmetic assumes they won't.
+// below (the actual rendered circle) and computeViewBoxForLocations() (the
+// padding floor) — a single source so the two can never silently drift
+// apart the way the spec's own "7+2=9" arithmetic assumes they won't.
 const PIN_RADIUS = 7;
 const PIN_HALO = 2;
 
@@ -31,25 +32,256 @@ const PROJECT_COUNTRY_TO_ISO = {
 applyStoredTheme();
 renderTopBar("map");
 renderPersonaSlot(document.getElementById("persona-slot"), getPersona());
+// v7 Part 10: index.html-only by construction (this is the one page that
+// imports this module) — decides on its own whether to show, this call
+// site doesn't branch on anything.
+initPerspectiveDoor();
 main();
+
+// ---------------------------------------------------------------------
+// v7 Part 13: the purpose-lens plug-in contract.
+//   { id, label, valueForLocation(location_id) -> number 1-5 | null, explainerText }
+// Generalizes the prior ad hoc FEATURED_CRITERIA shape (a criterion_id +
+// label pair, read directly off scores.jsonl inline in the render code)
+// so a future scored lens plugs in with zero new UI the moment a real
+// valueForLocation exists. Dog-friendly and family are explicitly NOT
+// built here — routed, not resolved, per Part 13's own no-invented-
+// scoring-method rule; no disabled/"coming soon" chip either (a chip that
+// doesn't work is a dead promise, the exact shape v5's no-bare-no
+// discipline exists to prevent).
+// ---------------------------------------------------------------------
+
+// A criterion-backed lens's valueForLocation is a one-line scores.jsonl
+// lookup — the same read every criterion on this site already resolves
+// through; nothing stops a future composite lens's valueForLocation from
+// being any other function returning the same 1-5-or-null shape.
+function criterionLens(store, criterionId, label) {
+  const crit = store.criteriaById.get(criterionId);
+  const displayLabel = label || (crit ? crit.name : criterionId);
+  return {
+    id: criterionId,
+    label: displayLabel,
+    valueForLocation(locationId) {
+      const row = store.scoresByLocation.get(locationId)?.get(criterionId);
+      return row && row.status === "scored" && row.score != null ? row.score : null;
+    },
+    explainerText: `Pins colored by ${displayLabel} alone, general figures — this view ignores any persona pick above.`,
+  };
+}
+
+// The two lenses Part 13 confirms as already-built and spec-compliant
+// (easiest visa, money goes furthest), folded into this build as-is.
+// "Best property access" was already a third entry in this array before
+// this change (ported from lists.js's own FEATURED_CRITERIA) — it's
+// not one of Part 13's four named purpose lenses, but it's already a
+// working, criterion-backed lens with no reason to drop it.
+function buildFeaturedLenses(store) {
+  return [
+    criterionLens(store, "visa-legal-pathway-ease", "Easiest visa"),
+    criterionLens(store, "cost-of-living-affordability", "Money goes furthest"),
+    criterionLens(store, "land-property-access", "Best property access"),
+  ];
+}
+
+// A "More…" pick (any of the other ten criteria, not one of the three
+// featured chips above) resolves to an ad hoc lens built the same way,
+// on demand — so every criterion on this site, not just the three
+// chips, colors the map through the exact same one code path.
+function resolveLens(store, lenses, lensId) {
+  if (!lensId) return null;
+  return lenses.find((l) => l.id === lensId) || criterionLens(store, lensId);
+}
+
+// ---------------------------------------------------------------------
+// v7 Part 9: zoom/pan state. Module-level, fresh on every page load (no
+// persistence anywhere below) — "state resets on load, not persisted"
+// is satisfied by construction, not a separate reset step.
+// ---------------------------------------------------------------------
+let STATE = { lensId: null, viewBox: null };
+
+// Craft latitude, named per the spec's own permission (same class as the
+// grain filter's own untested-on-paper parameters) — zoom-step factor,
+// deepest-zoom cap, cluster pixel-radius threshold, and pan-per-keypress
+// fraction are starting values, tuned by eye, not measured.
+const ZOOM_STEP = 1.4;
+const MAX_SCALE = 20;
+const CLUSTER_PX_THRESHOLD = 24;
+const PAN_FRACTION = 0.2;
+
+function parseViewBox(str) {
+  const [x, y, w, h] = str.split(/\s+/).map(Number);
+  return { x, y, w, h };
+}
+function viewBoxToString(vb) {
+  return `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
+}
+function boxCenter(vb) {
+  return { x: vb.x + vb.w / 2, y: vb.y + vb.h / 2 };
+}
+
+function homeViewBox(store) {
+  return parseViewBox(computeMapViewBox(store));
+}
+
+// Clamp any viewBox to WORLD_VIEWBOX's own bounds — the same rule
+// computeViewBoxForLocations() applies once at construction, re-applied
+// here since panning/zooming can drift a box toward or past the world's
+// own edge after the fact.
+function clampViewBox(vb) {
+  const [wx, wy, ww, wh] = WORLD_VIEWBOX.split(/\s+/).map(Number);
+  let { x, y, w, h } = vb;
+  w = Math.min(w, ww);
+  h = Math.min(h, wh);
+  x = Math.max(wx, Math.min(x, wx + ww - w));
+  y = Math.max(wy, Math.min(y, wy + wh - h));
+  return { x, y, w, h };
+}
+
+// Zoom a viewBox by `factor` (>1 in, <1 out), keeping `focal` (world-space
+// point) at the same relative position within the box before and after —
+// the standard "zoom toward the cursor/center" behavior.
+function zoomViewBox(vb, factor, focal) {
+  const newW = vb.w / factor;
+  const newH = vb.h / factor;
+  const fxRel = (focal.x - vb.x) / vb.w;
+  const fyRel = (focal.y - vb.y) / vb.h;
+  return { x: focal.x - fxRel * newW, y: focal.y - fyRel * newH, w: newW, h: newH };
+}
+
+function applyZoom(store, lenses, factor, focal) {
+  const home = homeViewBox(store);
+  const base = STATE.viewBox || home;
+  let vb = zoomViewBox(base, factor, focal || boxCenter(base));
+  const minW = home.w / MAX_SCALE;
+  if (vb.w < minW) vb = zoomViewBox(vb, minW / vb.w, focal || boxCenter(vb));
+  // Can't zoom OUT past the site's own "full world" framing — Reset
+  // already provides the one-action way back there (spec reason (a));
+  // zooming further out than home has no defined "more world" to show.
+  if (vb.w > home.w) vb = { ...home };
+  STATE.viewBox = clampViewBox(vb);
+  renderMap(store, lenses);
+}
+
+function applyPan(store, lenses, dxFrac, dyFrac) {
+  const vb = STATE.viewBox || homeViewBox(store);
+  STATE.viewBox = clampViewBox({ x: vb.x + dxFrac * vb.w, y: vb.y + dyFrac * vb.h, w: vb.w, h: vb.h });
+  renderMap(store, lenses);
+}
+
+function resetView(store, lenses) {
+  STATE.viewBox = homeViewBox(store);
+  renderMap(store, lenses);
+}
+
+// Converts a client-space (mouse/touch) point to this SVG's own
+// user-space (world) coordinates, via the browser's own screen-CTM —
+// the standard technique for "zoom centered on the cursor," not a
+// hand-rolled approximation of the SVG spec's own transform math.
+function clientToWorld(svg, clientX, clientY, fallback) {
+  if (!svg.createSVGPoint) return fallback;
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return fallback;
+  const svgPt = pt.matrixTransform(ctm.inverse());
+  return { x: svgPt.x, y: svgPt.y };
+}
+
+// Screen-pixel-radius pin declustering (Part 9 item 2): connected-
+// components clustering (union-find) over pairwise on-screen distance —
+// pins within CLUSTER_PX_THRESHOLD of ANY other pin in the same group
+// merge, a standard, honest reading of "within a fixed screen-pixel
+// radius of each other" for groups of 3+, not just strict pairs.
+function clusterPins(pinEntries, pxPerWorldUnit) {
+  const n = pinEntries.length;
+  const parent = pinEntries.map((_, i) => i);
+  function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+  function union(i, j) { const ri = find(i), rj = find(j); if (ri !== rj) parent[ri] = rj; }
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = (pinEntries[i].cx - pinEntries[j].cx) * pxPerWorldUnit;
+      const dy = (pinEntries[i].cy - pinEntries[j].cy) * pxPerWorldUnit;
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PX_THRESHOLD) union(i, j);
+    }
+  }
+  const groups = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(pinEntries[i]);
+  }
+  return [...groups.values()];
+}
 
 async function main() {
   const store = await loadStore();
   renderFooter(store);
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
+  const lenses = buildFeaturedLenses(store);
+  renderPurposeSelector(store, lenses);
+  renderMap(store, lenses);
+  wireMapInteractions(store, lenses);
+}
 
+function renderPurposeSelector(store, lenses) {
+  const el = document.getElementById("purpose-lists");
+  const lensIds = new Set(lenses.map((l) => l.id));
+  // "All thirteen, always reachable": the remaining criteria beyond the
+  // three featured chips, sorted by the schema's own display_order.
+  const moreCriteria = store.criteria.filter((c) => !lensIds.has(c.criterion_id));
+
+  const chipHtml = (id, label, active) =>
+    `<button type="button" class="btn-chip purpose-chip${active ? " active" : ""}" data-purpose="${id || ""}">${escapeHtml(label)}</button>`;
+
+  el.innerHTML =
+    chipHtml("", "Blended Fit index", !STATE.lensId) +
+    lenses.map((l) => chipHtml(l.id, l.label, STATE.lensId === l.id)).join("") +
+    `<select class="purpose-more" id="purpose-more">
+      <option value="">More…</option>
+      ${moreCriteria.map((c) => `<option value="${c.criterion_id}"${STATE.lensId === c.criterion_id ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+    </select>`;
+
+  const setLens = (value) => {
+    if (STATE.lensId === (value || null)) return;
+    STATE.lensId = value || null;
+    renderPurposeSelector(store, lenses);
+    renderMap(store, lenses);
+  };
+  el.querySelectorAll(".purpose-chip").forEach((btn) => {
+    btn.addEventListener("click", () => setLens(btn.dataset.purpose || null));
+  });
+  el.querySelector("#purpose-more").addEventListener("change", (e) => setLens(e.target.value || null));
+
+  const explainerEl = document.getElementById("purpose-explainer");
+  if (!STATE.lensId) {
+    explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
+  } else {
+    const lens = resolveLens(store, lenses, STATE.lensId);
+    explainerEl.textContent = lens ? lens.explainerText : "";
+  }
+}
+
+function renderMap(store, lenses) {
   const root = document.getElementById("map-root");
-  const persona = getPersona();
+  root.innerHTML = "";
+  if (!STATE.viewBox) STATE.viewBox = homeViewBox(store);
+  const home = homeViewBox(store);
+  const scale = home.w / STATE.viewBox.w;
+
+  const activeLens = resolveLens(store, lenses, STATE.lensId);
+  const persona = activeLens ? null : getPersona();
 
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("id", "worldmap");
-  // v6 addendum R1: framed to the pin extent, not the whole world — see
-  // computeMapViewBox() below. #worldmap keeps height:auto (style.css), no
-  // aspect forced here, so the box's own shape drives the rendered ratio.
-  svg.setAttribute("viewBox", computeMapViewBox(store));
+  // v6 addendum R1 / v7 Part 9: framed to the pin extent at rest
+  // (computeMapViewBox()), zoom/pan-adjustable from there — #worldmap
+  // keeps height:auto (style.css), no aspect forced here, so the box's
+  // own shape drives the rendered ratio.
+  svg.setAttribute("viewBox", viewBoxToString(STATE.viewBox));
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "World map, location pins colored by relocation fit");
+  svg.setAttribute("aria-label", "World map, location pins colored by relocation fit. Use the on-map buttons, scroll or pinch, or the plus/minus/arrow keys to zoom and pan.");
 
   const defs = document.createElementNS(svgNS, "defs");
   defs.innerHTML = `
@@ -57,21 +289,25 @@ async function main() {
       <rect width="4" height="4" fill="${eliminatedColor()}" />
       <line x1="0" y1="0" x2="0" y2="4" stroke="#f2e6d8" stroke-width="1.4" />
     </pattern>
+    <pattern id="map-grain" patternUnits="userSpaceOnUse" width="140" height="140">
+      <image href="${grainImageHref()}" x="0" y="0" width="140" height="140" />
+    </pattern>
   `;
   svg.appendChild(defs);
 
-  // Per-country average index (for the choropleth base layer). Computed
-  // via personaIndex(), which already falls back to the general index per-
-  // criterion wherever a persona has no fixture override for it (see
-  // data.js) - this line needs no persona-name branching, it's correct for
-  // any current or future persona shape as-is.
+  // Per-country average index (for the choropleth base layer). A lens
+  // active averages that lens's own valueForLocation() across the
+  // country's locations; otherwise the existing personaIndex()/
+  // generalIndex() split, unchanged.
   const countryAverages = new Map();
   for (const country of store.countries) {
     const locs = store.locations.filter((l) => l.country_id === country.country_id);
-    const vals = locs
-      .map((l) => (persona ? store.personaIndex(persona, l.location_id) : store.generalIndex(l.location_id)))
-      .filter(Boolean)
-      .map((r) => r.value);
+    const vals = activeLens
+      ? locs.map((l) => activeLens.valueForLocation(l.location_id)).filter((v) => v != null)
+      : locs
+          .map((l) => (persona ? store.personaIndex(persona, l.location_id) : store.generalIndex(l.location_id)))
+          .filter(Boolean)
+          .map((r) => r.value);
     if (vals.length) countryAverages.set(country.country_id, vals.reduce((a, b) => a + b, 0) / vals.length);
   }
 
@@ -97,54 +333,59 @@ async function main() {
     svg.appendChild(path);
   }
 
+  // v7 Part 15: extends the existing procedural-grain mechanism (style.css
+  // §1.5.1's own feTurbulence/feColorMatrix recipe) onto the map's own
+  // landmass/water fills, which sat outside its original body/.panel-card
+  // scope. World-space-fixed (WORLD_VIEWBOX, never the current zoomed
+  // viewBox) so it never needs recomputing on zoom/pan — the SVG's own
+  // viewBox window naturally shows the right cropped portion of it,
+  // exactly as it already does for the country-path fills above. Painted
+  // after the base fills and before Ormen Lange/pins, so neither the
+  // ornament nor a pin gets textured — only the fills do, per Part 15's
+  // own scope (coastline/border strokes explicitly untouched).
+  renderMapGrain(svg, svgNS);
+
   // v6 addendum R4: the site's first pure ornament — Ormen Lange, open
   // North Atlantic, ahead of the pin layer so a pin can never render under
-  // it even though their coordinates don't collide today. Not an input to
-  // computeMapViewBox() above (ornament, not a location) and not part of
-  // the persona-branch loop below (never interactive, never re-colored).
+  // it even though their coordinates don't collide today. Draws directly
+  // in PROJECTION world-space (not a persisted <g transform>), so it stays
+  // correctly pinned to its own anchor through zoom/pan with no extra code
+  // — the same viewBox mechanism that keeps country-path fills correctly
+  // positioned already covers it (Part 9 item 5's own requirement, met by
+  // the existing draw method rather than by a group-transform this file
+  // no longer uses — flagged as a small factual mismatch against the
+  // spec's own described mechanism, not a gap in the actual requirement).
   renderOrmenLange(svg, svgNS);
 
-  // Pin layer: exact per-location placement (real lat/lon), colored/marked
-  // by fit. This is the layer that actually carries persona/elimination
-  // meaning, since only Wenda/Carmen's verdict fixtures give us a real
-  // pass/fail read at all (see the build notes on why Waldo has no
-  // "eliminated" state to show).
+  // ---- Pin data pass: compute fill/tooltip per location, unchanged
+  // logic from before zoom/decluster existed — just deferred from
+  // immediate drawing into a plain array first, so declustering (below)
+  // can group by on-screen distance before anything is actually drawn.
+  const pinEntries = [];
   for (const loc of store.locations) {
     if (loc.lat == null || loc.lon == null) continue;
     const cx = PROJECTION.x(loc.lon);
     const cy = PROJECTION.y(loc.lat);
     const country = store.countriesById.get(loc.country_id);
 
-    // v4 addendum R3 §3.4: radius 6 -> 7, a small proportional bump — the
-    // halo ring itself is CSS-only (.location-pin's stroke, style.css).
-    // PIN_RADIUS is the same constant computeMapViewBox() pads against
-    // above, so the two can't silently drift apart.
-    let fill, radius = PIN_RADIUS, tooltip, eliminated = false;
+    let fill, tooltip, eliminated = false;
 
-    // Tooltip voice (v2 addendum §4): a one-line human
-    // answer leads every tooltip, built only from data already computed —
-    // the existing numeric Fit-index detail below follows it, kept in
-    // full, never removed (disclosure-hierarchy discipline: it recedes to
-    // second line, not to zero).
-    if (persona === "waldo") {
+    // Tooltip voice (v2 addendum §4): a one-line human answer leads every
+    // tooltip, built only from data already computed.
+    if (activeLens) {
+      const val = activeLens.valueForLocation(loc.location_id);
+      fill = scoreToColor(val);
+      tooltip = `${loc.display_name}, ${country.name} — ${activeLens.label}: ${val != null ? val.toFixed(1) + "/5" : "not scored yet"}`;
+    } else if (persona === "waldo") {
       const idx = store.personaIndex("waldo", loc.location_id);
       fill = scoreToColor(idx ? idx.value : null);
       const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
-      // v7 Part 4: the "(4 of 13 criteria are recalculated...)" mechanism
-      // parenthetical is cut — it lives in full on the location page's
-      // verdict block now, one click away (law 1), not required reading
-      // on every hover.
       tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5`;
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
       const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
       const verdict = perLoc?.verdict;
-      // Check for real criterion fixtures, not a hardcoded "always verification
-      // pending" assumption - criterion-level data for Wenda/Carmen landed
-      // concurrently with this build (see location.js's matching comment).
-      // When it exists, use their real persona-adjusted index, same as
-      // Waldo above.
       const hasCriterionFixtures = perLoc && perLoc.criteria && perLoc.criteria.size > 0;
       const idx = hasCriterionFixtures ? store.personaIndex(persona, loc.location_id) : null;
       const underlyingValue = idx ? idx.value : (general ? general.value : null);
@@ -154,53 +395,16 @@ async function main() {
         const visual = verdictVisual(vHeadline);
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
-        // v6 plain-language pass, item 5: "verification pending, not yet
-        // done" retired — it collided with the unrelated confidence tier
-        // "Unverified" (v1 §3.3's already-named collision class). One word
-        // flagged as a deliberate, non-silent deviation from the addendum's
-        // own quoted fragment: "hasn't" not "haven't" — the subject here
-        // ("criterion-level rescoring") is singular, and shipping a
-        // subject-verb disagreement would trade one readability problem for
-        // another on a page this project's own craft standard holds to
-        // plain, correct language.
-        // v7 Part 4: both mechanism clauses ("criterion-level rescoring
-        // hasn't been checked yet..." / "own re-scored fixture") are cut
-        // to just the number — the "why does this number look like that"
-        // answer already lives on the location page's verdict block and
-        // score-breakdown chapter, one click away (law 1).
         const indexLabel = `Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`;
-        // §4.2: the fixture's own already-computed verdictHeadline() string,
-        // unchanged — no new text authored, a render-surface change only.
-        // v6 plain-language pass, item 4: "visa/elimination read" ->
-        // "visa check" — drops "elimination" and "read"-as-noun.
         const headline = `${loc.display_name}, ${country.name} — ${vHeadline}.`;
-        // v5 §3.2 no-bare-no, folded into this cycle (v7 §7.2): for the
-        // one hard-no class (eliminated), append the fixed instead-line —
-        // the pin click-through is unchanged, this just names why
-        // clicking through is still worth it. Amber (typetrap/nearmiss)
-        // verdicts are conditional, not hard nos, so they get no added
-        // line — one wouldn't misstate a narrower option as a refusal.
         const insteadLine = visual.kind === "eliminated"
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
         tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})${insteadLine}`;
       } else {
-        // v6 plain-language pass, item 3: "no verdict fixture on file for
-        // this persona yet" -> "not checked yet for this persona" — the
-        // canonical band word (v4 §1.2 / BAND_LABEL["not-checked"]), not a
-        // fourth phrasing for the same state.
         tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
     } else if (persona) {
-      // v7 §7.1 item 2: the five newly-widened personas (Adira, Noa,
-      // Marek, Marguerite, Teo) have no fixture data yet — previously
-      // this fell into the plain "else" branch below and silently
-      // behaved as if no persona were selected at all. Now it gets the
-      // general fill (nothing else to color by) plus the same canonical
-      // "not checked yet for this persona" line the Wenda/Carmen
-      // no-verdict branch above already uses (BAND_LABEL["not-checked"]
-      // in that string's own wording) — zero new copy, reused in a spot
-      // it didn't reach before.
       const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
       tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
@@ -208,39 +412,10 @@ async function main() {
       const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
       const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
-      // v7 Part 4: the "(weighted average of N/13 scored criteria)"
-      // parenthetical is cut — mechanism detail, not the hook; it still
-      // lives in full on the location page's verdict block and score-
-      // breakdown chapter (one click away, law 1).
       tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
     }
 
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("cx", cx);
-    circle.setAttribute("cy", cy);
-    circle.setAttribute("r", radius);
-    circle.setAttribute("class", "location-pin" + (eliminated ? " eliminated" : ""));
-    if (!eliminated) circle.setAttribute("fill", fill);
-    circle.setAttribute("tabindex", "0");
-    circle.setAttribute("role", "link");
-    circle.setAttribute("aria-label", `${loc.display_name}, ${country.name}`);
-    circle.dataset.tooltip = tooltip;
-    circle.dataset.loc = loc.location_id;
-
-    // v7 no-JS fallback: pin click-through now targets the prerendered
-    // per-location page (l/<id>.html), not location.html?loc=<id> — real,
-    // crawlable static content exists at that URL (see
-    // tools/prerender-locations.mjs); the query-string route still works
-    // as a legacy fallback (location.js reads both).
-    const go = () => { location.href = withPersona(siteUrl(`l/${loc.location_id}.html`)); };
-    circle.addEventListener("click", go);
-    circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
-    circle.addEventListener("mouseenter", (e) => showTip(e, tooltip));
-    circle.addEventListener("focus", (e) => showTip(e, tooltip));
-    circle.addEventListener("mouseleave", hideTip);
-    circle.addEventListener("blur", hideTip);
-
-    svg.appendChild(circle);
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated });
   }
 
   const wrap = document.createElement("div");
@@ -250,7 +425,17 @@ async function main() {
   tip.className = "pin-label-tooltip";
   tip.id = "pin-tooltip";
   wrap.appendChild(tip);
+  const zoomControls = buildZoomControls(store, lenses);
+  wrap.appendChild(zoomControls);
   root.appendChild(wrap);
+
+  // ---- Declustering pass: real rendered CSS pixel width, measured now
+  // that #map-root is (still) attached to the live DOM — not hardcoded,
+  // not assumed, recomputed on every render since it changes with zoom
+  // and with the viewport itself.
+  const containerWidthPx = root.getBoundingClientRect().width || 800;
+  const pxPerWorldUnit = containerWidthPx / STATE.viewBox.w;
+  const groups = clusterPins(pinEntries, pxPerWorldUnit);
 
   function showTip(e, text) {
     const tipEl = document.getElementById("pin-tooltip");
@@ -266,25 +451,214 @@ async function main() {
     if (tipEl) tipEl.style.display = "none";
   }
 
+  for (const group of groups) {
+    if (group.length === 1) {
+      const entry = group[0];
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", entry.cx);
+      circle.setAttribute("cy", entry.cy);
+      // Part 9 item 3: constant on-screen size, not constant map-unit
+      // size — radius/stroke divided by the current zoom scale on every
+      // render (scale=1 at rest, so this is pixel-identical to the
+      // pre-zoom build at the home view).
+      circle.setAttribute("r", (PIN_RADIUS / scale).toFixed(3));
+      circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
+      circle.setAttribute("class", "location-pin" + (entry.eliminated ? " eliminated" : ""));
+      if (!entry.eliminated) circle.setAttribute("fill", entry.fill);
+      circle.setAttribute("tabindex", "0");
+      circle.setAttribute("role", "link");
+      circle.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
+      circle.dataset.tooltip = entry.tooltip;
+      circle.dataset.loc = entry.loc.location_id;
+
+      const go = () => { location.href = withPersona(siteUrl(`l/${entry.loc.location_id}.html`)); };
+      circle.addEventListener("click", go);
+      circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
+      circle.addEventListener("mouseenter", (e) => showTip(e, entry.tooltip));
+      circle.addEventListener("focus", (e) => showTip(e, entry.tooltip));
+      circle.addEventListener("mouseleave", hideTip);
+      circle.addEventListener("blur", hideTip);
+
+      svg.appendChild(circle);
+    } else {
+      // Part 9 item 2: a cluster badge — neutral PENDING_COLOR, never a
+      // ramp hue (averaging several genuinely distinct locations' scores
+      // into one color would assert a value this seat doesn't get to
+      // invent). Click/tap zooms to fit the cluster's own bounding box,
+      // via the SAME padding logic computeMapViewBox() already uses
+      // (computeViewBoxForLocations()), reused not reinvented.
+      const cx = group.reduce((s, p) => s + p.cx, 0) / group.length;
+      const cy = group.reduce((s, p) => s + p.cy, 0) / group.length;
+      const r = (PIN_RADIUS + 2) / scale;
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", cx);
+      circle.setAttribute("cy", cy);
+      circle.setAttribute("r", r.toFixed(3));
+      circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
+      circle.setAttribute("class", "location-pin cluster-badge");
+      circle.setAttribute("fill", PENDING_COLOR);
+      circle.setAttribute("tabindex", "0");
+      circle.setAttribute("role", "button");
+      const names = group.map((p) => p.loc.display_name).join(", ");
+      circle.setAttribute("aria-label", `${group.length} locations close together: ${names}. Activate to zoom in and separate them.`);
+      const zoomToCluster = () => {
+        STATE.viewBox = parseViewBox(computeViewBoxForLocations(group.map((p) => p.loc)));
+        renderMap(store, lenses);
+      };
+      circle.addEventListener("click", zoomToCluster);
+      circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); zoomToCluster(); } });
+      svg.appendChild(circle);
+
+      const text = document.createElementNS(svgNS, "text");
+      text.setAttribute("x", cx);
+      text.setAttribute("y", cy);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("dominant-baseline", "central");
+      text.setAttribute("class", "cluster-badge-count");
+      text.setAttribute("font-size", (10 / scale).toFixed(2));
+      text.setAttribute("pointer-events", "none");
+      text.setAttribute("aria-hidden", "true");
+      text.textContent = String(group.length);
+      svg.appendChild(text);
+    }
+  }
+
   renderLegend(document.getElementById("map-legend"), persona);
   renderJudgmentNote(document.getElementById("map-judgment-note"));
 }
 
-// v6 addendum R1: the map's viewBox, framed to the current pin extent
-// instead of the whole world — a touch more within reach, no
-// Greenland/North Pole dead space above the northernmost real candidate.
-// Reads the FULL 38-location set every call, unfiltered by persona, so the
-// crop never shifts on a persona pick (§R1.1) — and this is also the
-// literal mechanism by which a future Longyearbyen pin (~78N) widens the
-// frame on its own next render, no code change beyond the new location
-// row (the addendum's own "waiting is free" claim).
-function computeMapViewBox(store) {
-  const pts = store.locations
+// Zoom controls (Part 9 item 1): fixed bottom-right of #map-root, one of
+// three redundant entry points (buttons here; scroll/pinch and keyboard
+// wired once in wireMapInteractions() below, since #map-root itself
+// persists across renders while this control panel is rebuilt each time,
+// same rebuild-every-render pattern the rest of this function already
+// uses for pins/legend).
+function buildZoomControls(store, lenses) {
+  const div = document.createElement("div");
+  div.className = "zoom-controls";
+  div.setAttribute("role", "group");
+  div.setAttribute("aria-label", "Map zoom controls");
+  div.innerHTML = `
+    <button type="button" class="zoom-btn" id="zoom-out" aria-label="Zoom out">&minus;</button>
+    <button type="button" class="zoom-btn" id="zoom-reset" aria-label="Reset to full-world view">Reset</button>
+    <button type="button" class="zoom-btn" id="zoom-in" aria-label="Zoom in">+</button>
+  `;
+  div.querySelector("#zoom-in").addEventListener("click", () => applyZoom(store, lenses, ZOOM_STEP, boxCenter(STATE.viewBox)));
+  div.querySelector("#zoom-out").addEventListener("click", () => applyZoom(store, lenses, 1 / ZOOM_STEP, boxCenter(STATE.viewBox)));
+  div.querySelector("#zoom-reset").addEventListener("click", () => resetView(store, lenses));
+  return div;
+}
+
+// Wired ONCE (not per-render): #map-root is the same DOM node for the
+// page's whole life (only its innerHTML is replaced by renderMap()), so
+// wheel/touch/keyboard listeners attached here never need re-attaching
+// and can't leak.
+function wireMapInteractions(store, lenses) {
+  const root = document.getElementById("map-root");
+  if (!root) return;
+
+  // Entry point 2: scroll-wheel / trackpad-pinch (wheel event with any
+  // deltaY), centered on the cursor.
+  root.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const svgEl = root.querySelector("svg");
+    if (!svgEl) return;
+    const focal = clientToWorld(svgEl, e.clientX, e.clientY, boxCenter(STATE.viewBox || homeViewBox(store)));
+    applyZoom(store, lenses, e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, focal);
+  }, { passive: false });
+
+  // Known limitation flagged in Part 9: trackpad-pinch (wheel+ctrlKey) and
+  // real mobile touch-pinch are distinct mechanisms — the wheel listener
+  // above covers the former (trackpads fire synthetic ctrlKey wheel
+  // events for pinch gestures in every major browser); this covers the
+  // latter for real, via actual two-finger touch events, not assumed to
+  // already work.
+  let pinchStartDist = null;
+  let pinchStartBox = null;
+  function touchDistance(t1, t2) {
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  root.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2) {
+      pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+      pinchStartBox = { ...(STATE.viewBox || homeViewBox(store)) };
+    }
+  }, { passive: true });
+  root.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2 && pinchStartDist) {
+      e.preventDefault();
+      const svgEl = root.querySelector("svg");
+      if (!svgEl) return;
+      const dist = touchDistance(e.touches[0], e.touches[1]);
+      const factor = dist / pinchStartDist;
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const focal = clientToWorld(svgEl, midX, midY, boxCenter(pinchStartBox));
+      STATE.viewBox = pinchStartBox; // pivot from the gesture's own start each move, not the last frame
+      applyZoom(store, lenses, factor, focal);
+    }
+  }, { passive: false });
+  root.addEventListener("touchend", (e) => {
+    if (e.touches.length < 2) { pinchStartDist = null; pinchStartBox = null; }
+  });
+
+  // Entry point 3: keyboard, scoped to when focus is somewhere inside
+  // #map-root (a pin, a cluster badge, or the zoom buttons) — a global,
+  // unscoped listener would hijack "+"/"-" typed anywhere else on the
+  // page (e.g. the "More…" select), which reason (a)/(b) never ask for.
+  document.addEventListener("keydown", (e) => {
+    if (!root.contains(document.activeElement)) return;
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); applyZoom(store, lenses, ZOOM_STEP, boxCenter(STATE.viewBox)); }
+    else if (e.key === "-" || e.key === "_") { e.preventDefault(); applyZoom(store, lenses, 1 / ZOOM_STEP, boxCenter(STATE.viewBox)); }
+    else if (e.key === "0") { e.preventDefault(); resetView(store, lenses); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); applyPan(store, lenses, 0, -PAN_FRACTION); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); applyPan(store, lenses, 0, PAN_FRACTION); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); applyPan(store, lenses, -PAN_FRACTION, 0); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); applyPan(store, lenses, PAN_FRACTION, 0); }
+  });
+}
+
+// v7 Part 15: reads the SAME data-URI CSS already defines once
+// (style.css's --grain-svg custom property, §1.5.1) rather than a second,
+// hand-copied string here — the two can't silently drift apart, since
+// there's only ever one authored copy of the filter recipe.
+function grainImageHref() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--grain-svg").trim();
+  const m = raw.match(/^url\((["']?)(.*)\1\)$/);
+  return m ? m[2] : raw;
+}
+
+function renderMapGrain(svg, svgNS) {
+  const [wx, wy, ww, wh] = WORLD_VIEWBOX.split(/\s+/).map(Number);
+  const rect = document.createElementNS(svgNS, "rect");
+  rect.setAttribute("x", wx);
+  rect.setAttribute("y", wy);
+  rect.setAttribute("width", ww);
+  rect.setAttribute("height", wh);
+  rect.setAttribute("fill", "url(#map-grain)");
+  rect.setAttribute("aria-hidden", "true");
+  rect.style.mixBlendMode = "multiply";
+  rect.style.opacity = "0.08";
+  rect.style.pointerEvents = "none";
+  svg.appendChild(rect);
+}
+
+// v6 addendum R1: the padding/clamp logic, shared by the whole-map view
+// (computeMapViewBox, below) and Part 9's cluster-fit zoom (renderMap's
+// zoomToCluster, above) — reused, not reinvented, per that section's own
+// explicit instruction. Reads the FULL 38-location set every call when
+// invoked via computeMapViewBox(), unfiltered by persona, so the crop
+// never shifts on a persona pick; when invoked with a cluster's own
+// member locations instead, the exact same math frames just that
+// cluster's bounding box.
+function computeViewBoxForLocations(locs) {
+  const pts = locs
     .filter((l) => l.lat != null && l.lon != null)
     .map((l) => ({ x: PROJECTION.x(l.lon), y: PROJECTION.y(l.lat) }));
-  // Degenerate fallback only — never expected with real data (38/38
-  // locations carry lat/lon today), but a bare crash on an empty set would
-  // be worse than falling back to the full world.
+  // Degenerate fallback only — never expected with real data, but a bare
+  // crash on an empty set would be worse than falling back to the full
+  // world.
   if (!pts.length) return WORLD_VIEWBOX;
 
   const minX = Math.min(...pts.map((p) => p.x));
@@ -294,13 +668,7 @@ function computeMapViewBox(store) {
 
   // §R1.3: pad every edge by at least the largest pin's radius+halo x 3
   // (pins never sit flush to the edge) PLUS a term proportional to the
-  // box's own span, so a small future cluster still gets breathing room —
-  // the spec leaves the exact percentage to builder judgment. 6% chosen:
-  // generous enough that a tight regional cluster (e.g. today's Guatemala
-  // pair) doesn't feel cropped, small enough that it doesn't reintroduce
-  // real dead space at the box's current ~519x209-unit size. Additive, not
-  // a max() with the fixed floor — "at least X plus Y" read as both terms
-  // always applying, not one superseding the other.
+  // box's own span, so a small cluster still gets breathing room.
   const FIXED_PAD = (PIN_RADIUS + PIN_HALO) * 3;
   const PROPORTIONAL_PAD_PCT = 0.06;
   const spanX = maxX - minX, spanY = maxY - minY;
@@ -322,14 +690,17 @@ function computeMapViewBox(store) {
   return `${boxMinX} ${boxMinY} ${boxMaxX - boxMinX} ${boxMaxY - boxMinY}`;
 }
 
-// v6 addendum R4: Ormen Lange — the site's first pure ornament, asserting
-// no fact, citing no source, carrying no confidence tier (exempt from
-// the why/instead render contract by construction, since that contract
-// governs hard verdicts and this ship claims nothing). Reviewed and
-// cleared as non-blocking: "a rounder
-// hull, no visible shields" — a voyaging silhouette, not the historical
-// warship's dragon-prow/shield-rack read, since this flock carries spirits
-// specifically fleeing armed conflict.
+function computeMapViewBox(store) {
+  return computeViewBoxForLocations(store.locations);
+}
+
+// v6 addendum R4 / 2026-07-13 placeholder: the site's first pure
+// ornament slot — asserting no fact, citing no source, carrying no
+// confidence tier (exempt from the why/instead render contract by
+// construction). The original line-art longship attempt is retired by
+// direct instruction ("let's get rid of the attempt at Ormen Lange") —
+// a plain X placeholder holds the spot until real artwork lands; same
+// slot, same non-interactive contract, nothing else changed.
 function renderOrmenLange(svg, svgNS) {
   const g = document.createElementNS(svgNS, "g");
   g.setAttribute("class", "ormen-lange");
@@ -346,18 +717,12 @@ function renderOrmenLange(svg, svgNS) {
   const cx = PROJECTION.x(-20);
   const cy = PROJECTION.y(45);
 
-  // Line-art longship, drawn in a local 0..40 x 0..20 box then centered on
-  // (cx, cy) via translate — hull (closed outline, stroked not filled),
-  // one mast, one short yard; no dragon head, no shield rack.
+  // Placeholder X, an 8-unit cross centered on (cx, cy) — deliberately the
+  // plainest possible marker, not a second art attempt.
   const path = document.createElementNS(svgNS, "path");
-  path.setAttribute("d",
-    "M2,14 Q4,18 11,16.5 Q20,18.5 29,16.5 Q36,18 38,14 " +
-    "Q35,11.5 29,12.5 Q20,10.5 11,12.5 Q4,11.5 2,14 Z " +
-    "M20,12.5 L20,2 M14,5 L26,5"
-  );
+  path.setAttribute("d", `M${cx - 4},${cy - 4} L${cx + 4},${cy + 4} M${cx - 4},${cy + 4} L${cx + 4},${cy - 4}`);
   path.setAttribute("fill", "none");
   g.appendChild(path);
-  g.setAttribute("transform", `translate(${cx - 20}, ${cy - 10})`);
   svg.appendChild(g);
 }
 
@@ -375,24 +740,16 @@ function renderLegend(el, persona) {
   // Re-read the theme-appropriate ramp/colors at render time (not cached),
   // so this legend is always correct for the current light/dark mode.
   //
-  // v6 addendum §2.3: five named, ordinally-labeled steps replace the old
-  // unlabeled swatch strip — each stop gets its own `.legend-step` (swatch
-  // + name); in dark mode getScaleLegend() withholds `name` (see that
-  // function's own comment), so the step renders swatch-only there rather
-  // than a wrong color word.
+  // v6 addendum §2.3 / v7 Part 16: five named, ordinally-labeled steps
+  // replace the old unlabeled swatch strip — each stop gets its own
+  // `.legend-step` (swatch + name); in dark mode getScaleLegend()
+  // withholds `name` (see that function's own comment), so the step
+  // renders swatch-only there rather than a wrong color word.
   const scaleHtml = getScaleLegend().map(
     (s) => `<span class="legend-step"><span class="legend-swatch" style="background:${s.color}"></span>${s.name ? ` ${escapeHtml(s.name)}` : ""}</span>`
   ).join("");
   let extra = "";
   if (persona === "wenda" || persona === "carmen") {
-    // v6 plain-language pass, item 1: "Near-miss / type-trap" and
-    // "Misses / categorical absence" were internal vocabulary leaking to a
-    // reader — reusing the shipped BAND_LABEL registry (app-shared.js,
-    // moved here from lists.js by this same addendum) retires both and
-    // keeps this legend's words identical to the Lists page's own group
-    // headers for the same states. "unclassified" is deliberately excluded
-    // — a build-time registry-gap signal, never a reader-facing legend
-    // entry (v4 §1.3 / v5 §3.8).
     extra = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
       if (band === "doesnt-clear") {
         return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
@@ -409,14 +766,6 @@ function renderLegend(el, persona) {
 }
 
 function renderJudgmentNote(el) {
-  // v7 §4.1: re-ruling, ground-truthed — v1 §2.2.1 asked for this to
-  // recede behind a <details>, but it was never actually built that way;
-  // index.html now wraps this element in <details class="recede"> with
-  // the six-word summary ("Pin locations are approximate") as the one
-  // small findable line law 6 asks for. The lead sentence that used to
-  // open this element's own innerHTML moves to that <summary> (in
-  // index.html, not authored twice) — this function now fills only the
-  // body: the two longer caveats, unchanged in wording, one click away.
   el.innerHTML = `
     Good enough to place a dot on the map, not for door-to-door
     navigation. Every location gets the same treatment; more precision

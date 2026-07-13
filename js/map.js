@@ -103,7 +103,13 @@ let STATE = { lensId: null, viewBox: null };
 // grain filter's own untested-on-paper parameters) — zoom-step factor,
 // deepest-zoom cap, cluster pixel-radius threshold, and pan-per-keypress
 // fraction are starting values, tuned by eye, not measured.
-const ZOOM_STEP = 1.4;
+const ZOOM_STEP = 1.4; // one discrete +/- button click or +/- keypress
+// Deliberately much smaller than ZOOM_STEP: a wheel/trackpad gesture fires
+// many events per scroll (a trackpad can send dozens for one swipe), so
+// reusing ZOOM_STEP here compounded into runaway zoom (1.4^10 = ~29x from
+// a single fast scroll) — flagged live, 2026-07-14, "you have to work to
+// zoom hard." This is the per-event factor, not a one-action step.
+const WHEEL_ZOOM_STEP = 1.03;
 const MAX_SCALE = 20;
 const CLUSTER_PX_THRESHOLD = 24;
 const PAN_FRACTION = 0.2;
@@ -564,7 +570,7 @@ function wireMapInteractions(store, lenses) {
     const svgEl = root.querySelector("svg");
     if (!svgEl) return;
     const focal = clientToWorld(svgEl, e.clientX, e.clientY, boxCenter(STATE.viewBox || homeViewBox(store)));
-    applyZoom(store, lenses, e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, focal);
+    applyZoom(store, lenses, e.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, focal);
   }, { passive: false });
 
   // Known limitation flagged in Part 9: trackpad-pinch (wheel+ctrlKey) and

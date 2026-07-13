@@ -583,25 +583,39 @@ function wireMapInteractions(store, lenses) {
   // button only; doesn't preventDefault on mousedown/mouseup, so a plain
   // click (no movement) still reaches pins'/clusters' own click handlers
   // unchanged — only an actual drag repositions the view.
-  let panStart = null; // { clientX, clientY, box: {x,y,w,h}, rectW, rectH }
+  //
+  // PAN_DRAG_THRESHOLD_PX: renderMap() rebuilds the SVG's pins/clusters
+  // as fresh DOM nodes on every intervening mousemove, which could swap
+  // a pin's own <circle> out from under the pointer mid-click on
+  // ordinary hand jitter and suppress the browser's native click firing.
+  // Below this many pixels of movement, nothing re-renders and
+  // pin/cluster clicks are provably untouched; only once real drag
+  // distance is crossed does panning actually engage.
+  const PAN_DRAG_THRESHOLD_PX = 4;
+  let panStart = null; // { clientX, clientY, box: {x,y,w,h}, rectW, rectH, moved }
   root.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     const svgEl = root.querySelector("svg");
     if (!svgEl) return;
     const rect = svgEl.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
-    panStart = { clientX: e.clientX, clientY: e.clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height };
+    panStart = { clientX: e.clientX, clientY: e.clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height, moved: false };
   });
   window.addEventListener("mousemove", (e) => {
     if (!panStart) return;
+    const rawDx = e.clientX - panStart.clientX, rawDy = e.clientY - panStart.clientY;
+    if (!panStart.moved) {
+      if (Math.sqrt(rawDx * rawDx + rawDy * rawDy) < PAN_DRAG_THRESHOLD_PX) return;
+      panStart.moved = true;
+    }
     e.preventDefault();
     root.classList.add("map-panning");
     // Dragging right/down should reveal what's to the left/above, i.e.
     // the map content follows the cursor (the standard "grab the map"
     // convention) — the opposite sign from the keyboard arrows above,
     // which pan the *viewport* rather than drag the *content*.
-    const dx = -((e.clientX - panStart.clientX) / panStart.rectW) * panStart.box.w;
-    const dy = -((e.clientY - panStart.clientY) / panStart.rectH) * panStart.box.h;
+    const dx = -(rawDx / panStart.rectW) * panStart.box.w;
+    const dy = -(rawDy / panStart.rectH) * panStart.box.h;
     STATE.viewBox = clampViewBox({ x: panStart.box.x + dx, y: panStart.box.y + dy, w: panStart.box.w, h: panStart.box.h });
     renderMap(store, lenses);
   });
@@ -634,7 +648,7 @@ function wireMapInteractions(store, lenses) {
     } else if (e.touches.length === 1) {
       const rect = touchRootRect();
       if (!rect || rect.width === 0 || rect.height === 0) return;
-      touchPanStart = { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height };
+      touchPanStart = { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, box: { ...(STATE.viewBox || homeViewBox(store)) }, rectW: rect.width, rectH: rect.height, moved: false };
     }
   }, { passive: true });
   root.addEventListener("touchmove", (e) => {
@@ -650,9 +664,14 @@ function wireMapInteractions(store, lenses) {
       STATE.viewBox = pinchStartBox; // pivot from the gesture's own start each move, not the last frame
       applyZoom(store, lenses, factor, focal);
     } else if (e.touches.length === 1 && touchPanStart) {
+      const rawDx = e.touches[0].clientX - touchPanStart.clientX, rawDy = e.touches[0].clientY - touchPanStart.clientY;
+      if (!touchPanStart.moved) {
+        if (Math.sqrt(rawDx * rawDx + rawDy * rawDy) < PAN_DRAG_THRESHOLD_PX) return;
+        touchPanStart.moved = true;
+      }
       e.preventDefault();
-      const dx = -((e.touches[0].clientX - touchPanStart.clientX) / touchPanStart.rectW) * touchPanStart.box.w;
-      const dy = -((e.touches[0].clientY - touchPanStart.clientY) / touchPanStart.rectH) * touchPanStart.box.h;
+      const dx = -(rawDx / touchPanStart.rectW) * touchPanStart.box.w;
+      const dy = -(rawDy / touchPanStart.rectH) * touchPanStart.box.h;
       STATE.viewBox = clampViewBox({ x: touchPanStart.box.x + dx, y: touchPanStart.box.y + dy, w: touchPanStart.box.w, h: touchPanStart.box.h });
       renderMap(store, lenses);
     }

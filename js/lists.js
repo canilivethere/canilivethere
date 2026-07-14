@@ -3,7 +3,7 @@ import { scoreToColor, verdictVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
-  FIT_INDEX_DEFINITION, WEIGHT_CLASS_LABEL,
+  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
@@ -54,7 +54,7 @@ async function main() {
   // The persona-context line moved into render() itself (below) — §1.5's
   // coverage counts must respect the active country filter, so it's
   // recomputed on every render() call, not set once here.
-  document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
+  document.getElementById("fit-def-caption").textContent = `${FIT_INDEX_DEFINITION} ${SCALE_ANCHOR_STRING}`;
 
   renderPurposeSelector(store, persona);
   render(store, persona);

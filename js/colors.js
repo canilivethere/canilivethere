@@ -60,24 +60,41 @@ function rgbToHex([r, g, b]) {
   );
 }
 
-// value: 1..5 (fractional allowed). Clamped and linearly interpolated
-// across the 5 stops of the theme-appropriate ramp above.
+// v8 R4: the unscored/null branch no longer returns a bare gray — it
+// adopts the site's existing GAP voice (same family as confidenceBadge()'s
+// badge-gap and the fact-list's own "Not yet researched" treatment), so
+// "not researched" reads as one honest gap-shape site-wide instead of a
+// fourth unrelated gray. Duplicated as literal hex here rather than a CSS
+// var() reference — same intentional-duplication pattern this file already
+// uses for ELIMINATED_STROKE/CONDITIONAL_COLOR/pendingColor(), since this
+// value has to work as a plain SVG fill attribute and an inline chip
+// background alike, not just inside a stylesheet. Matches style.css's own
+// --gap-bg token, both themes (that token already carries a real dark-mode
+// value, so this isn't a new dark-mode surface — reusing an existing one).
+const GAP_BG_LIGHT = "#E4D8BC";
+const GAP_BG_DARK = "#2c2c28";
+
+// value: 1..5 (fractional allowed), or null/NaN for "not researched."
+// v8 R2: quantized to the ramp's 5 NAMED stops — no more linear
+// interpolation between them. A value snaps to its nearest stop
+// (Math.round(clamped) - 1, per the ruling's own arithmetic) everywhere
+// this function is consumed: map pins, list chips, location chips — one
+// semantic per color site-wide. The exact fractional number stays the
+// fact, rendered as text (tooltips/chips already carry it); color now
+// only ever answers "roughly what kind," never "exactly what."
 export function scoreToColor(value) {
-  // Neutral gray, unscored — a warmer, darker neutral in dark mode so it
-  // reads as "no data" against the dark paper rather than a stray bright
-  // patch (a builder color choice, not run through the palette
-  // validator — same class of minor, unspecced fill decision as the
-  // map's own dark water tone, see the v2 addendum §2.4).
-  if (value == null || Number.isNaN(value)) return isDarkTheme() ? "#4a4640" : "#e2e2e2";
+  if (value == null || Number.isNaN(value)) return isDarkTheme() ? GAP_BG_DARK : GAP_BG_LIGHT;
   const stops = currentScaleStops();
   const clamped = Math.max(1, Math.min(5, value));
-  const pos = clamped - 1; // 0..4
-  const i = Math.min(3, Math.floor(pos));
-  const frac = pos - i;
-  const a = hexToRgb(stops[i]);
-  const b = hexToRgb(stops[i + 1]);
-  const mixed = a.map((v, idx) => v + (b[idx] - v) * frac);
-  return rgbToHex(mixed);
+  const idx = Math.max(0, Math.min(4, Math.round(clamped) - 1));
+  return stops[idx];
+}
+
+// v8: a plain "is this the gap state" check, shared by any caller that
+// needs to branch on it (map.js's per-pin gap stroke class, the dog-import
+// facts lens) instead of re-testing value==null/NaN independently.
+export function isGapValue(value) {
+  return value == null || Number.isNaN(value);
 }
 
 // Recomputed on every call (not a cached const) so it reflects the
@@ -117,27 +134,43 @@ export const ELIMINATED_FILL = "url(#hatch-eliminated)";
 // #846546 dark). Light aubergine clears 10.9-16.3:1 against all three
 // surfaces and stays distinct from every other frozen verdict color
 // (ΔE 66-98) — that distinctness check still holds today, untouched by
-// Part 16. **Stale as of v7 Part 16, flagged rather than silently left
-// asserting a now-false claim:** the "same dark violet-purple family as
-// the ramp's own weakest stop" coherence read (ΔE 27.2 against the old
-// #330063) no longer applies — Part 16 moved the ramp's weakest stop to
-// #7a2213 (red), so this color and the ramp's low end are no longer the
-// same hue family. Not re-derived here (out of this change's own scope,
-// which Part 16 explicitly named as ramp-hexes-and-legend-names only) —
-// a real, named gap for whoever next tunes ELIMINATED_STROKE, not a
-// contradiction quietly left standing. Dark aubergine clears 3.19:1
-// against dark paper, matching brown's old floor — was never provably
-// "same family" as a ramp end even before Part 16, since the dark
-// general ramp is still honey-gold with no dark violet/red anchor (a
-// named, carried-over caveat, stated here verbatim rather than
-// re-argued).
+// Part 16. **Resolved, v8 R4:** aubergine vs. the ramp's own weakest stop
+// (now red, #7a2213, since Part 16) separates at ΔE 54.1 — distinctness
+// holds by measurement, hex unchanged. Dark aubergine clears 3.19:1
+// against dark paper, matching brown's old floor — the dark general ramp
+// is still honey-gold with no dark violet/red anchor, so no dark-mode
+// hue-family claim is made either way (carried over, not re-argued).
 export const ELIMINATED_STROKE = "#370036";
 const ELIMINATED_STROKE_DARK = "#984f92";
 export function eliminatedColor() {
   return isDarkTheme() ? ELIMINATED_STROKE_DARK : ELIMINATED_STROKE;
 }
 export const CONDITIONAL_COLOR = "#e07b1a"; // amber/orange, "possible, painfully" — same value both themes
-export const PENDING_COLOR = "#9a9a9a"; // verification-pending gray — same value both themes
+
+// v8 R4: theme-split — light moves #9a9a9a -> #8A8272 (3.13:1 vs paper,
+// warm family, replacing a cool gray that measured 2.32:1); dark theme
+// keeps its prior value, explicitly out of scope this pass. Was a bare
+// exported constant; now a function (same pattern as clearsColor()/
+// eliminatedColor() above) since the value is theme-dependent. Meaning:
+// "checked, but the verdict itself is unverified" — pending verdicts,
+// never a count or an unscored/gap state (those are R5's cluster-badge
+// panel treatment and this file's own gap-voice branch above,
+// respectively — three different claims, three different colors, not
+// one gray standing in for all of them).
+const PENDING_LIGHT = "#8A8272";
+const PENDING_DARK = "#9a9a9a";
+export function pendingColor() {
+  return isDarkTheme() ? PENDING_DARK : PENDING_LIGHT;
+}
+
+// v8 Part 6: the dog-import facts lens's one positive state ("rules on
+// file") — deliberately outside both the ramp and the verdict-color
+// family (minimum ΔE 45.8 against every ramp stop and every verdict
+// color, validated), a third, distinct family for a third kind of claim
+// ("rules exist," never a grade). Same value both themes; the lens's own
+// "nothing on file" state reuses scoreToColor(null)'s gap voice instead of
+// a fourth color, per the same file's own doctrine.
+export const DOG_LENS_COLOR = "#3D5A72";
 
 // "Clears" needs its own dark-mode value. clearsColor()'s only consumer is
 // verdictVisual()'s "clear" branch, whose color is always rendered as a
@@ -166,8 +199,8 @@ export function verdictVisual(headline) {
   if (h.startsWith("one door opens")) return { kind: "typetrap", color: CONDITIONAL_COLOR, label: "One door opens, leads nowhere" };
   if (h.startsWith("clears")) return { kind: "clear", color: clearsColor(), label: "Clears" };
   if (h.startsWith("near-miss")) return { kind: "nearmiss", color: CONDITIONAL_COLOR, label: "Near-miss" };
-  if (h.startsWith("unverified")) return { kind: "pending", color: PENDING_COLOR, label: "Unverified" };
+  if (h.startsWith("unverified")) return { kind: "pending", color: pendingColor(), label: "Unverified" };
   if (h.startsWith("misses") || h.startsWith("categorical absence"))
     return { kind: "eliminated", color: eliminatedColor(), label: "Misses" };
-  return { kind: "unknown", color: PENDING_COLOR, label: headline };
+  return { kind: "unknown", color: pendingColor(), label: headline };
 }

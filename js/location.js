@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
   renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
-  FIT_INDEX_DEFINITION, buildFitHeadline,
+  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -252,11 +252,21 @@ function buildVerdictBlock(store, loc, country, persona) {
       // tooltip), where the same string is correctly UNqualified —
       // there, no persona is in play at all, so there's no "checked for
       // someone specific" expectation to disclose against.
+      // v8 Part 10 Ruling 1: reorders this box — lead with what we know,
+      // not with a confession about our own process. Every element and
+      // every word survives from v7 Part 12 (this supersedes only the
+      // ORDER, per Part 10's own amendment note); only positions move:
+      // (1) the general Fit one-liner now leads; (2) the honest gap line
+      // renders directly beneath it, unchanged verbatim, still above the
+      // fold and read before any click — it now scopes the line above it
+      // instead of confessing ahead of content the reader hasn't met yet;
+      // (3) the red-flag badge stays last, ground-before-alarm preserved
+      // exactly as Part 12 first won it.
       const general = store.generalIndex(loc.location_id);
       const generalHeadline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       div.innerHTML = `
-        <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures below apply unchanged.</p>
         <p class="verdict-headline">${escapeHtml(generalHeadline)} (general figures)</p>
+        <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures above apply unchanged.</p>
         ${redFlagBadgeGeneral}
         ${breakdownLinkGeneral}
       `;
@@ -322,7 +332,7 @@ function buildScoreBar(store, loc, persona) {
     return `<span class="criterion-chip"><span class="fit-swatch" style="background:${swatch}"></span>
       ${escapeHtml(crit.name)}: ${val != null ? val + "/5" : "gap"}${tag}</span>`;
   });
-  details.innerHTML = `<summary>Score breakdown</summary><p class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</p><div class="criterion-scorebar">${chips.join("")}</div>`;
+  details.innerHTML = `<summary>Score breakdown</summary><p class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</p><p class="fit-def">${escapeHtml(SCALE_ANCHOR_STRING)}</p><div class="criterion-scorebar">${chips.join("")}</div>`;
   return details;
 }
 
@@ -372,6 +382,17 @@ function buildSectionNav() {
 // different reasonable reader could map these fields differently; this
 // is an open judgment call, not a certainty — named here plainly rather
 // than presented as settled.
+//
+// v8 Part 3 completions: (1) scope transport needs no extra code — a
+// country-scope `mechanism_legality` fact already inherits onto every one
+// of that country's location pages via factsByLocation()'s own existing
+// country->location inheritance (data.js), the same mechanism every other
+// country-scope fact already gets; (2) surface confinement is already
+// true by construction — this function is only ever called from
+// buildSection(), i.e. inside a location-page chapter, never from the map,
+// a tooltip, or Lists; (3) the consequence-gap fallback string below is
+// the ruled fixed string for this row type specifically (v5's named-gap
+// form, not the generic "Not yet researched" every other fact uses).
 function buildIllegalRoutesHtml(facts) {
   const illegalFacts = facts.filter(
     (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
@@ -408,7 +429,7 @@ function buildIllegalRoutesHtml(facts) {
       <div class="illegal-route-row">
         <div class="fact-label">${escapeHtml(practice)}</div>
         <div class="fact-value"><strong>Illegal</strong></div>
-        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "Not yet researched"}</div>
+        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "What enforcement actually looks like here isn't researched yet."}</div>
         ${insteadHtml}
       </div>
     `;

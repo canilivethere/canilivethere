@@ -76,8 +76,17 @@
      friendlier teal, validated against the score ramp's own light-end
      floor (2.05:1, real margin) — #eef4f8 -> #e7f4f5. --country-fill
      (v4 R3 §3.3 confirms this is already the "terrain-paper" warm tan the
-     addendum asked for — unchanged). */
-  --map-water: #e7f4f5;
+     addendum asked for — unchanged).
+     v8 R6: --map-water moves again, #e7f4f5 -> #DCE7DF — joining the
+     parchment family (a pale blue-green wash) rather than staying the
+     one cool-mint surface on an otherwise warm page. Still unambiguously
+     water: land/water separate at real ΔE, coastline strokes plus
+     geography do the rest of the definition work (the same "drawn on one
+     surface, strokes define" doctrine already used for land-on-parchment).
+     This narrows, not reverses, the v4 ruling above the same way that
+     ruling narrowed v2's — hue direction kept, temperature brought into
+     family. */
+  --map-water: #DCE7DF;
   --country-fill: #d6cdb8;
   /* v6 addendum R3 §3.1: sand-tone, thinner, translucent — retires the
      hardcoded #ffffff "municipal overlay" white grid flagged in review
@@ -364,11 +373,16 @@ h3 { font-size: 1.05rem; }
 
 /* ---------- map surface ---------- */
 .map-wrap { position: relative; width: 100%; }
-#worldmap { width: 100%; height: auto; background: var(--map-water); border: 1px solid var(--line); border-radius: 6px; }
-/* v2 addendum §4.2: pins over choropleth by visual weight, not DOM order —
-   the choropleth (researched-country fills included, set inline by map.js)
-   reads as flatter/quieter background context; pins keep full contrast so
-   they draw the eye first regardless of paint order. */
+/* v8 Part 2: the map plate now takes the same pasted-plate contract every
+   other card on this site uses (v7 §1.5.2) — 3px corner radius (cut-paper,
+   not phone-app; was 6px) and the warm oxblood-family shadow, alongside
+   its own already-present --line border. Closes the last surface that
+   still spoke the old cool-blue product language, now that R1/R6 have
+   handled the other two (country fills, water tone). */
+#worldmap { width: 100%; height: auto; background: var(--map-water); border: 1px solid var(--line); border-radius: 3px; box-shadow: 0 1px 4px rgba(140, 47, 27, 0.08); }
+/* v2 addendum §4.2: pins draw the eye first regardless of paint order —
+   country outlines (v8 R1: uniform fill, never a computed value) sit
+   underneath as flatter, quieter background context. */
 /* v6 addendum R3 §3.1: --country-border (sand-tone) replaces the hardcoded
    white stroke; thinner (0.4 -> 0.25) and translucent (new stroke-opacity)
    on top of a color that already clears contrast alone. --line was
@@ -401,11 +415,30 @@ h3 { font-size: 1.05rem; }
 }
 .location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: calc(var(--pin-stroke, 2) * 1.25); }
 .location-pin.eliminated { fill: url(#hatch-eliminated); stroke: var(--eliminated); }
-/* v7 Part 9 item 2: cluster badges share the pin's own stroke/cursor/
-   hover language (same class) but never a ramp hue fill (set inline by
-   map.js, PENDING_COLOR) — the count numeral inside is plain white,
-   readable against that neutral gray at every ramp position. */
-.cluster-badge-count { fill: #fff; font-family: "Work Sans", sans-serif; font-weight: 600; }
+/* v8 R4: "not researched" gets its own stroke (fill is already the gap
+   voice's own hex, set inline by colors.js's scoreToColor()) — the same
+   gap family every fact-list/badge-gap element already uses, so an
+   unscored pin reads as one honest gap-shape site-wide, not a fourth
+   unrelated gray. */
+.location-pin.gap { stroke: var(--gap-ink); }
+/* v8 R3: the presence axis. A pin that carries no real persona-specific
+   read renders muted — reduced fill-opacity (the ramp/gap color
+   underneath is unchanged, only its strength drops) plus a plain --line
+   stroke at FULL opacity (deliberately not muted itself — the stroke is
+   what keeps a faded pin findable at world zoom, so it doesn't get the
+   same treatment as the fill). Combined with .gap (a pin can be both:
+   unresearched AND not checked for the active persona) — declared AFTER
+   .gap below on purpose, so its stroke rule wins the cascade on equal
+   specificity: fade is the broader "not checked for you" state and takes
+   visual precedence over the narrower gap-ink stroke in that one combo. */
+.location-pin.pin-faded { fill-opacity: 0.55; stroke: var(--line); stroke-opacity: 1; }
+/* v8 R5: cluster badges leave the ramp/gray family entirely — a count is
+   chrome, not data, so it reads as a pasted paper label ("3"), never as a
+   dot that could be mistaken for a low or pending value. Fill/stroke here
+   override the plain .location-pin rule above (equal specificity, later
+   in source); no inline fill is set for cluster badges at all anymore. */
+.location-pin.cluster-badge { fill: var(--panel); stroke: var(--line); }
+.cluster-badge-count { fill: var(--ink); font-family: "Work Sans", sans-serif; font-weight: 600; }
 
 /* v7 Part 9 item 1: zoom controls, fixed bottom-right of the map itself
    (.map-wrap is already position:relative) — one of three redundant
@@ -444,6 +477,15 @@ h3 { font-size: 1.05rem; }
 .legend-swatch { width: 18px; height: 14px; display: inline-block; border: 1px solid var(--line); }
 .legend-item { display: flex; align-items: center; gap: 0.35rem; }
 .legend-hatch-demo { width: 18px; height: 14px; display: inline-block; border: 1px solid var(--eliminated); background: repeating-linear-gradient(45deg, var(--eliminated), var(--eliminated) 2px, #fff 2px, #fff 5px); }
+/* v8 R3/R7: a demo swatch for the persona-active legend's "faded" row —
+   the same reduced-opacity treatment map pins get (R3), applied to a
+   plain swatch instead of an SVG fill so the legend and the map agree
+   about what "faded" looks like. */
+.legend-faded-demo { opacity: 0.55; }
+/* v8 Part 6: the dog-import facts lens's gap swatch gets the gap-ink
+   border instead of the plain --line one, matching the gap voice used
+   everywhere else on the site rather than a bare neutral swatch. */
+.legend-gap-demo { border-color: var(--gap-ink); }
 
 /* v6 addendum R4: Ormen Lange — monochrome border-ink line-art, never a
    click/focus target (non-interactive by construction, see map.js's own
@@ -514,13 +556,20 @@ h3 { font-size: 1.05rem; }
 .door-tile:hover, .door-tile:focus { border-color: var(--accent); }
 /* Neutral stub (Part 17): visible even with no portrait file present —
    never a broken-image icon (perspective-door.js removes a failed <img>
-   on error, leaving this background showing through). */
+   on error, leaving this background showing through).
+   v8 Part 4 item 1: the frame contract — same warm shadow family as every
+   other "pasted plate" surface (the 1px --line ring and object-fit:cover
+   crop were already here) — so eight hand-made images, whatever their own
+   style, read as one coherent set. Identical for all eight, no exceptions:
+   this is the only portrait rule on the page, nothing overrides it per
+   persona. */
 .door-portrait {
   width: 64px;
   height: 64px;
   border-radius: 50%;
   background: var(--gap-bg);
   border: 1px solid var(--line);
+  box-shadow: 0 1px 4px rgba(140, 47, 27, 0.08);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -529,21 +578,29 @@ h3 { font-size: 1.05rem; }
 .door-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .door-name { font-family: "Fraunces", serif; font-weight: 700; font-size: 1rem; }
 .door-descriptor { font-size: 0.8rem; color: var(--muted); }
-/* The escape hatch (Part 10): plain-text, deliberately less weighted
-   than the eight tiles (no card chrome, no portrait) but not
-   apologetic — same underline-link treatment as any other text link. */
+/* v8 Part 4 item 4: the escape hatch, promoted — a full-width row beneath
+   the grid, in the card family (--panel background, 1px --line border,
+   3px radius, same hover-to-accent-border treatment as the tiles), no
+   portrait and no name, text centered. Same furniture as the eight tiles,
+   a quieter occupant: less CONTENT, equal STANDING — replaces the old
+   plain-underlined-link treatment, which read as a footnote rather than a
+   real ninth door. */
 .door-escape {
   display: block;
-  margin: 0 auto;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 0.9rem;
-  text-decoration: underline;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  text-align: center;
+  text-decoration: none;
   cursor: pointer;
-  padding: 0;
+  padding: 0.9rem 0.6rem;
+  margin: 0;
   font-family: inherit;
 }
+.door-escape:hover, .door-escape:focus { border-color: var(--accent); }
 
 /* ---------- lists ---------- */
 .fit-def { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--muted); padding: 0 0 0.4rem; }

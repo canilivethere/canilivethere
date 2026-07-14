@@ -181,14 +181,14 @@ function sectionForFact(fact) {
   return "overview";
 }
 
-// v7 Part 14: illegal-but-practiced routes — the Node-side twin of
-// js/location.js's buildIllegalRoutesHtml() (same reason this file
+// v7 Part 14 / v8 Part 3: illegal-but-practiced routes — the Node-side
+// twin of js/location.js's buildIllegalRoutesHtml() (same reason this file
 // already duplicates generalIndex()/sectionForFact() rather than sharing
 // them: this script runs in Node, that one in the browser). Field-
-// mapping judgment call and empty-state discipline both identical to
-// that function's own comment — see it for the full reasoning, not
-// re-argued here. Renders nothing until a real prohibited-enforced fact
-// exists in derived/.
+// mapping judgment call, empty-state discipline, and the fixed
+// consequence-gap string are all identical to that function's own
+// comment — see it for the full reasoning, not re-argued here. Renders
+// nothing until a real prohibited-enforced fact exists in derived/.
 function buildIllegalRoutesHtml(facts) {
   const illegalFacts = facts.filter(
     (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
@@ -215,7 +215,7 @@ function buildIllegalRoutesHtml(facts) {
       <div class="illegal-route-row">
         <div class="fact-label">${escapeHtml(practice)}</div>
         <div class="fact-value"><strong>Illegal</strong></div>
-        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "Not yet researched"}</div>
+        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "What enforcement actually looks like here isn't researched yet."}</div>
         ${insteadHtml}
       </div>
     `;

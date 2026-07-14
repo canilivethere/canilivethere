@@ -39,12 +39,13 @@
 // is real-world political geography. CanILiveThere's own "country_id" "CR"
 // means *Crete* (an island region of Greece), not the ISO code CR (Costa
 // Rica) — a genuine naming collision between the project's registry and
-// real ISO codes. To avoid ever implying "all of Greece" or "Costa Rica" was
-// researched, CR is deliberately NOT mapped to any shaded country polygon
-// below (see PROJECT_COUNTRY_TO_ISO in map.js) — Crete's two locations
-// (Chania, Heraklion) render as accurately-placed pins only, with the GR
-// (Greece) polygon left in neutral, unshaded "context" gray, same as every
-// other unresearched country.
+// real ISO codes. As of the map-color system rebuild, every country
+// polygon below (including GR) renders in the same uniform, neutral fill —
+// a country's outline never asserts a value at all anymore, researched or
+// not (see map.js's own renderMap()) — so this collision no longer risks
+// implying "all of Greece" or "Costa Rica" was researched: Crete's two
+// locations (Chania, Heraklion) render as accurately-placed pins on top of
+// the same neutral GR polygon every other country gets.
 
 export const WORLD_VIEWBOX = "30.767 241.591 784.077 458.627";
 

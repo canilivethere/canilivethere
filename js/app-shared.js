@@ -77,6 +77,17 @@ const PERSONA_LABELS = {
 export const FIT_INDEX_DEFINITION =
   "Fit index: a 1–5 score combining every researched factor. Higher is better — 5 is the strongest fit, 1 is the weakest. It's a sort key, not a verdict on its own.";
 
+// v8 Part 5: the scale-anchor disclosure — one canonical string, cited (not
+// restated) from this project's own internal scale-semantics ruling: a 5
+// is the world benchmark, not perfection and not merely "best of this
+// dataset."
+// Reused verbatim in three render homes (map legend, Lists caption,
+// location page score-breakdown chapter) so a reachable top changes how
+// every 4 and 5 on the site reads, the same way FIT_INDEX_DEFINITION
+// travels everywhere the Fit index itself appears.
+export const SCALE_ANCHOR_STRING =
+  "A 5 isn't perfection — it means as good as this realistically gets anywhere in the world, tradeoffs included.";
+
 // v7 Part 10: the perspective door needs the switcher's own descriptor
 // string split into its two rendering halves — a first name (shown at
 // larger weight on each tile) and the descriptor sentence itself (shown

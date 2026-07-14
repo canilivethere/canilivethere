@@ -1,9 +1,9 @@
 import { loadStore, verdictHeadline } from "./data.js";
-import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, CONDITIONAL_COLOR, PENDING_COLOR } from "./colors.js";
+import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
-  FIT_INDEX_DEFINITION, buildFitHeadline, isActivationKey,
+  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   BAND_ORDER, BAND_LABEL,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
@@ -16,18 +16,6 @@ import { initPerspectiveDoor } from "./perspective-door.js";
 // apart the way the spec's own "7+2=9" arithmetic assumes they won't.
 const PIN_RADIUS = 7;
 const PIN_HALO = 2;
-
-// CanILiveThere's own country_id doesn't always equal a real ISO code — see
-// worldmap-data.js's header comment. CR (Crete, an island region of Greece)
-// is deliberately left unmapped so the choropleth never implies "all of
-// Greece" was researched; Crete's two locations still render as accurately
-// placed, accurately colored PINS (lat/lon is a real per-location fact).
-const PROJECT_COUNTRY_TO_ISO = {
-  GT: "GT", CO: "CO", MX: "MX", AR: "AR", PT: "PT",
-  BZ: "BZ", MA: "MA", US: "US", TH: "TH", CR: null,
-  AL: "AL", BG: "BG", EC: "EC", EG: "EG", ES: "ES",
-  ID: "ID", IN: "IN", MY: "MY", PY: "PY", VN: "VN", ZA: "ZA",
-};
 
 applyStoredTheme();
 renderTopBar("map");
@@ -55,11 +43,15 @@ main();
 // lookup — the same read every criterion on this site already resolves
 // through; nothing stops a future composite lens's valueForLocation from
 // being any other function returning the same 1-5-or-null shape.
+// `kind: "score"` (v8 Part 6) distinguishes this shape from the new
+// "facts" lens kind below — one field the render code branches on instead
+// of duck-typing which function a lens object happens to carry.
 function criterionLens(store, criterionId, label) {
   const crit = store.criteriaById.get(criterionId);
   const displayLabel = label || (crit ? crit.name : criterionId);
   return {
     id: criterionId,
+    kind: "score",
     label: displayLabel,
     valueForLocation(locationId) {
       const row = store.scoresByLocation.get(locationId)?.get(criterionId);
@@ -69,17 +61,68 @@ function criterionLens(store, criterionId, label) {
   };
 }
 
+// v8 Part 6: the dog-import facts lens — a second lens KIND ("facts"
+// instead of "score"), extending Part 13's plug-in contract rather than
+// forking it. Colors pins by whether the rules are researched, never by
+// how good/bad they are (Part 13's own no-invented-scoring-method refusal
+// still stands) — facts, disclosed as facts, never a grade.
+//
+// Resolves off fact_key prefix match ("...pet-import-dog", this also
+// catches the "dog-and-cat" variants, since a prefix match doesn't care
+// what follows) over `store.factsByLocation` — the SAME own-facts-plus-
+// country-inherited resolution every other fact list on this site already
+// reads through (data.js), not a second, narrower country-only lookup.
+// This matters for real, not just in principle: a dry run against the live
+// derived layer found a genuine dog-import row filed at LOCATION scope
+// (Puerto Rico's Rincón, prefixed by its own location_id, not its
+// country's) that a country-id-only prefix check would have silently
+// missed even though the fact is real, not a gap — building against
+// factsByLocation catches it correctly, the same way it already would for
+// any other fact type. The prefix itself is checked against whatever
+// follows a fact_key's own first colon, not tied to which id (country or
+// location) happens to precede it — verified against the live derived
+// layer this session: matches real rows under several observed key-
+// naming variants — a country whose only dog-import row uses a different
+// naming shape (e.g. a cat-only key, or a key with no "dog" token at all)
+// would still silently miss under this mechanism; a real, named limit of
+// a prefix match over organically-grown keys, not solved here (flagged to
+// the data-format owner as a normalization candidate, not fixed by this
+// render code). A [GAP] row counts as absent, same as everywhere else on
+// this site.
+function dogImportFactsLens(store) {
+  return {
+    id: "dog-import-facts",
+    kind: "facts",
+    label: "Dog import rules",
+    factsForLocation(locationId) {
+      const rows = (store.factsByLocation.get(locationId) || []).filter((f) => {
+        if (!f.fact_key || f.value_raw === "[GAP]") return false;
+        const idx = f.fact_key.indexOf(":");
+        const rest = idx === -1 ? f.fact_key : f.fact_key.slice(idx + 1);
+        return rest.startsWith("pet-import-dog");
+      });
+      return rows.length ? rows.map((f) => ({ label: f.fact_label, text: f.value_raw })) : null;
+    },
+    explainerText:
+      "Unscored on purpose — these are the import rules on file, not a grade. Blue pins have researched rules; hover to read them. This view ignores any persona pick above.",
+  };
+}
+
 // The two lenses Part 13 confirms as already-built and spec-compliant
 // (easiest visa, money goes furthest), folded into this build as-is.
 // "Best property access" was already a third entry in this array before
 // this change (ported from lists.js's own FEATURED_CRITERIA) — it's
 // not one of Part 13's four named purpose lenses, but it's already a
-// working, criterion-backed lens with no reason to drop it.
+// working, criterion-backed lens with no reason to drop it. The dog-
+// import lens (v8 Part 6) is a fourth chip, appended last — reversible on
+// purpose (a confirmation of keeping this lens at all is still pending):
+// removing it again is one array entry, nothing else references it.
 function buildFeaturedLenses(store) {
   return [
     criterionLens(store, "visa-legal-pathway-ease", "Easiest visa"),
     criterionLens(store, "cost-of-living-affordability", "Money goes furthest"),
     criterionLens(store, "land-property-access", "Best property access"),
+    dogImportFactsLens(store),
   ];
 }
 
@@ -261,7 +304,22 @@ function renderPurposeSelector(store, lenses) {
 
   const explainerEl = document.getElementById("purpose-explainer");
   if (!STATE.lensId) {
-    explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
+    // v8 R3 amendment (the no-fixture standing line): a persona active
+    // with zero fixtures anywhere (the five personas with no fixture rows
+    // at all) means the WHOLE map renders faded — that needs saying in
+    // words here, not only in the legend, since a first-time visitor who
+    // has never seen the full-strength state has no legend-free way to
+    // read uniform muted pins as "nothing checked yet" rather than "the
+    // site's own look." Only overrides the default line for that one
+    // state; every other state (fixture-bearing persona, or no persona at
+    // all) keeps the existing line unchanged.
+    const persona = getPersona();
+    if (persona && !store.fixturesByPersona.has(persona)) {
+      const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
+      explainerEl.textContent = `Faded pins — general figures, not checked for ${displayName}`;
+    } else {
+      explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
+    }
   } else {
     const lens = resolveLens(store, lenses, STATE.lensId);
     explainerEl.textContent = lens ? lens.explainerText : "";
@@ -301,41 +359,20 @@ function renderMap(store, lenses) {
   `;
   svg.appendChild(defs);
 
-  // Per-country average index (for the choropleth base layer). A lens
-  // active averages that lens's own valueForLocation() across the
-  // country's locations; otherwise the existing personaIndex()/
-  // generalIndex() split, unchanged.
-  const countryAverages = new Map();
-  for (const country of store.countries) {
-    const locs = store.locations.filter((l) => l.country_id === country.country_id);
-    const vals = activeLens
-      ? locs.map((l) => activeLens.valueForLocation(l.location_id)).filter((v) => v != null)
-      : locs
-          .map((l) => (persona ? store.personaIndex(persona, l.location_id) : store.generalIndex(l.location_id)))
-          .filter(Boolean)
-          .map((r) => r.value);
-    if (vals.length) countryAverages.set(country.country_id, vals.reduce((a, b) => a + b, 0) / vals.length);
-  }
-
-  // Base layer: every country outline we have, neutral gray by default,
-  // shaded only for CanILiveThere's own researched countries (and only
-  // where the ISO mapping is unambiguous — see PROJECT_COUNTRY_TO_ISO).
-  const isoToProjectCountry = new Map(
-    Object.entries(PROJECT_COUNTRY_TO_ISO).filter(([, iso]) => iso).map(([pid, iso]) => [iso, pid])
-  );
-  for (const [iso, d] of Object.entries(COUNTRY_PATHS)) {
+  // v8 R1: the country-average choropleth is retired. Every country
+  // polygon now renders identically (uniform --country-fill, set by
+  // style.css's own .country-path rule — nothing set inline here at all)
+  // — pins are the only value-bearing marks on this map. A country with
+  // pins on it is visibly "worked" by construction; a country's outline
+  // never asserts a value, so no shading means nothing either way (see
+  // renderJudgmentNote()'s own updated copy below). This also retires the
+  // blended per-country number this project's own doctrine never wanted
+  // on the map in the first place (location-level, never blended per
+  // country).
+  for (const d of Object.values(COUNTRY_PATHS)) {
     const path = document.createElementNS(svgNS, "path");
     path.setAttribute("d", d);
     path.setAttribute("class", "country-path");
-    const projectId = isoToProjectCountry.get(iso);
-    if (projectId && countryAverages.has(projectId)) {
-      path.setAttribute("fill", scoreToColor(countryAverages.get(projectId)));
-      const country = store.countriesById.get(projectId);
-      path.setAttribute("data-country", projectId);
-      const title = document.createElementNS(svgNS, "title");
-      title.textContent = `${country.name}: country-average index ${countryAverages.get(projectId).toFixed(1)}/5`;
-      path.appendChild(title);
-    }
     svg.appendChild(path);
   }
 
@@ -374,19 +411,48 @@ function renderMap(store, lenses) {
     const cy = PROJECTION.y(loc.lat);
     const country = store.countriesById.get(loc.country_id);
 
-    let fill, tooltip, eliminated = false;
+    let fill, tooltip, eliminated = false, gap = false, faded = false;
 
     // Tooltip voice (v2 addendum §4): a one-line human answer leads every
     // tooltip, built only from data already computed.
+    //
+    // v8 R3: the presence axis. `faded` marks a pin that gets rendered at
+    // reduced opacity because a persona is active, no lens is active, and
+    // this pin carries no real persona-specific read — never set when a
+    // lens is active (R3's own precedence ruling: a lens is general
+    // figures by definition, every pin full-strength) and never set when
+    // no persona is picked at all (nothing to fade against).
     if (activeLens) {
-      const val = activeLens.valueForLocation(loc.location_id);
-      fill = scoreToColor(val);
-      tooltip = `${loc.display_name}, ${country.name} — ${activeLens.label}: ${val != null ? val.toFixed(1) + "/5" : "not scored yet"}`;
+      if (activeLens.kind === "facts") {
+        // v8 Part 6: the dog-import facts lens — two states only, no
+        // ramp hue in either (using one would whisper "grade").
+        const facts = activeLens.factsForLocation(loc.location_id);
+        if (facts) {
+          fill = DOG_LENS_COLOR;
+          const lines = facts.length > 1
+            ? facts.map((f) => `${f.label}: ${f.text}`).join(" ")
+            : facts[0].text;
+          tooltip = `${loc.display_name}, ${country.name} — Dog import: ${lines}`;
+        } else {
+          fill = scoreToColor(null);
+          gap = true;
+          tooltip = `${loc.display_name}, ${country.name} — Dog import: not researched yet.`;
+        }
+      } else {
+        const val = activeLens.valueForLocation(loc.location_id);
+        fill = scoreToColor(val);
+        gap = isGapValue(val);
+        tooltip = `${loc.display_name}, ${country.name} — ${activeLens.label}: ${val != null ? val.toFixed(1) + "/5" : "not scored yet"}`;
+      }
     } else if (persona === "waldo") {
       const idx = store.personaIndex("waldo", loc.location_id);
-      fill = scoreToColor(idx ? idx.value : null);
-      const headline = buildFitHeadline(store, "waldo", loc, country, idx ? idx.value : null);
-      tooltip = `${headline}\nWaldo's Fit index: ${idx && idx.value != null ? idx.value.toFixed(1) : "n/a"}/5`;
+      const value = idx ? idx.value : null;
+      const hasRealRead = !!(idx && idx.personaAdjusted === true);
+      fill = scoreToColor(value);
+      gap = isGapValue(value);
+      faded = !hasRealRead;
+      const headline = buildFitHeadline(store, "waldo", loc, country, value);
+      tooltip = `${headline}\nWaldo's Fit index: ${value != null ? value.toFixed(1) : "n/a"}/5`;
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
@@ -395,7 +461,10 @@ function renderMap(store, lenses) {
       const hasCriterionFixtures = perLoc && perLoc.criteria && perLoc.criteria.size > 0;
       const idx = hasCriterionFixtures ? store.personaIndex(persona, loc.location_id) : null;
       const underlyingValue = idx ? idx.value : (general ? general.value : null);
+      const hasRealRead = !!verdict || hasCriterionFixtures;
       fill = scoreToColor(underlyingValue);
+      gap = isGapValue(underlyingValue);
+      faded = !hasRealRead;
       if (verdict) {
         const vHeadline = verdictHeadline(verdict.expected);
         const visual = verdictVisual(vHeadline);
@@ -408,20 +477,35 @@ function renderMap(store, lenses) {
           : "";
         tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})${insteadLine}`;
       } else {
-        tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
+        // v8 Part 10 Ruling 2: knowledge-first — the general fit headline,
+        // then the general Fit index (labeled as such), then the existing
+        // canonical "not checked yet" line last, not alone. Zero new
+        // authorship: same buildFitHeadline() mechanism the no-persona
+        // branch below already uses, and the exact same closing sentence
+        // this branch always rendered, just no longer the WHOLE tooltip.
+        const generalHeadline = buildFitHeadline(store, null, loc, country, underlyingValue);
+        tooltip = `${generalHeadline}\nFit index: ${underlyingValue != null ? underlyingValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
     } else if (persona) {
+      // The five personas with zero fixtures anywhere — always faded,
+      // always the general figure, same Part 10 Ruling 2 knowledge-first
+      // shape as Wenda/Carmen's own no-fixture branch above.
       const general = store.generalIndex(loc.location_id);
-      fill = scoreToColor(general ? general.value : null);
-      tooltip = `${loc.display_name}, ${country.name} — not checked yet for this persona.`;
+      const value = general ? general.value : null;
+      fill = scoreToColor(value);
+      gap = isGapValue(value);
+      faded = true;
+      const headline = buildFitHeadline(store, null, loc, country, value);
+      tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
     } else {
       const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
+      gap = isGapValue(general ? general.value : null);
       const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
     }
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded });
   }
 
   const wrap = document.createElement("div");
@@ -469,7 +553,16 @@ function renderMap(store, lenses) {
       // pre-zoom build at the home view).
       circle.setAttribute("r", (PIN_RADIUS / scale).toFixed(3));
       circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
-      circle.setAttribute("class", "location-pin" + (entry.eliminated ? " eliminated" : ""));
+      // v8 R3/R4: "gap" (unresearched — gap-ink stroke, css/style.css) and
+      // "pin-faded" (R3's presence axis — reduced fill-opacity, --line
+      // stroke) are independent, combinable classes, not a single state
+      // enum — a pin can be both at once (unresearched AND not checked for
+      // the active persona). Precedence between their two stroke rules is
+      // resolved by CSS ordering, named there, not here.
+      circle.setAttribute("class", "location-pin"
+        + (entry.eliminated ? " eliminated" : "")
+        + (entry.gap ? " gap" : "")
+        + (entry.faded ? " pin-faded" : ""));
       if (!entry.eliminated) circle.setAttribute("fill", entry.fill);
       circle.setAttribute("tabindex", "0");
       circle.setAttribute("role", "link");
@@ -487,12 +580,16 @@ function renderMap(store, lenses) {
 
       svg.appendChild(circle);
     } else {
-      // Part 9 item 2: a cluster badge — neutral PENDING_COLOR, never a
-      // ramp hue (averaging several genuinely distinct locations' scores
-      // into one color would assert a value this seat doesn't get to
-      // invent). Click/tap zooms to fit the cluster's own bounding box,
-      // via the SAME padding logic computeMapViewBox() already uses
-      // (computeViewBoxForLocations()), reused not reinvented.
+      // v8 R5: a cluster badge is chrome (a count), not data — "N places
+      // here," never a color that could be mistaken for a value. Fill/
+      // stroke/numeral color now come entirely from CSS (.cluster-badge,
+      // .cluster-badge-count in style.css: --panel fill, --line stroke,
+      // --ink numeral), no inline fill set here at all — was PENDING_COLOR
+      // before v8, which conflated "a count" with "an unverified verdict,"
+      // two different claims that shouldn't share a color. Click/tap zooms
+      // to fit the cluster's own bounding box, via the SAME padding logic
+      // computeMapViewBox() already uses (computeViewBoxForLocations()),
+      // reused not reinvented.
       const cx = group.reduce((s, p) => s + p.cx, 0) / group.length;
       const cy = group.reduce((s, p) => s + p.cy, 0) / group.length;
       const r = (PIN_RADIUS + 2) / scale;
@@ -502,7 +599,6 @@ function renderMap(store, lenses) {
       circle.setAttribute("r", r.toFixed(3));
       circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
       circle.setAttribute("class", "location-pin cluster-badge");
-      circle.setAttribute("fill", PENDING_COLOR);
       circle.setAttribute("tabindex", "0");
       circle.setAttribute("role", "button");
       const names = group.map((p) => p.loc.display_name).join(", ");
@@ -529,7 +625,7 @@ function renderMap(store, lenses) {
     }
   }
 
-  renderLegend(document.getElementById("map-legend"), persona);
+  renderLegend(document.getElementById("map-legend"), persona, activeLens, store);
   renderJudgmentNote(document.getElementById("map-judgment-note"));
 }
 
@@ -815,10 +911,14 @@ function renderOrmenLange(svg, svgNS) {
 const BAND_LEGEND_COLOR = {
   clears: () => clearsColor(),
   "near-miss": () => CONDITIONAL_COLOR,
-  "not-checked": () => PENDING_COLOR,
+  "not-checked": () => pendingColor(),
 };
 
-function renderLegend(el, persona) {
+// v8 R7: the legend becomes mode-aware — three mutually exclusive shapes,
+// never overlaid on each other, so the colors on screen and the words
+// explaining them always agree about what mode is showing. Exact strings
+// are ruled UI copy, transported verbatim, not paraphrased here.
+function renderLegend(el, persona, activeLens, store) {
   // Re-read the theme-appropriate ramp/colors at render time (not cached),
   // so this legend is always correct for the current light/dark mode.
   //
@@ -830,20 +930,60 @@ function renderLegend(el, persona) {
   const scaleHtml = getScaleLegend().map(
     (s) => `<span class="legend-step"><span class="legend-swatch" style="background:${s.color}"></span>${s.name ? ` ${escapeHtml(s.name)}` : ""}</span>`
   ).join("");
-  let extra = "";
-  if (persona === "wenda" || persona === "carmen") {
-    extra = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
-      if (band === "doesnt-clear") {
-        return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
-      }
-      const color = BAND_LEGEND_COLOR[band]();
-      return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
-    }).join("");
+
+  if (activeLens && activeLens.kind === "facts") {
+    // Facts-lens variant (Part 6): two swatches, no ramp, no scale-anchor
+    // line — nothing 1-5 is on screen in this mode.
+    el.innerHTML = `
+      <div class="legend-scale">
+        <span class="legend-item"><span class="legend-swatch" style="background:${DOG_LENS_COLOR}"></span> Rules on file</span>
+        <span class="legend-item"><span class="legend-swatch legend-gap-demo" style="background:${scoreToColor(null)}"></span> Not researched yet</span>
+      </div>
+      <span>${escapeHtml(activeLens.explainerText)}</span>
+    `;
+    return;
   }
+
+  if (activeLens) {
+    // Lens active (score-kind): the ramp is still general figures, just
+    // for one criterion instead of the blend — title says so, no persona
+    // verdict rows (a lens suppresses the persona read entirely).
+    el.innerHTML = `
+      <div class="legend-scale">Pin color — ${escapeHtml(activeLens.label)}, general figures: ${scaleHtml}</div>
+      <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
+    `;
+    return;
+  }
+
+  if (persona) {
+    // Persona active: two rows, no full-strength ramp row at all — the
+    // ramp only ever appears faded in this mode (on the map itself), so
+    // showing it full-strength in the legend would contradict what a
+    // reader is actually looking at.
+    const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
+    const hasFixtures = store.fixturesByPersona.has(persona);
+    let checkedRow = "";
+    if (hasFixtures) {
+      const swatches = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
+        if (band === "doesnt-clear") {
+          return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
+        }
+        const color = BAND_LEGEND_COLOR[band]();
+        return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
+      }).join("");
+      checkedRow = `<div class="legend-scale">Solid pins — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
+    }
+    const fadedDemoColor = getScaleLegend()[2].color; // the ramp's middle stop, any one representative stop
+    const fadedRow = `<div class="legend-scale">Faded pins — general figures, not checked for ${escapeHtml(displayName)} <span class="legend-swatch legend-faded-demo" style="background:${fadedDemoColor}"></span></div>`;
+    el.innerHTML = checkedRow + fadedRow;
+    return;
+  }
+
+  // General (no persona, no lens):
   el.innerHTML = `
-    <div class="legend-scale">1 — weakest fit ${scaleHtml} 5 — strongest fit</div>
+    <div class="legend-scale">Pin color — general Fit index: ${scaleHtml}</div>
+    <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
     <span>${escapeHtml(FIT_INDEX_DEFINITION)}</span>
-    ${extra}
   `;
 }
 
@@ -854,16 +994,15 @@ function renderJudgmentNote(el) {
     may come later.
     <br><br>
     <strong>Two more honest limits of this first map build:</strong>
-    (1) The world outline is a real, licensed simplified political map, but
-    only the site's own researched countries are shaded — the rest is
-    neutral context, not "no data implied to exist." Crete (CanILiveThere's
-    "CR") is deliberately left unshaded as a country, since its two
-    researched locations are on the island, not the Greek mainland — see
-    pins, not the Greece polygon.
+    (1) Countries are all drawn the same — the pins carry the data. A
+    country's outline never asserts a value, so no shading means nothing
+    either way. Crete (CanILiveThere's "CR") is deliberately unmapped as a
+    country outline — its two researched locations are on the island, not
+    the Greek mainland — see pins, not the Greece polygon.
     (2) Only Wenda's and Carmen's verdict fixtures give a real
     clears/misses read; Waldo's map has no "eliminated" state to show yet,
     because no hard-constraint pass/fail has been computed for him — only
-    his four re-scored criteria, which still blend into a continuous 1–5
-    color, not a gone/not-gone one. Full detail in the build notes.
+    his four re-scored criteria, which still blend into the same 1–5 ramp,
+    not a gone/not-gone one. Full detail in the build notes.
   `;
 }

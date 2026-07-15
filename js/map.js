@@ -7,6 +7,7 @@ import {
   BAND_ORDER, BAND_LABEL, formatNumbersInText, STATE_HEADLINE, STATE_HEADLINE_BAND,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
+import { TERRAIN_FEATURES } from "./terrain-data.js";
 import { siteUrl } from "./site-root.js";
 import { initPerspectiveDoor } from "./perspective-door.js";
 
@@ -16,6 +17,43 @@ import { initPerspectiveDoor } from "./perspective-door.js";
 // apart the way the spec's own "7+2=9" arithmetic assumes they won't.
 const PIN_RADIUS = 7;
 const PIN_HALO = 2;
+
+// v10 Part 13: real-world km -> world-viewBox units, for terrain sizing
+// only (pins/hit-areas never use this — they hold constant SCREEN size via
+// pxPerWorldUnit instead; terrain is real geography and should genuinely
+// grow/shrink on screen with zoom, the same way country outlines already
+// do). Equirectangular approximation (111km per degree of latitude is the
+// standard constant for this class of estimate) applied to PROJECTION's own
+// latitude slope, not a second, independently-tuned figure — checked
+// against the spec's own cited conversion (18km -> ~0.39-0.44 world-units,
+// §13.3): this factor reproduces that range (18 *
+// this constant ≈ 0.436), so it's the same math, not a re-derivation.
+const KM_PER_DEGREE_LAT = 111;
+const WORLD_UNITS_PER_KM = Math.abs(PROJECTION.y(1) - PROJECTION.y(0)) / KM_PER_DEGREE_LAT;
+
+// v10 §13.4: zoom-threshold fade-in, an implementation call on the two
+// numbers the spec deliberately left open (it fixes only the ~20px floor
+// and the 0.25-0.35 opacity range, not a second threshold or a specific
+// value inside that range). TERRAIN_FADE_FULL_PX is a plain 3x multiple of
+// the floor — no research behind it, a reasonable ramp width, not a
+// measured number (an open judgment call, not asserted as settled).
+// TERRAIN_OPACITY_TARGET sits at the range's own midpoint.
+const TERRAIN_FADE_MIN_PX = 20; // narrow-axis on-screen footprint below which a terrain shape doesn't render at all
+const TERRAIN_FADE_FULL_PX = 60; // footprint at/above which opacity reaches its fixed target
+const TERRAIN_OPACITY_TARGET = 0.3;
+
+// v10 Part 12.3: persistent solo-pin labels. Font size and halo width are
+// both constant ON SCREEN (same pxPerWorldUnit idiom as pin radius/stroke),
+// so a place name reads the same size at any zoom. AVG_CHAR_WIDTH_PX is a
+// deliberately crude estimate (no canvas measureText call, keeping this
+// dependency-light) used ONLY for the collision-fallback check below, not
+// for anything rendered — good enough to catch real overlaps, not a layout
+// engine.
+const LABEL_FONT_SIZE_PX = 9;
+const LABEL_GAP_PX = 3; // gap between the pin's own radius+halo and the label's top edge
+const LABEL_HALO_PX = 2; // thin --paper halo stroke width, for legibility over varying ground
+const LABEL_AVG_CHAR_WIDTH_PX = LABEL_FONT_SIZE_PX * 0.56;
+const LABEL_LINE_HEIGHT_PX = LABEL_FONT_SIZE_PX * 1.3;
 
 applyStoredTheme();
 renderTopBar("map");
@@ -271,6 +309,63 @@ function clusterPins(pinEntries, pxPerWorldUnit) {
     groups.get(r).push(pinEntries[i]);
   }
   return [...groups.values()];
+}
+
+// v10 Part 12.3: which solo pins' persistent labels get suppressed because
+// they'd visually collide with another one at borderline distances (a real,
+// flagged gap in the spec's own review — a named minimum fallback, not left
+// unhandled). Greedy, deterministic, same stable-sort idiom Ruling 2/Ruling 4
+// already use elsewhere in this file: earlier location_id keeps its label; a
+// later one that would overlap an already-kept label is suppressed (falls
+// back to hover/tap discovery, the same mechanism a knotted pin already uses
+// one zoom level down — not an invented third behavior). The overlap check
+// itself is a deliberately crude AABB estimate (character-count-based
+// width, no canvas measureText call) — good enough to catch real collisions,
+// not pixel-exact typesetting (an untested-on-a-render judgment call, named
+// as such, not asserted as settled).
+function computeLabelSuppressions(soloEntries, pxPerWorldUnit) {
+  const sorted = [...soloEntries].sort((a, b) => {
+    const ai = a.loc.location_id, bi = b.loc.location_id;
+    return ai < bi ? -1 : ai > bi ? 1 : 0;
+  });
+  const kept = [];
+  const suppressed = new Set();
+  const halfWidth = (entry) => (entry.loc.display_name.length * LABEL_AVG_CHAR_WIDTH_PX) / 2;
+  for (const entry of sorted) {
+    const collides = kept.some((other) => {
+      const dxPx = (entry.cx - other.cx) * pxPerWorldUnit;
+      const dyPx = (entry.cy - other.cy) * pxPerWorldUnit;
+      return Math.abs(dxPx) < (halfWidth(entry) + halfWidth(other)) && Math.abs(dyPx) < LABEL_LINE_HEIGHT_PX;
+    });
+    if (collides) suppressed.add(entry.loc.location_id);
+    else kept.push(entry);
+  }
+  return suppressed;
+}
+
+// v10 Part 12.3: the persistent name label itself — pointer-events:none
+// (purely visual, never a second interactive surface), constant on-screen
+// size via the same pxPerWorldUnit idiom pin radius/stroke already use
+// (Part 9 item 3), offset below the pin by its own radius+halo+gap. Halo
+// stroke width set inline for the same constant-on-screen reason as
+// font-size; css/style.css's .location-label rule supplies the
+// paint-order/stroke-color/fill.
+function makeSoloLabel(svgNS, entry, pxPerWorldUnit) {
+  const text = document.createElementNS(svgNS, "text");
+  const offsetWorld = (PIN_RADIUS + PIN_HALO + LABEL_GAP_PX + LABEL_FONT_SIZE_PX * 0.85) / pxPerWorldUnit;
+  text.setAttribute("x", entry.cx);
+  text.setAttribute("y", entry.cy + offsetWorld);
+  text.setAttribute("text-anchor", "middle");
+  text.setAttribute("class", "location-label");
+  text.style.fontSize = (LABEL_FONT_SIZE_PX / pxPerWorldUnit).toFixed(3) + "px";
+  text.style.strokeWidth = (LABEL_HALO_PX / pxPerWorldUnit).toFixed(3);
+  text.setAttribute("pointer-events", "none");
+  // The hit-circle's own aria-label already names this place — this text is
+  // a purely visual, redundant echo of it, so a screen reader shouldn't
+  // hear every place name twice.
+  text.setAttribute("aria-hidden", "true");
+  text.textContent = entry.loc.display_name;
+  return text;
 }
 
 // v8 Part 11 Ruling 2: a plain, deterministic string hash (FNV-1a) — the
@@ -588,6 +683,25 @@ function renderMap(store, lenses) {
   const pxPerWorldUnit = containerWidthPx / STATE.viewBox.w;
   const groups = clusterPins(pinEntries, pxPerWorldUnit);
 
+  // v10 §13.4: ground layer, appended here — after grain/Ormen Lange (both
+  // already in the SVG's child list above) and strictly before any pin
+  // below (none have been appended yet at this point in the function) — so
+  // paint order alone, not a z-index, guarantees a pin never renders behind
+  // its own local terrain, same rule Part 12.1's grain fix already
+  // established for this file.
+  renderTerrain(svg, svgNS, pinEntries, pxPerWorldUnit);
+
+  // v10 Part 12.3: label-collision fallback, computed once up front (needs
+  // every solo pin's true screen position relative to every other, not just
+  // its own neighbors) so the render loop below can just check membership.
+  // Reasonable-and-simple call, named plainly (spec left this open): earlier
+  // location_id keeps its label; a later one that would visually collide
+  // with an already-kept label falls back to hover/tap discovery only — the
+  // exact mechanism a knotted pin already uses one zoom level down, not an
+  // invented third behavior.
+  const soloEntries = groups.filter((g) => g.length === 1).map((g) => g[0]);
+  const suppressedLabels = computeLabelSuppressions(soloEntries, pxPerWorldUnit);
+
   function showTip(e, text) {
     const tipEl = document.getElementById("pin-tooltip");
     tipEl.textContent = text;
@@ -661,6 +775,41 @@ function renderMap(store, lenses) {
     hit.addEventListener("blur", leave);
   }
 
+  // v10 Part 12.2: a one-shot settle-on-release animation, additive beside
+  // wireHover()'s own lift (unchanged). Wired to the solo hit-circle only
+  // (below) — NOT the knot's shared hit-shape, a real technical reason, not
+  // §11.4's "no single visual element to lift" reasoning repeated: a knot's
+  // click handler (zoomToCluster(), below) synchronously wipes and rebuilds
+  // #map-root's whole innerHTML in the same task pointerup's class-add
+  // already ran in (pointerup always fires before click, same synchronous
+  // task, no paint between them) — the animating circle would be destroyed
+  // before the browser ever gets to paint its first frame, a dead, inert
+  // effect, not a degraded one. Confirmed by reading zoomToCluster() itself,
+  // not just reasoned — named as an open uncertainty since this specific
+  // negative (an animation that provably never paints) hasn't been visually
+  // confirmed to show nothing, only traced via the synchronous call chain
+  // that would prevent it. pointerup (not a mouseup+touchend
+  // pair) per the spec's own explicit, scoped deviation (§12.2) — avoids
+  // the synthetic-mouse-event double-fire a touch would otherwise also
+  // trigger; keyup parity for the existing Enter/Space activation keys,
+  // matching this project's own convention elsewhere. The class is
+  // force-removed then re-added (a reflow forced between, via a read of
+  // offsetWidth) so a repeat tap always restarts the animation from its own
+  // 0% frame, per the spec's own implementation note — without the reflow,
+  // re-adding a class already present is a no-op and the animation
+  // wouldn't restart.
+  function wireSettle(hit, visualPins) {
+    const settle = () => {
+      for (const p of visualPins) {
+        p.classList.remove("pin-settle");
+        void p.offsetWidth;
+        p.classList.add("pin-settle");
+      }
+    };
+    hit.addEventListener("pointerup", settle);
+    hit.addEventListener("keyup", (e) => { if (isActivationKey(e)) settle(); });
+  }
+
   for (const group of groups) {
     if (group.length === 1) {
       // v8 Part 11 §11.3 item 1: solo pins were already under the mobile
@@ -695,7 +844,19 @@ function renderMap(store, lenses) {
       hit.addEventListener("click", go);
       hit.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
       wireHover(hit, [visualPin], entry.tooltip);
+      wireSettle(hit, [visualPin]);
       svg.appendChild(hit);
+
+      // v10 Part 12.3: a solo pin (this exact branch — group.length === 1)
+      // earns a persistent name label the moment it declusters, tied to the
+      // same zoom event that already gives it independent tap-target
+      // status. Suppressed for a location whose label would visually
+      // collide with an already-kept one (computeLabelSuppressions, above)
+      // — that location still gets its name via hover/tap, same as any
+      // knotted pin.
+      if (!suppressedLabels.has(entry.loc.location_id)) {
+        svg.appendChild(makeSoloLabel(svgNS, entry, pxPerWorldUnit));
+      }
     } else {
       // v8 Part 11 Ruling 1: no centroid badge — retire the merged-circle-
       // plus-numeral mechanism entirely. Every member renders as its own
@@ -1014,6 +1175,44 @@ function renderMapGrain(svg, svgNS) {
   rect.style.opacity = "0.08";
   rect.style.pointerEvents = "none";
   svg.appendChild(rect);
+}
+
+// v10 Part 13: per-location terrain, Tier A only (a neutral filled circle —
+// Tier B's real traced shape/markers are null for every entry today, so
+// they're skipped here rather than half-rendered). Per v8 §1.2's
+// three-claims doctrine, cited in the spec: terrain asserts no claim — same
+// channel as parchment/land/water, never a graded fill, so unlike a pin's
+// own radius (constant ON SCREEN, via pxPerWorldUnit) this shape is sized
+// in real world-viewBox units and genuinely grows/shrinks with zoom, the
+// way real geography should. pxPerWorldUnit is used only to measure the
+// shape's own CURRENT on-screen footprint, for the fade-in threshold check.
+function renderTerrain(svg, svgNS, pinEntries, pxPerWorldUnit) {
+  for (const entry of pinEntries) {
+    const features = TERRAIN_FEATURES[entry.loc.location_id];
+    if (!features) continue;
+    for (const f of features) {
+      // Tier B needs a real traced shape/markers — none exist yet for any
+      // location (named plainly in terrain-data.js and the spec itself).
+      // Not attempted here; a future session's real cartographic pull adds
+      // its own render branch when shape/markers stop being null.
+      if (f.tier !== "A" || f.radius_km == null) continue;
+      const radiusWorld = f.radius_km * WORLD_UNITS_PER_KM;
+      const footprintPx = radiusWorld * pxPerWorldUnit * 2; // full diameter — the "narrow axis" for a circle
+      if (footprintPx < TERRAIN_FADE_MIN_PX) continue;
+      const t = Math.max(0, Math.min(1, (footprintPx - TERRAIN_FADE_MIN_PX) / (TERRAIN_FADE_FULL_PX - TERRAIN_FADE_MIN_PX)));
+      const opacity = t * TERRAIN_OPACITY_TARGET;
+      if (opacity <= 0) continue;
+      const shape = document.createElementNS(svgNS, "circle");
+      shape.setAttribute("cx", entry.cx);
+      shape.setAttribute("cy", entry.cy);
+      shape.setAttribute("r", radiusWorld.toFixed(3));
+      shape.setAttribute("class", "terrain-feature");
+      shape.style.opacity = opacity.toFixed(3);
+      shape.setAttribute("aria-hidden", "true");
+      shape.setAttribute("pointer-events", "none");
+      svg.appendChild(shape);
+    }
+  }
 }
 
 // v6 addendum R1: the padding/clamp logic, shared by the whole-map view

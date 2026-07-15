@@ -88,6 +88,18 @@
      family. */
   --map-water: #DCE7DF;
   --country-fill: #d6cdb8;
+  /* v10 Part 13: per-location terrain ground fill. Carries no claim (v8
+     §1.2's three-claims doctrine — same channel as parchment/land/water,
+     never the ramp/verdict families), so this wasn't run through the full
+     WCAG/ΔE validation pipeline those claim-bearing colors get — picked for
+     plain visual distinctness from --country-fill (tan), --map-water (pale
+     mint), and --paper (cream): a muted sage-moss green, a hue family none
+     of the other three touch. Always painted at a low opacity (0.25-0.35,
+     map.js's own fade target) on top of --country-fill, never at full
+     strength, so it reads as "specific ground texture here," not a fourth
+     competing surface. The spec left the exact token as implementation
+     latitude rather than a ruled value. */
+  --terrain-fill: #7a8a63;
   /* v6 addendum R3 §3.1: sand-tone, thinner, translucent — retires the
      hardcoded #ffffff "municipal overlay" white grid flagged in review
      ("less of these straight lines... an exciting map, not a municipal
@@ -459,6 +471,30 @@ h3 { font-size: 1.05rem; }
   transform: scale(1.15);
   filter: drop-shadow(0 2px 4px rgba(140, 47, 27, 0.18));
 }
+/* v10 Part 12.2: a one-shot settle animation, additive beside .pin-lift
+   above (unchanged) — fired on release (map.js's wireSettle(), pointerup +
+   keyup), not on hover/leave. A small dip-then-overshoot-then-rest, reads
+   as a physical object settling onto paper. Values transported verbatim
+   from the spec, not re-tuned. */
+@keyframes pin-settle {
+  0%   { transform: scale(1.15); }
+  45%  { transform: scale(0.94); }
+  75%  { transform: scale(1.04); }
+  100% { transform: scale(1.0); }
+}
+.location-pin.pin-settle { animation: pin-settle 260ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+/* A real gap named in the design review, not left unhandled: no
+   prefers-reduced-motion handling existed
+   anywhere in this codebase before this Part — this is the first. Skips
+   the animation entirely for a reader who's set that OS-level preference,
+   rather than a shortened variant: the settle is pure decoration (the
+   click/keyboard activation it accompanies already works instantly without
+   it), so there's nothing to preserve at reduced intensity — same
+   "decoration never outranks comprehension" doctrine this seat has already
+   applied to ambient/idle pin motion (v8 Part 11 §11.4 item 3). */
+@media (prefers-reduced-motion: reduce) {
+  .location-pin.pin-settle { animation: none; }
+}
 /* v8 Part 11 §11.3 item 1: cursor affordance for the enlarged, invisible
    hit-circle every pin (solo or knotted) now carries — the visible pin
    itself no longer receives pointer events, so its own `cursor: pointer`
@@ -468,6 +504,23 @@ h3 { font-size: 1.05rem; }
    attributes (fill/r) are set inline in map.js since both are computed
    per-knot; this rule exists only so the class has a documented home. */
 .knot-shadow { pointer-events: none; }
+/* v10 Part 13: per-location terrain ground shape — opacity is set inline
+   per-shape (map.js's own zoom-threshold fade math), fill/pointer-events
+   live here since they're constant across every terrain feature. */
+.terrain-feature { fill: var(--terrain-fill); pointer-events: none; }
+/* v10 Part 12.3: persistent solo-pin name label — small muted type, a thin
+   --paper halo (paint-order: stroke fill) for legibility over varying
+   land/water fill underneath, the same "halo for legibility on a busy
+   ground" idea the pin's own stroke already uses. font-size/stroke-width
+   are set inline per-label (map.js's own pxPerWorldUnit constant-on-screen
+   idiom), not here. */
+.location-label {
+  fill: var(--muted);
+  stroke: var(--paper);
+  paint-order: stroke fill;
+  font-weight: 500;
+  user-select: none;
+}
 
 /* v7 Part 9 item 1: zoom controls, fixed bottom-right of the map itself
    (.map-wrap is already position:relative) — one of three redundant
@@ -813,6 +866,12 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
     --focus: #0b5fff; /* clears the 3:1 non-text/UI-component floor as-is */
     --map-water: #16232b; /* deep, clearly-blue-not-black; distinct from --panel */
     --country-fill: #4a4234;
+    /* v10 Part 13: dark counterpart to --terrain-fill above — a slightly
+       lighter, still-desaturated sage so it stays visible (at the same
+       0.25-0.35 render opacity) against both the dark country-fill (warm
+       dark tan) and dark map-water (deep navy), same "distinct hue family"
+       reasoning, not independently re-validated. */
+    --terrain-fill: #6b7a58;
 
     /* Chip-on-white-text roles need their own dark-mode value, distinct
        from --accent's link-text tuning: #5fa8e0 (right for text against

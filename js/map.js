@@ -250,7 +250,13 @@ function applyZoom(store, lenses, factor, focal) {
   const base = STATE.viewBox || home;
   let vb = zoomViewBox(base, factor, focal || boxCenter(base));
   const minW = home.w / MAX_SCALE;
-  if (vb.w < minW) vb = zoomViewBox(vb, minW / vb.w, focal || boxCenter(vb));
+  // zoomViewBox() computes newW = vb.w / factor, so correcting an
+  // over-zoomed box back to minW needs factor = vb.w / minW (not
+  // minW / vb.w, which was the bug: passing the inverted factor made
+  // newW = vb.w^2 / minW, shrinking vb further instead of correcting it
+  // — compounding on every subsequent zoom-in click toward a degenerate
+  // near-zero, eventually NaN, viewBox).
+  if (vb.w < minW) vb = zoomViewBox(vb, vb.w / minW, focal || boxCenter(vb));
   // Can't zoom OUT past the site's own "full world" framing — Reset
   // already provides the one-action way back there (spec reason (a));
   // zooming further out than home has no defined "more world" to show.

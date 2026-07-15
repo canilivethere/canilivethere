@@ -1223,7 +1223,7 @@ function renderMapGrain(svg, svgNS) {
   rect.setAttribute("fill", "url(#map-grain)");
   rect.setAttribute("aria-hidden", "true");
   rect.style.mixBlendMode = "multiply";
-  rect.style.opacity = "0.08";
+  rect.style.opacity = "0.16";
   rect.style.pointerEvents = "none";
   svg.appendChild(rect);
 }

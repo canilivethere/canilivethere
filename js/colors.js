@@ -1,36 +1,39 @@
 // CanILiveThere — color logic for the map, lists, and score chips.
 //
-// Light-mode Fit-index scale. **v7 Part 16 (2026-07-13) supersedes v6
-// R2.1's own "stays unchanged" ruling — it does not stay unchanged.**
-// Tone instruction, verbatim: "same kinda shades as
-// were used already." Three of five stops are the exact hexes already
-// shipped and already CVD/contrast-validated (v6) — only their POSITION
-// on the ramp moves; #006726/#596e00/#ae7d00 are reused verbatim, not
-// re-derived. Two new stops (#7a2213 Red, #a35a0e Orange) replace the
-// old violet/blue worst-end, checked this session against parchment
-// (#F2E8D5) with the same WCAG relative-luminance math the rest of this
-// palette uses as its stand-in for the still-unresolved dataviz skill:
-// #7a2213 8.36:1, #a35a0e 4.29:1 — both clear the 3:1 non-text floor
-// with real margin. Hue check, computed not eyeballed: 7.8°→30.6°→
-// 43.1°→71.4°→142.2°, a clean monotonic red-to-green progression, muted/
-// dark-saturated throughout, no stop reads neon or primary-traffic-light.
-// **Named open gap, an explicit deferral, not silently
-// dropped:** no lightness/saturation CVD accommodation this pass — a
-// hue-only red-to-green ramp is the single worst-case failure mode for
-// red-green colorblindness (deuteranopia/protanopia, ~8% of men), and
-// this ships anyway on direct instruction; the Machado-2009 CVD
-// simulation that validated the PRIOR ramp's hues against each other
-// was not re-run against this one. Revisit in a dedicated later color
-// pass, not decided here.
-const SCALE_STOPS_LIGHT = ["#7a2213", "#a35a0e", "#ae7d00", "#596e00", "#006726"];
+// Light-mode Fit-index scale. **v10 Part 11 (2026-07-15) retires the v7
+// Part 16 red->green ramp entirely** — deep blue (weakest) through a
+// warm-neutral pivot to deep amber/gold (strongest), replacing every hue
+// in the array, not just repositioning stops the way Part 16 did.
+// Provenance: a live conversation asking the ramp to read intuitively
+// without color-normal vision. Validated hexes, computed this pass (real
+// WCAG relative-luminance + CIE76 ΔE, not eyeballed) — transported
+// verbatim, no new hex work done here:
+//   #1d3f5c 9.01:1   #3f6478 5.23:1   #7d6b45 4.25:1
+//   #8f6a1f 4.07:1   #6b4a10 6.61:1   (all vs. parchment #F2E8D5 — every
+//   stop clears the 3:1 non-text floor with real margin, beating all but
+//   two of the OLD ramp's five stops).
+// Adjacent-stop ΔE (16.8/40.6/22.2/15.3) and a cross-check against every
+// other meaning-color already on this site (min ΔE 16.6) both confirm no
+// collision. The real accessibility argument: this ramp carries ~81% of
+// its Lab color separation on the blue-yellow axis instead of the
+// red-green axis red-green colorblindness collapses — the OLD ramp put
+// ~71% of its separation on exactly the axis that fails, the worst-case
+// construction. **Named honestly, not oversold:** this is a computed
+// axis-decomposition argument, not a rendered Machado-2009 (or
+// equivalent) CVD simulation — stronger than every prior pass's bare
+// "mitigates," short of "validated." Revisit with an actual simulation
+// pass if that gap ever needs fully closing, not decided here.
+const SCALE_STOPS_LIGHT = ["#1d3f5c", "#3f6478", "#7d6b45", "#8f6a1f", "#6b4a10"];
 const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"];
-// v7 Part 16 names, light ramp only — paired with SCALE_STOPS_LIGHT by
-// index, red (weakest) -> green (strongest). getScaleLegend() below
-// withholds names in dark mode rather than mislabeling an unrelated
-// honey-gold swatch "Red"/"Green" (see that function's own comment) —
-// dark-mode ramp is UNCHANGED, out of scope this pass (same v6 R2.1
-// caution), still the honey-gold scale from the 2026-07-10 revision.
-const SCALE_STOP_NAMES_LIGHT = ["Red", "Orange", "Yellow", "Yellow-green", "Green"];
+// v10 Part 11: color-NAME labels ("Red"/"Green", v7 Part 16) are retired
+// in favor of MEANING labels — reusing FIT_INDEX_DEFINITION's own already-
+// established vocabulary ("5 is the strongest fit, 1 is the weakest")
+// rather than inventing new register. Ruled UI copy, transported
+// verbatim — do not reword. Theme-independent by construction (a meaning
+// has no hue to mismatch, unlike a color name against an unrelated
+// dark-mode ramp) — see getScaleLegend() below, which now returns this
+// regardless of theme.
+const SCALE_STOP_MEANING = ["Weakest fit", "Below-average fit", "Middling fit", "Above-average fit", "Strongest fit"];
 
 // Theme detection (v4 addendum R2): reads the `data-theme` attribute
 // app-shared.js's applyStoredTheme()/toggleTheme() set on <html>, not the
@@ -101,22 +104,20 @@ export function isGapValue(value) {
 // current theme at render time — call sites re-read this each render,
 // same as scoreToColor.
 //
-// v6 addendum §2.3 / v7 Part 16: each stop carries its own `name` (Red/
-// Orange/Yellow/Yellow-green/Green as of Part 16 — was Violet/Blue/
-// Green/Yellow-green/Yellow) so the legend can label steps instead of
-// showing an unlabeled swatch strip. Light-mode only, deliberately: the
-// dark ramp is explicitly out of scope this pass (R2.1, still true post-
-// Part-16) and stays the old honey-gold hues, so naming it "Red"..."Green"
-// would put a wrong color name on an unrelated swatch — a scoped
-// extension of the addendum's own dark-ramp exclusion, not a
-// contradiction of it (flagged for the record, not silently decided).
+// v10 Part 11: each stop carries its own `name`, now a MEANING label
+// (SCALE_STOP_MEANING, above) rather than a hue name — returned
+// regardless of theme. This retires the v7 Part 16 dark-mode withholding:
+// a meaning label has no hue to mismatch against the honey-gold dark
+// ramp the way "Red"/"Green" did, so dark mode's legend — which has
+// shown bare unlabeled swatches since that withholding began — now gets
+// the same five labels for free, zero new authorship, zero new
+// validation needed (no color claim is being made by the text).
 export function getScaleLegend() {
   const stops = currentScaleStops();
-  const dark = isDarkTheme();
   return [1, 2, 3, 4, 5].map((v) => ({
     value: v,
     color: stops[v - 1],
-    name: dark ? null : SCALE_STOP_NAMES_LIGHT[v - 1],
+    name: SCALE_STOP_MEANING[v - 1],
   }));
 }
 

@@ -1116,13 +1116,14 @@ function renderLegend(el, persona, activeLens, store) {
   // Re-read the theme-appropriate ramp/colors at render time (not cached),
   // so this legend is always correct for the current light/dark mode.
   //
-  // v6 addendum §2.3 / v7 Part 16: five named, ordinally-labeled steps
-  // replace the old unlabeled swatch strip — each stop gets its own
-  // `.legend-step` (swatch + name); in dark mode getScaleLegend()
-  // withholds `name` (see that function's own comment), so the step
-  // renders swatch-only there rather than a wrong color word.
+  // v10 Part 11: each stop reads "<value> · <meaning>" (e.g. "1 · Weakest
+  // fit") so color, number, and meaning read together at a glance — the
+  // v7 Part 16 hue-name label ("Red"/"Green", withheld in dark mode since
+  // it would mislabel the unrelated honey-gold ramp) is retired; a
+  // meaning label has no hue to mismatch, so it now renders in both
+  // themes for free (see getScaleLegend()'s own comment).
   const scaleHtml = getScaleLegend().map(
-    (s) => `<span class="legend-step"><span class="legend-swatch" style="background:${s.color}"></span>${s.name ? ` ${escapeHtml(s.name)}` : ""}</span>`
+    (s) => `<span class="legend-step"><span class="legend-swatch" style="background:${s.color}"></span> ${s.value} · ${escapeHtml(s.name)}</span>`
   ).join("");
 
   if (activeLens && activeLens.kind === "facts") {

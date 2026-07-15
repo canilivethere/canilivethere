@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
-  BAND_ORDER, BAND_LABEL, formatNumbersInText, STATE_HEADLINE, STATE_HEADLINE_BAND,
+  BAND_ORDER, BAND_LABEL, formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 import { TERRAIN_FEATURES } from "./terrain-data.js";
@@ -577,10 +577,19 @@ function renderMap(store, lenses) {
         const facts = activeLens.factsForLocation(loc.location_id);
         if (facts) {
           fill = DOG_LENS_COLOR;
-          const lines = facts.length > 1
-            ? facts.map((f) => `${f.label}: ${f.text}`).join(" ")
-            : facts[0].text;
-          tooltip = `${loc.display_name}, ${country.name} — Dog import: ${lines}`;
+          // 2026-07-16 readability fix: a fact's own value_raw is often
+          // several distinct clauses run together in one dense sentence
+          // (real content, bad presentation) —
+          // splitFactSentences() breaks it onto real lines at sentence/
+          // semicolon boundaries only (see app-shared.js for why not
+          // commas). Multiple facts for one location each get their own
+          // labeled block, blank-line separated, instead of one run-on
+          // space-joined string.
+          const blocks = facts.map((f) => {
+            const body = splitFactSentences(f.text).join("\n");
+            return facts.length > 1 ? `${f.label}:\n${body}` : body;
+          });
+          tooltip = `${loc.display_name}, ${country.name} — Dog import:\n${blocks.join("\n\n")}`;
         } else {
           fill = scoreToColor(null);
           gap = true;

@@ -408,6 +408,66 @@ export function formatNumbersInText(text) {
   return text.replace(/\d{5,}/g, (run) => Number(run).toLocaleString("en-US"));
 }
 
+// Some
+// fact rows on file (pet-import especially) are one dense run-on
+// `value_raw` paragraph bundling several distinct clauses — real content,
+// bad presentation. This splits on sentence-ending periods and semicolons
+// ONLY (the two boundary types the actual data supports without risking
+// meaning), never on commas (comma-joined lists inside one clause, e.g.
+// "€42.25 for one pet, €84.50 for two to five pets", stay on one line on
+// purpose — splitting every comma over-fragments a real list into noise).
+//
+// A period only counts as a boundary when followed by whitespace and then
+// an uppercase letter, digit, or open-paren (a real new clause/sentence
+// start) AND the word immediately before it is not a known abbreviation
+// or a single letter — guards against "incl. US" and "N. Ireland"-shaped
+// false splits, both real cases found in the live pet-import data during
+// this fix (Indonesia's Bali-routing fact, Malaysia's quarantine-exemption
+// fact). Decimal numbers ("0.5") are never split: the character before
+// the period there is a digit, not a letter, so the abbreviation-word
+// check naturally excludes them too — one guard, two problems solved.
+// Semicolons always split (no abbreviation ambiguity for a semicolon).
+// Verified against all 21 countries' live pet-import fact rows this
+// session — every split rejoins (whitespace-normalized) to the original
+// string with zero content loss or reordering.
+const SENTENCE_ABBREV_STOPLIST = new Set([
+  "incl", "etc", "vs", "approx", "no", "eg", "ie", "govt", "dept",
+  "st", "mt", "dr", "mr", "mrs", "jr", "sr", "vol", "co", "corp",
+  "inc", "ltd", "min", "max", "esp",
+]);
+
+export function splitFactSentences(text) {
+  if (!text) return [];
+  const result = [];
+  let cur = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    cur += ch;
+    if (ch === ";") {
+      if (/\s/.test(text[i + 1] || "")) {
+        result.push(cur.trim());
+        cur = "";
+      }
+    } else if (ch === ".") {
+      const rest = text.slice(i + 1);
+      const wsMatch = rest.match(/^\s+/);
+      if (wsMatch) {
+        const after = rest.slice(wsMatch[0].length);
+        if (/^[A-Z(0-9]/.test(after)) {
+          const wordMatch = cur.match(/([A-Za-z]+)\.$/);
+          const word = wordMatch ? wordMatch[1].toLowerCase() : "";
+          if (word.length > 1 && !SENTENCE_ABBREV_STOPLIST.has(word)) {
+            result.push(cur.trim());
+            cur = "";
+          }
+        }
+      }
+    }
+  }
+  if (cur.trim()) result.push(cur.trim());
+  return result.filter(Boolean);
+}
+
 // --- Live FX reference-currency stopgap (2026-07-14) ---
 // A reader's own nationality/currency isn't captured anywhere on the site
 // yet (that's tomorrow's real build); until then, this appends a USD

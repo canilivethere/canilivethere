@@ -549,6 +549,20 @@ h3 { font-size: 1.05rem; }
   max-width: 280px;
   z-index: 20;
   display: none;
+  /* 2026-07-16: tooltip text is set via textContent (map.js showTip()),
+     so a raw "\n" in the string was previously collapsed to a space by
+     the default `white-space: normal` — real newlines never actually
+     rendered as line breaks anywhere they were used, not just in the new
+     dog-import facts split below. pre-line preserves those newlines
+     while still wrapping long lines normally (unlike pre/pre-wrap, which
+     would also preserve runs of literal spaces this project doesn't rely
+     on). This is the one CSS change that makes the facts-lens line-break
+     fix (map.js dogImportFactsLens tooltip building) actually visible —
+     also fixes the same latent no-break issue on every other tooltip
+     already using "\n" (Waldo/Wenda/Carmen's multi-line tooltips), as a
+     side effect, not a separate pass.
+  */
+  white-space: pre-line;
 }
 .map-legend { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 0.75rem; font-size: 0.85rem; }
 .legend-scale { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }

@@ -1,5 +1,5 @@
 {
   "schema_version": 1,
-  "extracted_at": "2026-07-11T00:00:00Z",
+  "extracted_at": "2026-07-15T00:00:00Z",
   "source_ref_policy": "public snapshot - vault-internal provenance stripped on export (publication-boundary ruling, 2026-07-10): fact.source_ref truncated to bare source filename (consumed by the site's section bucketing), score/change-event source_ref removed, fixture provenance neutralized; source_url + confidence + source_count are the public trust layer"
 }

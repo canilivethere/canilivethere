@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
   renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
-  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline,
+  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -25,7 +25,13 @@ const SECTION_TITLES = {
 const SECTION_ORDER = ["overview", "visa", "property", "cost", "community", "redflags"];
 
 async function main() {
-  const store = await loadStore();
+  // Run together, not sequentially: the FX lookup is a best-effort
+  // annotation (formatValue()/detectBareCurrency() degrade to showing no
+  // USD approx at all if this hasn't resolved or failed), so it must
+  // never delay the actual page content behind a second network round
+  // trip. loadFxRates() never rejects (every failure path inside it is
+  // caught and swallowed), so this Promise.all can't itself throw.
+  const [store] = await Promise.all([loadStore(), loadFxRates()]);
   renderFooter(store);
   const persona = getPersona();
 

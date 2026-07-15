@@ -349,17 +349,126 @@ export function renderFooter(store) {
   document.body.appendChild(footer);
 }
 
+// Comma-group digit runs of 5+ so large figures ("500000 THB") read as
+// "500,000 THB" instead of forcing a reader to count zeros. Deliberately
+// stops at 4 digits: this project's facts mix genuine 4-digit years
+// ("2019", embedded in dates like "2019-10-31") with genuine 4-digit money
+// figures ("1900 THB"), and there's no reliable way to tell those apart
+// from the string alone — leaving 4-digit runs untouched is the safe
+// default (a 4-digit number is also easy enough to read unformatted;
+// the real readability problem starts at 5+ digits). Already-formatted
+// runs ("50,000") are naturally left alone, since the comma splits them
+// into shorter digit groups this regex doesn't re-match.
+export function formatNumbersInText(text) {
+  return text.replace(/\d{5,}/g, (run) => Number(run).toLocaleString("en-US"));
+}
+
+// --- Live FX reference-currency stopgap (2026-07-14) ---
+// A reader's own nationality/currency isn't captured anywhere on the site
+// yet (that's tomorrow's real build); until then, this appends a USD
+// approximation to bare-local-currency figures so "500,000 THB" doesn't
+// require a reader to already know an exchange rate. Deliberately a LIVE
+// lookup, not a hardcoded rate table: this project's own research already
+// shows rates drifting well past a 10% margin within days for volatile
+// currencies (Argentina's peso spans 430-510 ARS/USD across sources
+// written days apart) — a static number baked into code would look
+// authoritative and go visibly wrong. open.er-api.com is free, keyless,
+// updates daily, and covers every currency this site's facts use.
+// Fails soft everywhere (offline, blocked, unknown currency, no numeric
+// value): the reader always sees the real local-currency figure
+// regardless — this is a bonus annotation, never load-bearing.
+const FX_CACHE_KEY = "clt-fx-rates-v1";
+const FX_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — a normal browsing session makes at most one real request
+let fxRates = null; // { CODE: rate-per-USD }, null until loaded or on any failure
+
+export async function loadFxRates() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(FX_CACHE_KEY) || "null");
+    if (cached && Date.now() - cached.fetchedAt < FX_CACHE_TTL_MS) {
+      fxRates = cached.rates;
+      return;
+    }
+  } catch {
+    // corrupt/unavailable cache entry - fall through to a fresh fetch
+  }
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.rates) return;
+    fxRates = data.rates;
+    try {
+      sessionStorage.setItem(FX_CACHE_KEY, JSON.stringify({ rates: fxRates, fetchedAt: Date.now() }));
+    } catch {
+      // storage full/unavailable/private-browsing - fine, just skip caching
+    }
+  } catch {
+    // offline, blocked, rate-limited, whatever - the page works fine without this
+  }
+}
+
+// Bare currency-code units only ("THB", "THB/sqm", "RM/month",
+// "ZAR/m²") — deliberately conservative. Skipped on purpose: anything
+// already carrying a parenthetical/manual approx ("RM (~$213,000)") or a
+// "~", since that's either already hand-converted (don't show two
+// different USD guesses for one figure) or too free-text to parse
+// safely. USD and EUR themselves are excluded — a reader doesn't need
+// USD converted to USD, and EUR is already a widely-recognized
+// reference currency in its own right, unlike THB/MAD/ARS/etc. for most
+// readers.
+const BARE_CURRENCY_CODES = ["THB", "RM", "MYR", "ZAR", "MAD", "ARS", "IDR", "EGP", "COP", "MXN"];
+const CURRENCY_TO_FX_CODE = { RM: "MYR" };
+
+function detectBareCurrency(unit) {
+  if (!unit || unit.includes("(") || unit.includes("~")) return null;
+  for (const code of BARE_CURRENCY_CODES) {
+    if (unit === code || unit.startsWith(`${code}/`) || unit.startsWith(`${code} `)) {
+      return CURRENCY_TO_FX_CODE[code] || code;
+    }
+  }
+  return null;
+}
+
+function usdApprox(amount, fxCode) {
+  if (!fxRates || !fxRates[fxCode] || !Number.isFinite(amount)) return null;
+  const usd = amount / fxRates[fxCode];
+  if (!Number.isFinite(usd) || usd <= 0) return null;
+  const rounded = usd >= 100 ? Math.round(usd / 10) * 10 : Math.round(usd);
+  return rounded.toLocaleString("en-US");
+}
+
 export function formatValue(fact) {
   if (fact.value_raw === "[GAP]") return "Not yet researched";
-  const raw = String(fact.value_raw);
+  const raw = formatNumbersInText(String(fact.value_raw));
   // Only append the unit if value_raw doesn't already carry it as text —
   // some facts' own value_raw already spells out its unit inline (e.g.
   // "50km coast / 100km border", "49% of building"), and appending the
   // bare unit again on top of that duplicates it visibly ("...building %").
+  let out = raw;
   if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) {
-    return `${raw} ${fact.unit}`;
+    out = `${raw} ${fact.unit}`;
   }
-  return raw;
+  // Bug fix (2026-07-15, caught by a real-data dry run, not just a read of
+  // the code): detectBareCurrency() only inspected fact.unit for an
+  // existing manual approximation, but at least one real fact on file
+  // (ID:bpjs-kesehatan-monthly-cost-where-eligible) carries its own
+  // "(~$3-10)" approximation inside value_raw itself, with a perfectly
+  // bare unit ("IDR/month"). Without this second check, the moment that
+  // fact (or any future one shaped like it) gains value_num_low/high, a
+  // reader would see two different, disagreeing USD guesses stapled
+  // together ("(~$3-10) (≈$2-$8)") -- exactly the collision this
+  // function's own comment says it exists to prevent. Checking raw here
+  // (not fact.value_raw) is equivalent and cheaper: formatNumbersInText()
+  // never adds or removes "(" or "~".
+  const fxCode = detectBareCurrency(fact.unit);
+  if (fxCode && !raw.includes("(") && !raw.includes("~")) {
+    const low = usdApprox(fact.value_num_low, fxCode);
+    const high = Number.isFinite(fact.value_num_high) && fact.value_num_high !== fact.value_num_low
+      ? usdApprox(fact.value_num_high, fxCode)
+      : null;
+    if (low) out += high ? ` (≈$${low}–$${high})` : ` (≈$${low})`;
+  }
+  return out;
 }
 
 const CONF_LABEL = { High: "High confidence", Medium: "Medium confidence", Speculative: "Speculative" };

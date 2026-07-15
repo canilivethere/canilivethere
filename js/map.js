@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
-  BAND_ORDER, BAND_LABEL,
+  BAND_ORDER, BAND_LABEL, formatNumbersInText,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 import { siteUrl } from "./site-root.js";
@@ -101,7 +101,7 @@ function dogImportFactsLens(store) {
         const rest = idx === -1 ? f.fact_key : f.fact_key.slice(idx + 1);
         return rest.startsWith("pet-import-dog");
       });
-      return rows.length ? rows.map((f) => ({ label: f.fact_label, text: f.value_raw })) : null;
+      return rows.length ? rows.map((f) => ({ label: f.fact_label, text: formatNumbersInText(String(f.value_raw)) })) : null;
     },
     explainerText:
       "Unscored on purpose — these are the import rules on file, not a grade. Blue pins have researched rules; hover to read them. This view ignores any persona pick above.",

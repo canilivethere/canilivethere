@@ -5,15 +5,18 @@ one face image per persona from this directory, keyed mechanically off
 `VALID_PERSONAS` (`js/app-shared.js`) — no per-name code, so a file
 simply landing here is all that's needed.
 
-**None of the eight are present yet.** This is a real, unfilled gap, not
-silently worked around: portrait images are supplied directly by
+**All eight are present.** Portrait images are supplied directly by
 whoever owns this project (not fetchable or generatable by any build
-tooling). Until a given file exists, its tile renders a neutral
-circular stub (`.door-portrait`'s own background, `css/style.css`) —
-never a broken-image icon; `js/perspective-door.js` removes a failed
-`<img>` on load error, leaving the stub visible.
+tooling); all eight files below now exist and have cleared the
+adversarial publication-boundary review described below. Until a given
+file exists, its tile renders a neutral circular stub (`.door-portrait`'s
+own background, `css/style.css`) — never a broken-image icon;
+`js/perspective-door.js` removes a failed `<img>` on load error, leaving
+the stub visible. That stub path is still live code (it's what protects
+any future ninth persona or a temporarily-missing file), just not
+currently exercised by any of the eight named below.
 
-## Files needed, exact names
+## Files, exact names
 
 | File | Persona |
 |---|---|
@@ -38,4 +41,5 @@ Every face image passes the same adversarial publication-boundary
 review as any other public-bound asset on this site before a
 production build — fictional people, but review discipline is review
 discipline. No code change is needed once a file exists; this is
-purely an asset drop, same pattern as `fonts/README.md`.
+purely an asset drop, same pattern as `fonts/README.md`. All eight
+files currently in this directory have cleared that review.

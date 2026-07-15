@@ -584,14 +584,36 @@ function renderMap(store, lenses) {
         tooltip = `${loc.display_name}, ${country.name} — ${activeLens.label}: ${val != null ? val.toFixed(1) + "/5" : "not scored yet"}`;
       }
     } else if (persona === "waldo") {
+      // Part 15.4: Waldo's Fit index (place quality, persona-rescored where
+      // we have real data) and the engine's verdict (visa/residency
+      // eligibility) are different claim types, not two richness levels of
+      // the same claim — the pin's color channel stays Fit-index-only,
+      // unchanged (one-meaning-per-channel doctrine, v8 R1). When no
+      // rescore exists but the engine has an answer, that answer rides as
+      // a second, clearly distinguished tooltip line instead of changing
+      // the pin's color.
       const idx = store.personaIndex("waldo", loc.location_id);
       const value = idx ? idx.value : null;
-      const hasRealRead = !!(idx && idx.personaAdjusted === true);
+      const hasPersonaRescore = !!(idx && idx.personaAdjusted === true);
       fill = scoreToColor(value);
       gap = isGapValue(value);
-      faded = !hasRealRead;
       const headline = buildFitHeadline(store, "waldo", loc, country, value);
-      tooltip = `${headline}\nWaldo's Fit index: ${value != null ? value.toFixed(1) : "n/a"}/5`;
+      const baseTooltip = `${headline}\nWaldo's Fit index: ${value != null ? value.toFixed(1) : "n/a"}/5`;
+      if (hasPersonaRescore) {
+        faded = false;
+        tooltip = baseTooltip;
+      } else {
+        const engineVerdict = store.verdictsByPersona.get("waldo")?.get(loc.location_id);
+        if (engineVerdict) {
+          faded = false;
+          const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+          tooltip = `${baseTooltip}\nWaldo's visa/residency check: ${stateText}`;
+        } else {
+          // Defensive fallback only — full 8x38 engine coverage today.
+          faded = true;
+          tooltip = baseTooltip;
+        }
+      }
     } else if (persona === "wenda" || persona === "carmen") {
       const general = store.generalIndex(loc.location_id);
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
@@ -600,7 +622,12 @@ function renderMap(store, lenses) {
       const hasCriterionFixtures = perLoc && perLoc.criteria && perLoc.criteria.size > 0;
       const idx = hasCriterionFixtures ? store.personaIndex(persona, loc.location_id) : null;
       const underlyingValue = idx ? idx.value : (general ? general.value : null);
-      const hasRealRead = !!verdict || hasCriterionFixtures;
+      // Part 15.3: engine checked second, only when no hand fixture verdict
+      // answers this location — same precedence as location.js's
+      // buildVerdictBlock (15.2), same engine the five-persona branch below
+      // already uses.
+      const engineVerdict = !verdict ? store.verdictsByPersona.get(persona)?.get(loc.location_id) : null;
+      const hasRealRead = !!verdict || hasCriterionFixtures || !!engineVerdict;
       fill = scoreToColor(underlyingValue);
       gap = isGapValue(underlyingValue);
       faded = !hasRealRead;
@@ -615,6 +642,13 @@ function renderMap(store, lenses) {
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
         tooltip = `${headline}\n${displayName}'s visa check: ${verdict.expected}\n(${indexLabel})${insteadLine}`;
+      } else if (engineVerdict) {
+        const visual = bandVisual(engineVerdict.overall_band);
+        fill = visual.color;
+        gap = visual.gap;
+        eliminated = visual.eliminated;
+        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)`;
       } else {
         // v8 Part 10 Ruling 2: knowledge-first — the general fit headline,
         // then the general Fit index (labeled as such), then the existing
@@ -622,6 +656,8 @@ function renderMap(store, lenses) {
         // authorship: same buildFitHeadline() mechanism the no-persona
         // branch below already uses, and the exact same closing sentence
         // this branch always rendered, just no longer the WHOLE tooltip.
+        // Defensive fallback only — full 8x38 engine coverage today (Part
+        // 15.3).
         const generalHeadline = buildFitHeadline(store, null, loc, country, underlyingValue);
         tooltip = `${generalHeadline}\nFit index: ${underlyingValue != null ? underlyingValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }

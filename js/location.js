@@ -308,14 +308,35 @@ function buildVerdictBlock(store, loc, country, persona) {
       // instead of confessing ahead of content the reader hasn't met yet;
       // (3) the red-flag badge stays last, ground-before-alarm preserved
       // exactly as Part 12 first won it.
-      const general = store.generalIndex(loc.location_id);
-      const generalHeadline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
-      div.innerHTML = `
-        <p class="verdict-headline">${escapeHtml(generalHeadline)} (general figures)</p>
-        <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures above apply unchanged.</p>
-        ${redFlagBadgeGeneral}
-        ${breakdownLinkGeneral}
-      `;
+      // Part 15.2: Waldo/Wenda/Carmen, no hand fixture verdict for this
+      // location (Waldo: every location, no exceptions; Wenda/Carmen:
+      // wherever their own fixture set has no entry) — check the same
+      // engine (derived/verdicts.jsonl) the branch above already uses for
+      // the five no-fixture personas, one level down the same precedence
+      // chain this box already enforces (hand fixture always wins when
+      // present, checked first, unchanged above this Part).
+      const engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
+      if (engineVerdict) {
+        const visual = bandVisual(engineVerdict.overall_band);
+        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        div.innerHTML = `
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
+          <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
+          ${redFlagBadge}
+          ${breakdownLink}
+        `;
+      } else {
+        // Defensive fallback only — full 8x38 engine coverage today. Unchanged
+        // text from before this Part.
+        const general = store.generalIndex(loc.location_id);
+        const generalHeadline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
+        div.innerHTML = `
+          <p class="verdict-headline">${escapeHtml(generalHeadline)} (general figures)</p>
+          <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures above apply unchanged.</p>
+          ${redFlagBadgeGeneral}
+          ${breakdownLinkGeneral}
+        `;
+      }
     }
   } else {
     // No persona selected: the general-case hook, reusing

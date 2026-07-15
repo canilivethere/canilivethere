@@ -458,6 +458,15 @@ function renderPurposeSelector(store, lenses) {
       // points, full explanation lives one click in).
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
       explainerEl.textContent = `Pins colored by ${displayName}'s rule-derived eligibility read.`;
+    } else if (persona === "waldo") {
+      // v10 Part 15.5: still not false before this split (Waldo's Fit
+      // index genuinely is one of the two things the old shared sentence
+      // named), but no longer the clearest available line now that Waldo
+      // and Wenda/Carmen genuinely diverge in what colors their pins.
+      explainerEl.textContent = "Pins colored by Waldo's Fit index, rescored for him where we have real data.";
+    } else if (persona) {
+      const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
+      explainerEl.textContent = `Pins colored by ${displayName}'s visa/residency read — hand-checked where we've verified it, rule-derived elsewhere.`;
     } else {
       explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
     }
@@ -1349,6 +1358,31 @@ const BAND_LEGEND_COLOR = {
   "not-checked": () => pendingColor(),
 };
 
+// v10 Part 15.5: a short chip-style label parallel to STATE_HEADLINE,
+// keyed the same way (STATE_HEADLINE's own six states). Built for the
+// Wenda/Carmen legend's own rule-derived row specifically, where
+// STATE_HEADLINE's full sentences (one 17-word conditional clause among
+// them) read at a genuinely different density/register than the
+// hand-verified row's short BAND_LABEL chips stacked directly above them
+// -- confirmed against real data, not a hypothetical mismatch: both a
+// real "not-checked" fixture verdict and a real "data_gap" engine row
+// exist for the same persona at real locations today. Meaning preserved,
+// not shortened away -- QUALIFIES_CONDITIONAL and UNCERTAIN_TYPE stay
+// distinct in text even though they share one color, matching
+// STATE_HEADLINE's own doctrine (text carries the finer read, color only
+// the coarser one). Not used by the five-no-fixture-persona legend row
+// below, which still renders STATE_HEADLINE's full sentences unchanged --
+// that row has no hand-verified row above it to read short against, so
+// the density mismatch this label set exists to fix doesn't apply there.
+const STATE_CHIP_LABEL = {
+  QUALIFIES_AND_CONVERTS: "Clears, leads to permanent residency",
+  QUALIFIES_CONDITIONAL: "Clears, with conditions",
+  UNCERTAIN_TYPE: "Possible, income type unconfirmed",
+  FAILS_AMOUNT: "Doesn't clear the income bar",
+  DEAD_END_BLOCKING: "Confirmed dead end",
+  GAP_INSUFFICIENT_DATA: "Not enough documented yet",
+};
+
 // v8 R7: the legend becomes mode-aware — three mutually exclusive shapes,
 // never overlaid on each other, so the colors on screen and the words
 // explaining them always agree about what mode is showing. Exact strings
@@ -1393,13 +1427,32 @@ function renderLegend(el, persona, activeLens, store) {
 
   if (persona) {
     const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
+
+    if (persona === "waldo") {
+      // v10 Part 15.5: a genuine pre-existing bug, independent of tonight's
+      // fade fix — Waldo's pins have never been colored by BAND_LEGEND_COLOR
+      // or any clears/near-miss vocabulary. His own pin/tooltip branch above
+      // colors by scoreToColor() over his own Fit index, the same blue-amber
+      // ramp the no-persona/lens legends already show (scaleHtml, built once
+      // at the top of this function and reused here, not reinvented). Peeled
+      // into his own branch so the legend never again describes colors his
+      // pins don't paint.
+      el.innerHTML = `
+        <div class="legend-scale">Pin color — Waldo's Fit index, rescored where we have real data for him: ${scaleHtml}</div>
+        <span>${escapeHtml(SCALE_ANCHOR_STRING)} Where we've also checked his visa/residency path, that separate read shows in the tooltip and on his page — place quality and eligibility never share one pin color.</span>
+      `;
+      return;
+    }
+
     const hasFixtures = store.fixturesByPersona.has(persona);
     if (hasFixtures) {
-      // Waldo/Wenda/Carmen: two rows, no full-strength ramp row at all —
-      // the ramp only ever appears faded in this mode (on the map itself),
-      // so showing it full-strength in the legend would contradict what a
-      // reader is actually looking at. v9 Part 6.4 names this branch's own
-      // stale-fade tension but leaves it untouched, per that Part's scope.
+      // Wenda/Carmen only, now that Waldo is peeled off above. Two rows,
+      // both real states a reader can actually be shown, not one real row
+      // plus one stale fallback: a hand-verified fixture row (unchanged
+      // swatch vocabulary) plus a rule-derived engine row, closing the
+      // stale-fade tension v9 Part 6.4 named and left open (both personas
+      // now fall back to the engine wherever no hand fixture exists, so the
+      // old "faded pins, not checked" row was no longer true).
       const swatches = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
         if (band === "doesnt-clear") {
           return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
@@ -1407,10 +1460,30 @@ function renderLegend(el, persona, activeLens, store) {
         const color = BAND_LEGEND_COLOR[band]();
         return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
       }).join("");
-      const checkedRow = `<div class="legend-scale">Solid pins — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
-      const fadedDemoColor = getScaleLegend()[2].color; // the ramp's middle stop, any one representative stop
-      const fadedRow = `<div class="legend-scale">Faded pins — general figures, not checked for ${escapeHtml(displayName)} <span class="legend-swatch legend-faded-demo" style="background:${fadedDemoColor}"></span></div>`;
-      el.innerHTML = checkedRow + fadedRow;
+      const checkedRow = `<div class="legend-scale">Solid pins, hand-verified — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
+      // Two findings from a pre-build review of this exact row, both folded
+      // in: (1) this row's own header now says the pins are solid too,
+      // matching checkedRow's own framing — per the pin/tooltip logic above,
+      // `faded` is only ever true in the now-effectively-unreachable
+      // defensive fallback (full engine coverage today), so every real pin a
+      // reader sees under this row is solid, same as checkedRow's, and the
+      // header shouldn't leave that unconfirmed. (2) the items below use the
+      // short STATE_CHIP_LABEL set instead of STATE_HEADLINE's full-sentence
+      // text — confirmed against real data, not hypothetical, that stacking
+      // six full sentences directly under checkedRow's four short chip
+      // labels was a genuine density/register jump the old one-line faded
+      // row never carried.
+      const engineItems = Object.entries(STATE_CHIP_LABEL).map(([state, label]) => {
+        const band = STATE_HEADLINE_BAND[state];
+        if (band === "hard_fail") {
+          return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(label)}</span>`;
+        }
+        const color = bandVisual(band).color;
+        const swatchClass = band === "data_gap" ? "legend-swatch legend-gap-demo" : "legend-swatch";
+        return `<span class="legend-item"><span class="${swatchClass}" style="background:${color}"></span> ${escapeHtml(label)}</span>`;
+      }).join("");
+      const engineRow = `<div class="legend-scale">Also solid — rule-derived, everywhere else: ${engineItems}</div>`;
+      el.innerHTML = checkedRow + engineRow;
       return;
     }
     // v9 Part 6.5: the five no-fixture personas — a new third branch, one

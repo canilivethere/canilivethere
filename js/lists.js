@@ -1,10 +1,10 @@
 import { loadStore, verdictHeadline } from "./data.js";
-import { scoreToColor, verdictVisual } from "./colors.js";
+import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
-  verdictBand, BAND_ORDER, BAND_LABEL,
+  verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -32,6 +32,35 @@ const FEATURED_CRITERIA = [
 // addendum §2.3 so map.js's legend reuses the exact same registry
 // instead of forking its own labels — imported above, not redefined
 // here.
+
+// Third application of the same map.js/location.js fallback pattern
+// (Part 15.2/15.3): the six personas with no hand-authored VERDICT
+// fixture (Waldo, Adira, Noa, Marek, Marguerite, Teo) still get a real,
+// rule-derived read from the verdict-coverage engine
+// (derived/verdicts.jsonl, full 8x38 coverage, confirmed elsewhere) —
+// this table's own band-group headers need to sort those rows into the
+// correct bucket too, not silently drop them all into "not checked yet".
+// The engine's own `overall_band` is a closed 4-value enum (colors.js's
+// bandVisual() cites the same verification) — mapped onto four of this
+// table's five band-group keys (BAND_ORDER, above). "unclassified" is
+// this table's own build-time registry-gap signal (an unrecognized
+// fixture headline string) and has no engine equivalent; kept only as a
+// defensive catch for a future, currently-unseen band value, same
+// fail-loud idiom verdictBand()/bandVisual() already use rather than
+// silently mis-sorting an unrecognized value.
+const ENGINE_BAND_TO_GROUP = {
+  clean: "clears",
+  uncertain_or_conditional: "near-miss",
+  hard_fail: "doesnt-clear",
+  data_gap: "not-checked",
+};
+function engineVerdictGroup(overallBand) {
+  if (Object.prototype.hasOwnProperty.call(ENGINE_BAND_TO_GROUP, overallBand)) {
+    return ENGINE_BAND_TO_GROUP[overallBand];
+  }
+  console.warn("Unknown overall_band value in lists.js banding:", overallBand);
+  return "unclassified";
+}
 
 async function main() {
   const store = await loadStore();
@@ -137,20 +166,33 @@ function fitColumnLabel(store) {
 }
 
 // v4 addendum R1 §1.5, coverage honesty: which of the three shapes this
-// persona's fixture data actually has — mechanically detected from the
-// data itself (not a hardcoded persona-name check), so a future fourth
-// persona falls into the right branch automatically. "verdict" (Wenda/
-// Carmen today) takes priority over "criterion" when a persona somehow has
-// both, since the verdict-grouped banding is the richer read.
+// persona's data actually has — mechanically detected from the data
+// itself (not a hardcoded persona-name check), so a future ninth persona
+// falls into the right branch automatically. "verdict" (a hand fixture
+// verdict, Wenda/Carmen today, OR full engine coverage — every persona,
+// today) takes priority over "criterion" when a persona somehow has more
+// than one shape, since the verdict-grouped banding is the richer read.
 function personaCoverageKind(store, persona) {
   const perPersona = store.fixturesByPersona.get(persona);
-  if (!perPersona) return "neither";
   let hasVerdict = false, hasCriteria = false;
-  for (const entry of perPersona.values()) {
-    if (entry.verdict) hasVerdict = true;
-    if (entry.criteria.size > 0) hasCriteria = true;
+  if (perPersona) {
+    for (const entry of perPersona.values()) {
+      if (entry.verdict) hasVerdict = true;
+      if (entry.criteria.size > 0) hasCriteria = true;
+    }
   }
   if (hasVerdict) return "verdict";
+  // Engine-only coverage (derived/verdicts.jsonl) is a real, informative
+  // verdict read even where no hand fixture verdict exists — checked
+  // ahead of "criterion" on purpose: Waldo has both a criterion-fixture
+  // rescore AND full engine coverage, and the engine's categorical
+  // clears/conditional/fails/gap read is the richer, verdict-shaped
+  // claim (this exact split argued and held in Part 15.4's own build
+  // record), not a second copy of the Fit-index rescore. Also closes the
+  // five-zero-fixture-persona case (Adira/Noa/Marek/Marguerite/Teo),
+  // previously falling all the way through to "neither" even though the
+  // engine has answered every one of their locations for months.
+  if (store.verdictsByPersona.has(persona)) return "verdict";
   if (hasCriteria) return "criterion";
   return "neither";
 }
@@ -158,7 +200,11 @@ function personaCoverageKind(store, persona) {
 // Computed, never hardcoded, from the same filtered `rows` array render()
 // already builds — so a country filter narrows the claim correctly.
 function personaCoverage(rows) {
-  const checked = rows.filter((r) => r.verdict).length;
+  // A hand fixture and an engine read are both a real, checked answer —
+  // counted together here so the coverage line above the table (e.g.
+  // "checked for N of M places") states the true total, not just the
+  // hand-fixture subset of it.
+  const checked = rows.filter((r) => r.verdict || r.engineVerdict).length;
   return { checked, total: rows.length };
 }
 
@@ -195,6 +241,15 @@ function buildRows(store, persona) {
       const general = store.generalIndex(loc.location_id);
       let fitValue = general ? general.value : null;
       let verdict = null;
+      // Fallback verdict from the verdict-coverage engine (derived/
+      // verdicts.jsonl) — same precedence as location.js's buildVerdictBlock
+      // (15.2) and map.js's pin/tooltip (15.3): only populated when this
+      // persona has no hand fixture verdict at all for this location, hand
+      // fixture always wins where one exists (checked first, unchanged
+      // above). Null whenever `verdict` (the fixture) is set, or no persona
+      // is selected, or the engine itself has no row for this persona (a
+      // defensive gap only — full 8x38 coverage today, confirmed elsewhere).
+      let engineVerdict = null;
       // null = no persona selected (the question doesn't apply); true = a
       // real persona-adjusted figure; false = a persona is selected but this
       // row has no rescore, so the general figure is shown as a fallback —
@@ -211,6 +266,9 @@ function buildRows(store, persona) {
           personaAdjusted = false;
         }
         verdict = perLoc?.verdict || null;
+        if (!verdict) {
+          engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id) || null;
+        }
       }
       // Purpose-list score (§3): a straight read of scores.jsonl for the
       // one criterion currently selected, independent of persona — the
@@ -221,7 +279,7 @@ function buildRows(store, persona) {
         const row = store.scoresByLocation.get(loc.location_id)?.get(STATE.purposeCriterion);
         purposeScore = row && row.status === "scored" && row.score != null ? row.score : null;
       }
-      return { loc, country, general, fitValue, verdict, personaAdjusted, purposeScore };
+      return { loc, country, general, fitValue, verdict, engineVerdict, personaAdjusted, purposeScore };
     });
 }
 
@@ -272,15 +330,30 @@ function render(store, persona) {
 
 // v4 addendum R1 §1.3: persona verdict-first banding. Groups the same
 // buildRows() output (post country-filter) by verdictBand() off each row's
-// own headline — a row with no verdict fixture at all (Waldo's shape, or
-// any currently-unfixtured location) routes to "not-checked" directly,
-// absence detected rather than assumed (§1.3's own named edge case).
+// own headline where a hand fixture verdict exists, or by the engine's own
+// `overall_band` where it doesn't (see the loop below) — only a row with
+// neither (no persona-specific read has ever run for it) routes to
+// "not-checked" directly, absence detected rather than assumed (§1.3's own
+// named edge case).
 function renderBanded(store, persona, rows, tbody) {
   const kind = personaCoverageKind(store, persona);
   const groups = new Map(BAND_ORDER.map((b) => [b, []]));
   for (const row of rows) {
-    const headline = row.verdict ? verdictHeadline(row.verdict.expected) : null;
-    const band = headline ? verdictBand(headline) : "not-checked";
+    // Hand fixture wins where one exists (verdictBand() is built for its
+    // fixture-shaped headline text, unchanged); engine-fallback rows are
+    // banded off their own `overall_band` instead (engineVerdictGroup(),
+    // above) — not run through verdictBand(), which only recognizes the
+    // fixture headline vocabulary and would silently mis-sort every engine
+    // row into "unclassified". Rows with neither are the genuine
+    // not-checked case.
+    let band;
+    if (row.verdict) {
+      band = verdictBand(verdictHeadline(row.verdict.expected));
+    } else if (row.engineVerdict) {
+      band = engineVerdictGroup(row.engineVerdict.overall_band);
+    } else {
+      band = "not-checked";
+    }
     groups.get(band).push(row);
   }
 
@@ -338,6 +411,25 @@ function renderRow(store, row, persona, tbody) {
     // shown in full instead of truncated.
     verdictHtml = `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span>
       <div class="verdict-prose">${escapeHtml(row.verdict.expected)}</div>`;
+  } else if (row.engineVerdict) {
+    // Third application of the same map.js/location.js engine fallback
+    // (Part 15.2/15.3). There's no fixture-shaped prose for this claim, so
+    // (per this dispatch's own instruction) the chip carries the same
+    // STATE_HEADLINE sentence location.js's own verdict block already uses
+    // for the identical claim — zero new copy authored, and no separate
+    // verdict-prose line, since STATE_HEADLINE already states the finer
+    // read in full (the same "color answers roughly what kind, text
+    // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
+    // comment cites).
+    // A trailing <br> (same idiom this file already uses in buildBreakdown()
+    // below) stands in for the block-level <div class="verdict-prose"> the
+    // fixture branch above relies on to push visitLink onto its own line —
+    // without it, two adjacent `display: inline-block` elements (chip, then
+    // the visit-link anchor) would render on the same line, squeezed
+    // together with no separation. Caught live, by screenshot, not assumed.
+    const visual = bandVisual(row.engineVerdict.overall_band);
+    const stateText = STATE_HEADLINE[row.engineVerdict.overall_state] || row.engineVerdict.overall_state;
+    verdictHtml = `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span><br>`;
   }
 
   // Visit-layer affordance (§1.6): the honest interim pointer to the one

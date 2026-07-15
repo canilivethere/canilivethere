@@ -153,10 +153,12 @@ export const CONDITIONAL_COLOR = "#e07b1a"; // amber/orange, "possible, painfull
 // exported constant; now a function (same pattern as clearsColor()/
 // eliminatedColor() above) since the value is theme-dependent. Meaning:
 // "checked, but the verdict itself is unverified" — pending verdicts,
-// never a count or an unscored/gap state (those are R5's cluster-badge
-// panel treatment and this file's own gap-voice branch above,
-// respectively — three different claims, three different colors, not
-// one gray standing in for all of them).
+// never an unscored/gap state (this file's own gap-voice branch above) —
+// two claims, two colors, not one gray standing in for both. (A "count"
+// was a third claim R5's cluster-badge panel used to carry; Part 11
+// retired that mechanism entirely — a knot is now real overlapping pins,
+// no separate badge color at all, so there's nothing left to distinguish
+// this value from on that front.)
 const PENDING_LIGHT = "#8A8272";
 const PENDING_DARK = "#9a9a9a";
 export function pendingColor() {

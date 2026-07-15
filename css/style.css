@@ -407,13 +407,23 @@ h3 { font-size: 1.05rem; }
      map.js sets --pin-stroke per-circle (PIN_HALO / current zoom scale);
      the var()'s own fallback (2) matches the pre-zoom fixed value exactly,
      so nothing changes for any code path that doesn't set it. A CSS
-     custom property (not a plain inline style) so the :hover/:focus rule
+     custom property (not a plain inline style) so the .pin-lift rule
      below can still scale its own thicker value off the same per-element
      base, instead of an inline style silently overriding hover feedback. */
   stroke-width: var(--pin-stroke, 2);
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
+  /* v8 Part 11 §11.4 item 2: the same warm oxblood shadow already
+     validated and shipped for the map plate itself (#worldmap,
+     .door-portrait — rgba(140, 47, 27, 0.08), Part 2), reused verbatim,
+     not a new value — pins now read as cut from the same material as the
+     paper they sit on, not pasted on top of it by a different tool. */
+  filter: drop-shadow(0 1px 2px rgba(140, 47, 27, 0.08));
+  /* v8 Part 11 §11.4 item 3: a reactive "lift" only, no ambient/idle
+     motion — transform-box/-origin make the scale() below grow from the
+     circle's own center, not the SVG viewport's origin. */
+  transition: transform 120ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
 }
-.location-pin:hover, .location-pin:focus { stroke: var(--ink); stroke-width: calc(var(--pin-stroke, 2) * 1.25); }
 .location-pin.eliminated { fill: url(#hatch-eliminated); stroke: var(--eliminated); }
 /* v8 R4: "not researched" gets its own stroke (fill is already the gap
    voice's own hex, set inline by colors.js's scoreToColor()) — the same
@@ -432,13 +442,32 @@ h3 { font-size: 1.05rem; }
    specificity: fade is the broader "not checked for you" state and takes
    visual precedence over the narrower gap-ink stroke in that one combo. */
 .location-pin.pin-faded { fill-opacity: 0.55; stroke: var(--line); stroke-opacity: 1; }
-/* v8 R5: cluster badges leave the ramp/gray family entirely — a count is
-   chrome, not data, so it reads as a pasted paper label ("3"), never as a
-   dot that could be mistaken for a low or pending value. Fill/stroke here
-   override the plain .location-pin rule above (equal specificity, later
-   in source); no inline fill is set for cluster badges at all anymore. */
-.location-pin.cluster-badge { fill: var(--panel); stroke: var(--line); }
-.cluster-badge-count { fill: var(--ink); font-family: "Work Sans", sans-serif; font-weight: 600; }
+/* v8 Part 11 §11.3 item 1: the visible pin no longer receives its own
+   mouse/keyboard events (a larger invisible .pin-hit-area sits on top and
+   carries them instead) — map.js toggles this class on the paired visual
+   pin(s) from the hit-area's own hover/focus, in place of the old
+   :hover/:focus pseudo-classes, which could never fire on an element the
+   pointer can no longer actually reach. Declared AFTER .gap/.pin-faded on
+   purpose (equal specificity, later wins): a reader's own active
+   hover/focus should always be visible, never masked by a gap or faded
+   pin's own stroke — a small, deliberate improvement over the previous
+   source order (the old :hover/:focus rule sat BEFORE .gap/.pin-faded and
+   so lost that tie), not a silent carry-over of the old precedence. */
+.location-pin.pin-lift {
+  stroke: var(--ink);
+  stroke-width: calc(var(--pin-stroke, 2) * 1.25);
+  transform: scale(1.15);
+  filter: drop-shadow(0 2px 4px rgba(140, 47, 27, 0.18));
+}
+/* v8 Part 11 §11.3 item 1: cursor affordance for the enlarged, invisible
+   hit-circle every pin (solo or knotted) now carries — the visible pin
+   itself no longer receives pointer events, so its own `cursor: pointer`
+   above no longer has anywhere to apply from. */
+.pin-hit-area { cursor: pointer; }
+/* v8 Part 11 Ruling 4: the knot's own ambient-shadow silhouette — plain
+   attributes (fill/r) are set inline in map.js since both are computed
+   per-knot; this rule exists only so the class has a documented home. */
+.knot-shadow { pointer-events: none; }
 
 /* v7 Part 9 item 1: zoom controls, fixed bottom-right of the map itself
    (.map-wrap is already position:relative) — one of three redundant

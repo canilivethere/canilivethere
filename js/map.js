@@ -157,6 +157,16 @@ const MAX_SCALE = 20;
 const CLUSTER_PX_THRESHOLD = 24;
 const PAN_FRACTION = 0.2;
 
+// v8 Part 11: overlap/warmth redesign constants — same craft-latitude
+// class as the four above, explicitly flagged untested-on-a-rendered-page
+// by the spec itself (11.2 Ruling 4), not measured or user-tested here.
+const GROWTH_PER_MEMBER = 1.5; // px a knot's own footprint grows per extra member, capped by DENSITY_CAP
+const DENSITY_CAP = 8; // membership beyond this stops inflating the knot's own visual/hit footprint
+const RENDER_CAP = 12; // draw at most this many member pins as real circles (stable sort by location_id); the rest still count toward density growth and the aria-label, and stay reachable via zoom-to-fit
+const COINCIDENCE_PX_THRESHOLD = 4; // Ruling 2: only true near-coincidence (sub-4px true on-screen distance) gets nudged
+const COINCIDENCE_NUDGE_MAX_PX = 6; // Ruling 2's own displacement cap
+const HIT_RADIUS_PX = 22; // §11.3 item 1: invisible hit-area radius for every pin, solo or knotted — the visible pin alone (9px) is under standard mobile touch-target size
+
 function parseViewBox(str) {
   const [x, y, w, h] = str.split(/\s+/).map(Number);
   return { x, y, w, h };
@@ -261,6 +271,30 @@ function clusterPins(pinEntries, pxPerWorldUnit) {
     groups.get(r).push(pinEntries[i]);
   }
   return [...groups.values()];
+}
+
+// v8 Part 11 Ruling 2: a plain, deterministic string hash (FNV-1a) — the
+// ruling's own requirement is "never random, never re-rolled on
+// re-render," which needs a function of location_id alone, not
+// Math.random() or any per-render/per-session state.
+function stableHash(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+// Ruling 2: the small, deterministic nudge for a near-exactly-coincident
+// member — angle and magnitude both derive from the hash, so the same
+// location_id always nudges the same direction and distance on every
+// render/zoom step (no jitter), capped at COINCIDENCE_NUDGE_MAX_PX.
+function coincidenceNudgePx(locationId) {
+  const h = stableHash(locationId);
+  const angle = (h % 360) * (Math.PI / 180);
+  const mag = ((h >>> 9) % 101) / 100 * COINCIDENCE_NUDGE_MAX_PX;
+  return { dx: Math.cos(angle) * mag, dy: Math.sin(angle) * mag };
 }
 
 async function main() {
@@ -541,87 +575,215 @@ function renderMap(store, lenses) {
     if (tipEl) tipEl.style.display = "none";
   }
 
+  // v8 Part 11 §11.3 item 1: the visible pin is purely a color/shape mark
+  // now — every interactive affordance (click/keydown/hover/focus) moves
+  // onto a larger, invisible hit-circle layered on top (built by the two
+  // branches below), so the small precise dot never has to double as the
+  // touch target. aria-hidden here on purpose: the hit-circle carries the
+  // accessible name instead, so screen readers see one described control
+  // per place, not two.
+  function makeVisualPin(entry) {
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("cx", entry.cx);
+    circle.setAttribute("cy", entry.cy);
+    // Part 9 item 3: constant on-screen size, not constant map-unit
+    // size — radius/stroke divided by the current zoom scale on every
+    // render (scale=1 at rest, so this is pixel-identical to the
+    // pre-zoom build at the home view).
+    circle.setAttribute("r", (PIN_RADIUS / scale).toFixed(3));
+    circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
+    // v8 R3/R4: "gap" (unresearched — gap-ink stroke, css/style.css) and
+    // "pin-faded" (R3's presence axis — reduced fill-opacity, --line
+    // stroke) are independent, combinable classes, not a single state
+    // enum — a pin can be both at once (unresearched AND not checked for
+    // the active persona). Precedence between their two stroke rules is
+    // resolved by CSS ordering, named there, not here.
+    circle.setAttribute("class", "location-pin"
+      + (entry.eliminated ? " eliminated" : "")
+      + (entry.gap ? " gap" : "")
+      + (entry.faded ? " pin-faded" : ""));
+    if (!entry.eliminated) circle.setAttribute("fill", entry.fill);
+    circle.setAttribute("aria-hidden", "true");
+    circle.dataset.tooltip = entry.tooltip;
+    circle.dataset.loc = entry.loc.location_id;
+    return circle;
+  }
+
+  // Shared by both the solo hit-circle and the knot's own shared hit-shape
+  // below: toggles a "lifted" look on the paired visual pin(s) while the
+  // hit-circle itself has mouse/keyboard focus (§11.4 item 3 — reactive
+  // only, no ambient motion) and shows/hides the existing tooltip.
+  function wireHover(hit, visualPins, tooltipText) {
+    const enter = (e) => {
+      for (const p of visualPins) p.classList.add("pin-lift");
+      showTip(e, tooltipText);
+    };
+    const leave = () => {
+      for (const p of visualPins) p.classList.remove("pin-lift");
+      hideTip();
+    };
+    hit.addEventListener("mouseenter", enter);
+    hit.addEventListener("focus", enter);
+    hit.addEventListener("mouseleave", leave);
+    hit.addEventListener("blur", leave);
+  }
+
   for (const group of groups) {
     if (group.length === 1) {
+      // v8 Part 11 §11.3 item 1: solo pins were already under the mobile
+      // touch-target floor (visible radius 9px vs. the ~44px/22px-radius
+      // guidance every mobile convention converges on) — a real, separate
+      // finding from the knot redesign, folded in because it's the same
+      // real-device touch-target concern the knot redesign itself exists
+      // to fix.
       const entry = group[0];
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", entry.cx);
-      circle.setAttribute("cy", entry.cy);
-      // Part 9 item 3: constant on-screen size, not constant map-unit
-      // size — radius/stroke divided by the current zoom scale on every
-      // render (scale=1 at rest, so this is pixel-identical to the
-      // pre-zoom build at the home view).
-      circle.setAttribute("r", (PIN_RADIUS / scale).toFixed(3));
-      circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
-      // v8 R3/R4: "gap" (unresearched — gap-ink stroke, css/style.css) and
-      // "pin-faded" (R3's presence axis — reduced fill-opacity, --line
-      // stroke) are independent, combinable classes, not a single state
-      // enum — a pin can be both at once (unresearched AND not checked for
-      // the active persona). Precedence between their two stroke rules is
-      // resolved by CSS ordering, named there, not here.
-      circle.setAttribute("class", "location-pin"
-        + (entry.eliminated ? " eliminated" : "")
-        + (entry.gap ? " gap" : "")
-        + (entry.faded ? " pin-faded" : ""));
-      if (!entry.eliminated) circle.setAttribute("fill", entry.fill);
-      circle.setAttribute("tabindex", "0");
-      circle.setAttribute("role", "link");
-      circle.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
-      circle.dataset.tooltip = entry.tooltip;
-      circle.dataset.loc = entry.loc.location_id;
+      const visualPin = makeVisualPin(entry);
+      svg.appendChild(visualPin);
 
+      const hit = document.createElementNS(svgNS, "circle");
+      hit.setAttribute("cx", entry.cx);
+      hit.setAttribute("cy", entry.cy);
+      // Deliberately NOT the legacy PIN_RADIUS/scale idiom: that constant
+      // only approximates real screen pixels because it assumes the map's
+      // rendered container width is close to WORLD_VIEWBOX's own unit
+      // width — true-ish on a typical desktop layout, false on a narrow
+      // phone screen, where it silently shrinks. A real mobile-viewport
+      // Playwright pass caught this concretely (a 22-world-unit radius
+      // rendered as ~24 real CSS px on a 390px-wide viewport, well under
+      // the ~44px target) — pxPerWorldUnit is the CURRENT render's own
+      // true screen-px-per-world-unit ratio (already device-width-aware,
+      // recomputed every render), so dividing by it gives a genuinely
+      // constant ~HIT_RADIUS_PX CSS pixels on any device.
+      hit.setAttribute("r", (HIT_RADIUS_PX / pxPerWorldUnit).toFixed(3));
+      hit.setAttribute("fill", "transparent");
+      hit.setAttribute("class", "pin-hit-area");
+      hit.setAttribute("tabindex", "0");
+      hit.setAttribute("role", "link");
+      hit.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
       const go = () => { location.href = withPersona(siteUrl(`l/${entry.loc.location_id}.html`)); };
-      circle.addEventListener("click", go);
-      circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
-      circle.addEventListener("mouseenter", (e) => showTip(e, entry.tooltip));
-      circle.addEventListener("focus", (e) => showTip(e, entry.tooltip));
-      circle.addEventListener("mouseleave", hideTip);
-      circle.addEventListener("blur", hideTip);
-
-      svg.appendChild(circle);
+      hit.addEventListener("click", go);
+      hit.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
+      wireHover(hit, [visualPin], entry.tooltip);
+      svg.appendChild(hit);
     } else {
-      // v8 R5: a cluster badge is chrome (a count), not data — "N places
-      // here," never a color that could be mistaken for a value. Fill/
-      // stroke/numeral color now come entirely from CSS (.cluster-badge,
-      // .cluster-badge-count in style.css: --panel fill, --line stroke,
-      // --ink numeral), no inline fill set here at all — was PENDING_COLOR
-      // before v8, which conflated "a count" with "an unverified verdict,"
-      // two different claims that shouldn't share a color. Click/tap zooms
-      // to fit the cluster's own bounding box, via the SAME padding logic
-      // computeMapViewBox() already uses (computeViewBoxForLocations()),
-      // reused not reinvented.
-      const cx = group.reduce((s, p) => s + p.cx, 0) / group.length;
-      const cy = group.reduce((s, p) => s + p.cy, 0) / group.length;
-      const r = (PIN_RADIUS + 2) / scale;
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", cx);
-      circle.setAttribute("cy", cy);
-      circle.setAttribute("r", r.toFixed(3));
-      circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
-      circle.setAttribute("class", "location-pin cluster-badge");
-      circle.setAttribute("tabindex", "0");
-      circle.setAttribute("role", "button");
+      // v8 Part 11 Ruling 1: no centroid badge — retire the merged-circle-
+      // plus-numeral mechanism entirely. Every member renders as its own
+      // real, individually colored pin at its own true position, carrying
+      // the same fill/tooltip/gap/faded/eliminated treatment it would get
+      // standalone (Part 1's three-claims color doctrine is untouched;
+      // only whether pins may visually collide changes here).
+
+      // Ruling 4, second cap: stable sort by location_id (not draw order,
+      // which comes from clusterPins()'s own union-find and isn't stable
+      // across renders) so the same members render, in the same order, on
+      // every repaint; draw at most RENDER_CAP of them as real circles.
+      const sortedGroup = [...group].sort((a, b) => {
+        const ai = a.loc.location_id, bi = b.loc.location_id;
+        return ai < bi ? -1 : ai > bi ? 1 : 0;
+      });
+      const rendered = sortedGroup.slice(0, RENDER_CAP);
+
+      // Ruling 2: near-exact coincidence (true on-screen distance under
+      // COINCIDENCE_PX_THRESHOLD) gets a small, deterministic, capped
+      // nudge — checked only among the members actually drawn, since an
+      // unrendered member has no visual position to collide at. Exactly
+      // one mover per coincident pair (the later location_id in sort
+      // order), so the same member always moves and the pair never both
+      // move toward each other.
+      const nudgedPos = new Map(); // location_id -> {cx, cy}
+      for (let i = 0; i < rendered.length; i++) {
+        for (let j = i + 1; j < rendered.length; j++) {
+          const a = rendered[i], b = rendered[j];
+          const dxPx = (a.cx - b.cx) * pxPerWorldUnit;
+          const dyPx = (a.cy - b.cy) * pxPerWorldUnit;
+          if (Math.sqrt(dxPx * dxPx + dyPx * dyPx) < COINCIDENCE_PX_THRESHOLD && !nudgedPos.has(b.loc.location_id)) {
+            const off = coincidenceNudgePx(b.loc.location_id);
+            nudgedPos.set(b.loc.location_id, { cx: b.cx + off.dx / pxPerWorldUnit, cy: b.cy + off.dy / pxPerWorldUnit });
+          }
+        }
+      }
+
+      // Ruling 4: the density cue — growth shared by the ambient-shadow
+      // silhouette (visual, §11.4) and the shared hit-shape (functional,
+      // Ruling 3) below, so both read as the same knot getting "bigger,"
+      // not two independently tuned sizes.
+      const growthPx = Math.min(group.length - 1, DENSITY_CAP) * GROWTH_PER_MEMBER;
+
+      const centroidCx = group.reduce((s, p) => s + p.cx, 0) / group.length;
+      const centroidCy = group.reduce((s, p) => s + p.cy, 0) / group.length;
+      // Real spread of the group's own true positions — ALL members, not
+      // just the rendered subset, so the hit-shape keeps covering every
+      // real point zoom-to-fit can still reach (Ruling 4's own "still
+      // fully reachable" requirement), not only the dozen actually drawn.
+      let spreadWorld = 0;
+      for (const p of group) {
+        const dx = p.cx - centroidCx, dy = p.cy - centroidCy;
+        spreadWorld = Math.max(spreadWorld, Math.sqrt(dx * dx + dy * dy));
+      }
+      // Real screen pixels for the CURRENT device (see the solo hit-circle
+      // comment above for why pxPerWorldUnit, not the legacy /scale
+      // idiom, is the correct conversion for anything sized in Part 11).
+      const spreadPx = spreadWorld * pxPerWorldUnit;
+
+      // §11.4: the "ambient shadow" silhouette — a soft, oxblood-family
+      // disc behind the real pins, sized off the SAME growth term the
+      // hit-shape uses below, so a bigger knot visibly reads bigger before
+      // a reader counts overlapping edges. Not a proxy shape standing in
+      // for the group (Ruling 1 forbids that) — purely atmospheric, no
+      // fill meaning, no tooltip, no interactivity of its own; painted
+      // under the real pins. Reuses the exact map-plate oxblood shadow
+      // value (Part 2), not a new color.
+      const shadow = document.createElementNS(svgNS, "circle");
+      shadow.setAttribute("cx", centroidCx);
+      shadow.setAttribute("cy", centroidCy);
+      shadow.setAttribute("r", (((PIN_RADIUS + PIN_HALO) + growthPx) / pxPerWorldUnit).toFixed(3));
+      shadow.setAttribute("fill", "rgba(140, 47, 27, 0.08)");
+      shadow.setAttribute("class", "knot-shadow");
+      shadow.setAttribute("aria-hidden", "true");
+      shadow.setAttribute("pointer-events", "none");
+      svg.appendChild(shadow);
+
+      const visualPins = [];
+      for (const entry of rendered) {
+        const pos = nudgedPos.get(entry.loc.location_id);
+        const drawEntry = pos ? { ...entry, cx: pos.cx, cy: pos.cy } : entry;
+        const pin = makeVisualPin(drawEntry);
+        svg.appendChild(pin);
+        visualPins.push(pin);
+      }
+
+      // Ruling 3: one shared invisible hit-shape wrapping the group's real
+      // footprint (base touch-target floor + real spread + the same
+      // density growth as the shadow above) — the ONLY interactive
+      // surface for this knot while its members overlap. Individual member
+      // pins get no click/keyboard handler of their own (built above with
+      // none). Reuses computeViewBoxForLocations() and the existing
+      // aria-label pattern unchanged, since both were already honest and
+      // never claimed a bare count as their own visual.
+      const hitRadiusWorld = (HIT_RADIUS_PX + spreadPx + growthPx) / pxPerWorldUnit;
+      const hit = document.createElementNS(svgNS, "circle");
+      hit.setAttribute("cx", centroidCx);
+      hit.setAttribute("cy", centroidCy);
+      hit.setAttribute("r", hitRadiusWorld.toFixed(3));
+      hit.setAttribute("fill", "transparent");
+      hit.setAttribute("class", "pin-hit-area");
+      hit.setAttribute("tabindex", "0");
+      hit.setAttribute("role", "button");
       const names = group.map((p) => p.loc.display_name).join(", ");
-      circle.setAttribute("aria-label", `${group.length} locations close together: ${names}. Activate to zoom in and separate them.`);
+      hit.setAttribute("aria-label", `${group.length} locations close together: ${names}. Activate to zoom in and separate them.`);
       const zoomToCluster = () => {
         STATE.viewBox = parseViewBox(computeViewBoxForLocations(group.map((p) => p.loc)));
         renderMap(store, lenses);
       };
-      circle.addEventListener("click", zoomToCluster);
-      circle.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); zoomToCluster(); } });
-      svg.appendChild(circle);
-
-      const text = document.createElementNS(svgNS, "text");
-      text.setAttribute("x", cx);
-      text.setAttribute("y", cy);
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("dominant-baseline", "central");
-      text.setAttribute("class", "cluster-badge-count");
-      text.setAttribute("font-size", (10 / scale).toFixed(2));
-      text.setAttribute("pointer-events", "none");
-      text.setAttribute("aria-hidden", "true");
-      text.textContent = String(group.length);
-      svg.appendChild(text);
+      hit.addEventListener("click", zoomToCluster);
+      hit.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); zoomToCluster(); } });
+      // No wireHover() here on purpose: §11.4 item 3's reactive lift
+      // describes a single pin's own tactile feedback; a knot has no one
+      // visual element to "lift," so the shared hit-shape gets the same
+      // click/keyboard affordance the old badge had (a plain cursor, no
+      // tooltip) rather than an invented multi-pin lift effect. Named as a
+      // judgment call, not an explicit ruling either way, in the report.
+      svg.appendChild(hit);
     }
   }
 

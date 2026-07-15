@@ -70,7 +70,7 @@ async function fetchJson(path) {
 }
 
 async function buildStore(basePath) {
-  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, meta] =
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
@@ -79,6 +79,11 @@ async function buildStore(basePath) {
       fetchJsonl(basePath + "change-events.jsonl"),
       fetchJsonl(basePath + "profiles.jsonl"),
       fetchJsonl(basePath + "fixtures.jsonl"),
+      // v9 Part 6/7: the verdict-coverage engine's public export — the
+      // free-text reasons[] audit trail and internal engine_version are
+      // already stripped before this file ever reaches derived/, not
+      // filtered here.
+      fetchJsonl(basePath + "verdicts.jsonl"),
       fetchJson(basePath + "meta.json"),
     ]);
 
@@ -142,6 +147,17 @@ async function buildStore(basePath) {
 
   const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));
 
+  // verdictsByPersona: persona_id -> location_id -> verdict row (v9 Part
+  // 6/7 — the five no-fixture personas' only source of a real, rule-derived
+  // read; `routes_detail` stays a JSON-string-of-a-list on the row exactly
+  // as exported, unparsed here, since Tier 1 (this build) never reads it —
+  // a future Tier 2 build parses it at its own point of use).
+  const verdictsByPersona = new Map();
+  for (const v of verdicts) {
+    if (!verdictsByPersona.has(v.persona_id)) verdictsByPersona.set(v.persona_id, new Map());
+    verdictsByPersona.get(v.persona_id).set(v.location_id, v);
+  }
+
   const store = {
     countries,
     locations,
@@ -150,6 +166,7 @@ async function buildStore(basePath) {
     changeEvents,
     profiles,
     fixtures,
+    verdicts,
     countriesById,
     locationsById,
     criteriaById,
@@ -159,6 +176,7 @@ async function buildStore(basePath) {
     changeEventsByCountry,
     changeEventsByLocation,
     fixturesByPersona,
+    verdictsByPersona,
     profilesById,
     meta,
   };

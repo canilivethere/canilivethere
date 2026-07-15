@@ -1,10 +1,11 @@
 import { loadStore, sectionForFact, verdictHeadline } from "./data.js";
-import { scoreToColor, verdictVisual } from "./colors.js";
+import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
   renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
+  STATE_HEADLINE, verdictDisclosureSentence,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -230,7 +231,46 @@ function buildVerdictBlock(store, loc, country, persona) {
         ${insteadLine}
         ${breakdownLink}
       `;
+    } else if (!store.fixturesByPersona.has(persona)) {
+      // v9 Part 7 Tier 1: the five personas with zero hand fixtures
+      // anywhere now get a real, rule-derived read from the verdict-
+      // coverage engine (derived/verdicts.jsonl) here, instead of falling
+      // through to this box's own always-fires "not checked yet"
+      // confession below — Part 6's map-pin fix, a second render home for
+      // the identical claim (mirrors map.js's own persona branch exactly).
+      const engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
+      if (engineVerdict) {
+        const visual = bandVisual(engineVerdict.overall_band);
+        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        div.innerHTML = `
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
+          <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
+          ${redFlagBadge}
+          ${breakdownLink}
+        `;
+      } else {
+        // Defensive fallback only — the engine ships full 8x38 coverage
+        // today (verified directly, zero nulls), so this branch is not
+        // expected to fire. Falls back to the pre-v9 coverage-gap box
+        // (below) rather than rendering a blank verdict block.
+        const general = store.generalIndex(loc.location_id);
+        const generalHeadline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
+        div.innerHTML = `
+          <p class="verdict-headline">${escapeHtml(generalHeadline)} (general figures)</p>
+          <p class="verdict-prose">Not checked yet for this persona at this location — a coverage gap on our side, not a verdict (this project's own term for a checked, persona-specific judgment). The general figures above apply unchanged.</p>
+          ${redFlagBadgeGeneral}
+          ${breakdownLinkGeneral}
+        `;
+      }
     } else {
+      // v9 Part 6/7 scoping note: this branch now only fires for
+      // Waldo/Wenda/Carmen at a location where their own fixture set has
+      // no entry (store.fixturesByPersona.has(persona) is true, but not
+      // for this location_id) — the five no-fixture personas are peeled
+      // off into the branch above and never reach here. Unchanged below,
+      // per this dispatch's own scope (v9 Part 6.4 names Waldo/Wenda/
+      // Carmen's own stale-fade tension but leaves it untouched).
+      //
       // v7 Part 12 (amends v5 §3.4/the original two-piece box: a
       // review found an honesty admission immediately followed by an
       // unweighted alarm count, both exits looping back into the same

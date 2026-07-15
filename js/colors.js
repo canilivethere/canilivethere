@@ -187,6 +187,31 @@ export function clearsColor() {
   return isDarkTheme() ? CLEARS_DARK : CLEARS_LIGHT;
 }
 
+// v9 Part 6.1: the verdict-coverage engine's own `overall_band` (a closed
+// 4-value enum, derived/verdicts.jsonl) mapped onto the SAME verdict-band
+// channel verdictVisual() already drives for fixture-bearing personas — no
+// new hex, no new CSS, reusing clearsColor()/CONDITIONAL_COLOR/
+// eliminatedColor()/scoreToColor(null) exactly as they already exist.
+// `data_gap` is a distinct claim from `pendingColor()` (spec's own
+// reasoning, quoted): pendingColor() means "checked, but the verdict
+// itself is unverified" (a human-process state); data_gap means "the
+// engine ran and the underlying facts don't reach an answer" — the same
+// claim scoreToColor(null) already carries site-wide, not a process state.
+// Defensive fallback matches verdictVisual()'s own "unknown" idiom: the
+// engine's enum is closed today (verified directly against the live
+// file), but an unrecognized value shouldn't silently mis-render.
+export function bandVisual(band) {
+  switch (band) {
+    case "clean": return { color: clearsColor(), eliminated: false, gap: false };
+    case "uncertain_or_conditional": return { color: CONDITIONAL_COLOR, eliminated: false, gap: false };
+    case "hard_fail": return { color: eliminatedColor(), eliminated: true, gap: false };
+    case "data_gap": return { color: scoreToColor(null), eliminated: false, gap: true };
+    default:
+      console.warn("Unknown overall_band value:", band);
+      return { color: pendingColor(), eliminated: false, gap: false };
+  }
+}
+
 // Wenda/Carmen verdict-headline -> visual treatment. Mechanical keyword
 // match on the fixture's own leading clause (see data.js verdictHeadline),
 // never a re-interpretation of the prose.

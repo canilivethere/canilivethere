@@ -1,10 +1,10 @@
 import { loadStore, verdictHeadline } from "./data.js";
-import { scoreToColor, getScaleLegend, verdictVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
+import { scoreToColor, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
-  BAND_ORDER, BAND_LABEL, formatNumbersInText,
+  BAND_ORDER, BAND_LABEL, formatNumbersInText, STATE_HEADLINE, STATE_HEADLINE_BAND,
 } from "./app-shared.js";
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 import { siteUrl } from "./site-root.js";
@@ -349,8 +349,14 @@ function renderPurposeSelector(store, lenses) {
     // all) keeps the existing line unchanged.
     const persona = getPersona();
     if (persona && !store.fixturesByPersona.has(persona)) {
+      // v9 Part 6.3: retired, not softened — full 8x38 verdict-engine
+      // coverage means there is no "we haven't looked" case left for these
+      // five personas, so the old faded-pins confession is now false for
+      // them. Replacement points at Part 8's fuller disclosure rather than
+      // carrying it here (Part 2's placement doctrine: compact surface
+      // points, full explanation lives one click in).
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
-      explainerEl.textContent = `Faded pins — general figures, not checked for ${displayName}`;
+      explainerEl.textContent = `Pins colored by ${displayName}'s rule-derived eligibility read.`;
     } else {
       explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
     }
@@ -519,16 +525,39 @@ function renderMap(store, lenses) {
         tooltip = `${generalHeadline}\nFit index: ${underlyingValue != null ? underlyingValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
     } else if (persona) {
-      // The five personas with zero fixtures anywhere — always faded,
-      // always the general figure, same Part 10 Ruling 2 knowledge-first
-      // shape as Wenda/Carmen's own no-fixture branch above.
+      // v9 Part 6: the five personas with zero hand fixtures anywhere now
+      // get a real, rule-derived read from the verdict-coverage engine
+      // (derived/verdicts.jsonl, full 8x38 coverage, confirmed by direct
+      // count) instead of the uniform fade this branch used to render
+      // unconditionally. `faded` is never set in this branch anymore —
+      // Part 6.3: full coverage means there's no "we haven't looked" case
+      // left for these five; a `data_gap` answer is a different, weaker
+      // claim ("the engine looked and the facts don't reach an answer"),
+      // gets its own color below, not the fade treatment.
+      const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
+      const verdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
       const general = store.generalIndex(loc.location_id);
-      const value = general ? general.value : null;
-      fill = scoreToColor(value);
-      gap = isGapValue(value);
-      faded = true;
-      const headline = buildFitHeadline(store, null, loc, country, value);
-      tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
+      const generalValue = general ? general.value : null;
+      if (verdict) {
+        const visual = bandVisual(verdict.overall_band);
+        fill = visual.color;
+        gap = visual.gap;
+        eliminated = visual.eliminated;
+        const stateText = STATE_HEADLINE[verdict.overall_state] || verdict.overall_state;
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${generalValue != null ? generalValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)`;
+      } else {
+        // Defensive fallback only — the engine ships full 8x38 coverage
+        // today (verified directly, zero nulls), so this branch is not
+        // expected to fire for any of today's five personas/38 locations.
+        // Kept so a genuinely missing verdict row, or a future ninth
+        // no-fixture persona the engine hasn't run for yet, degrades to
+        // the pre-v9 honest "not checked" shape instead of a blank pin.
+        fill = scoreToColor(generalValue);
+        gap = isGapValue(generalValue);
+        faded = true;
+        const headline = buildFitHeadline(store, null, loc, country, generalValue);
+        tooltip = `${headline}\nFit index: ${generalValue != null ? generalValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
+      }
     } else {
       const general = store.generalIndex(loc.location_id);
       fill = scoreToColor(general ? general.value : null);
@@ -1121,14 +1150,14 @@ function renderLegend(el, persona, activeLens, store) {
   }
 
   if (persona) {
-    // Persona active: two rows, no full-strength ramp row at all — the
-    // ramp only ever appears faded in this mode (on the map itself), so
-    // showing it full-strength in the legend would contradict what a
-    // reader is actually looking at.
     const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
     const hasFixtures = store.fixturesByPersona.has(persona);
-    let checkedRow = "";
     if (hasFixtures) {
+      // Waldo/Wenda/Carmen: two rows, no full-strength ramp row at all —
+      // the ramp only ever appears faded in this mode (on the map itself),
+      // so showing it full-strength in the legend would contradict what a
+      // reader is actually looking at. v9 Part 6.4 names this branch's own
+      // stale-fade tension but leaves it untouched, per that Part's scope.
       const swatches = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
         if (band === "doesnt-clear") {
           return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
@@ -1136,11 +1165,28 @@ function renderLegend(el, persona, activeLens, store) {
         const color = BAND_LEGEND_COLOR[band]();
         return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
       }).join("");
-      checkedRow = `<div class="legend-scale">Solid pins — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
+      const checkedRow = `<div class="legend-scale">Solid pins — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
+      const fadedDemoColor = getScaleLegend()[2].color; // the ramp's middle stop, any one representative stop
+      const fadedRow = `<div class="legend-scale">Faded pins — general figures, not checked for ${escapeHtml(displayName)} <span class="legend-swatch legend-faded-demo" style="background:${fadedDemoColor}"></span></div>`;
+      el.innerHTML = checkedRow + fadedRow;
+      return;
     }
-    const fadedDemoColor = getScaleLegend()[2].color; // the ramp's middle stop, any one representative stop
-    const fadedRow = `<div class="legend-scale">Faded pins — general figures, not checked for ${escapeHtml(displayName)} <span class="legend-swatch legend-faded-demo" style="background:${fadedDemoColor}"></span></div>`;
-    el.innerHTML = checkedRow + fadedRow;
+    // v9 Part 6.5: the five no-fixture personas — a new third branch, one
+    // swatch row keyed to STATE_HEADLINE's six labels, grouped under their
+    // four overall_band colors (mirrors BAND_LEGEND_COLOR's own pattern
+    // above; hard_fail reuses the existing hatch-demo markup, data_gap
+    // reuses the existing gap-demo swatch class). No faded row here —
+    // nothing is faded for these five anymore (6.3).
+    const items = Object.entries(STATE_HEADLINE).map(([state, text]) => {
+      const band = STATE_HEADLINE_BAND[state];
+      if (band === "hard_fail") {
+        return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(text)}</span>`;
+      }
+      const color = bandVisual(band).color;
+      const swatchClass = band === "data_gap" ? "legend-swatch legend-gap-demo" : "legend-swatch";
+      return `<span class="legend-item"><span class="${swatchClass}" style="background:${color}"></span> ${escapeHtml(text)}</span>`;
+    }).join("");
+    el.innerHTML = `<div class="legend-scale">${escapeHtml(displayName)}'s rule-derived read: ${items}</div>`;
     return;
   }
 

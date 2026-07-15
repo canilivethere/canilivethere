@@ -88,6 +88,51 @@ export const FIT_INDEX_DEFINITION =
 export const SCALE_ANCHOR_STRING =
   "A 5 isn't perfection — it means as good as this realistically gets anywhere in the world, tradeoffs included.";
 
+// v9 Part 6.2/7.1: the verdict-coverage engine's own `overall_state` (a
+// closed 6-value enum, derived/verdicts.jsonl, strictly finer-grained than
+// `overall_band` — UNCERTAIN_TYPE and QUALIFIES_CONDITIONAL both paint
+// CONDITIONAL_COLOR via colors.js's bandVisual() but mean different things
+// in words). Text always carries the finer read; color only the coarser
+// one (v8 Part 1's own "color answers roughly what kind, text answers
+// exactly what" doctrine, cited not restated). Committed UI copy, same
+// class as BAND_LABEL/WEIGHT_CLASS_LABEL below.
+export const STATE_HEADLINE = {
+  QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
+  QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
+  UNCERTAIN_TYPE: "Possible — but whether this profile's income type qualifies for this route isn't confirmed yet.",
+  FAILS_AMOUNT: "Doesn't clear the income bar this route sets.",
+  DEAD_END_BLOCKING: "Confirmed dead end — this route doesn't lead where this profile needs it to.",
+  GAP_INSUFFICIENT_DATA: "Not enough documented yet for a real read.",
+};
+
+// Which of the four `overall_band` values each `overall_state` belongs to —
+// verified by a direct cross-tab of the real 304-row derived/verdicts.jsonl
+// (every state maps to exactly one band, confirmed, not assumed from the
+// enum names alone). Used only by the map legend (v9 Part 6.5), to group
+// STATE_HEADLINE's six labels under their four band colors.
+export const STATE_HEADLINE_BAND = {
+  QUALIFIES_AND_CONVERTS: "clean",
+  QUALIFIES_CONDITIONAL: "uncertain_or_conditional",
+  UNCERTAIN_TYPE: "uncertain_or_conditional",
+  FAILS_AMOUNT: "hard_fail",
+  DEAD_END_BLOCKING: "hard_fail",
+  GAP_INSUFFICIENT_DATA: "data_gap",
+};
+
+// v9 Part 8: the mandatory rule-derived-verdict disclosure. Two load-
+// bearing content requirements, both from this project's own residency-
+// rules research: (1) a plain explanation of what "rule-derived" means
+// (computed, checked against a stated profile — not legal advice, not a
+// guarantee); (2) the nationality caveat, present on every verdict render,
+// never silent — sourcing skews toward common/unrestricted passports, so
+// silence on a nationality rule means undocumented, not confirmed open.
+// Shipped as committed spec copy per this project's own precedent — one
+// canonical sentence, many future render homes, cited not restated, same
+// idiom as FIT_INDEX_DEFINITION/SCALE_ANCHOR_STRING above.
+export function verdictDisclosureSentence(displayName) {
+  return `This read is computed from this project's own documented visa and residency rules, checked against ${displayName}'s stated profile — not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned here, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.`;
+}
+
 // v7 Part 10: the perspective door needs the switcher's own descriptor
 // string split into its two rendering halves — a first name (shown at
 // larger weight on each tile) and the descriptor sentence itself (shown

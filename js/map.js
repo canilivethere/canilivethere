@@ -245,7 +245,12 @@ function zoomViewBox(vb, factor, focal) {
   return { x: focal.x - fxRel * newW, y: focal.y - fyRel * newH, w: newW, h: newH };
 }
 
-function applyZoom(store, lenses, factor, focal) {
+// Pure state update: computes the next STATE.viewBox for a zoom by
+// `factor` around `focal`, WITHOUT rendering. Split out of applyZoom()
+// (below) so a rapid burst of input events (wheel/touch-pinch) can update
+// this cheap, no-DOM math on every single event while still batching the
+// expensive renderMap() call itself — see applyZoomThrottled().
+function computeZoomState(store, factor, focal) {
   const home = homeViewBox(store);
   const base = STATE.viewBox || home;
   let vb = zoomViewBox(base, factor, focal || boxCenter(base));
@@ -262,7 +267,45 @@ function applyZoom(store, lenses, factor, focal) {
   // zooming further out than home has no defined "more world" to show.
   if (vb.w > home.w) vb = { ...home };
   STATE.viewBox = clampViewBox(vb);
+}
+
+function applyZoom(store, lenses, factor, focal) {
+  computeZoomState(store, factor, focal);
   renderMap(store, lenses);
+}
+
+// Bug fix, 2026-07-16: wireMapInteractions()'s wheel and touchmove
+// (2-finger pinch) handlers used to call applyZoom() — a full synchronous
+// renderMap() (DOM teardown/rebuild of every country path, pin, hit-circle,
+// and label, plus a forced-layout getBoundingClientRect() call) — on EVERY
+// raw wheel/touchmove event, with no throttling anywhere. WHEEL_ZOOM_STEP
+// is deliberately tiny (1.03), so reaching a meaningful zoom from world
+// view takes 100+ discrete events — exactly the burst size a real fast
+// scroll/trackpad gesture produces in under a second. Reproduced live
+// (headless Chromium, synthetic wheel/touch bursts): 150 events blocked
+// the main thread for ~1.4s, 400 events for ~3.2s, linear at ~8-9ms per
+// synchronous render — a genuine, multi-second freeze, not a hypothetical.
+//
+// Fix: keep the cheap, no-DOM zoom math (computeZoomState) running on
+// every raw event, so the FINAL zoom level is still exactly correct and no
+// event's intent is silently dropped — but batch the expensive render:
+// at most one renderMap() per animation frame, however many events arrived
+// since the last one. Button-click and keyboard zoom (applyZoom(), above)
+// fire far less frequently than a scroll/pinch gesture and are left on the
+// original immediate-render path — they don't need this and shouldn't
+// change behavior.
+let zoomRenderScheduled = false;
+function scheduleZoomRender(store, lenses) {
+  if (zoomRenderScheduled) return;
+  zoomRenderScheduled = true;
+  requestAnimationFrame(() => {
+    zoomRenderScheduled = false;
+    renderMap(store, lenses);
+  });
+}
+function applyZoomThrottled(store, lenses, factor, focal) {
+  computeZoomState(store, factor, focal);
+  scheduleZoomRender(store, lenses);
 }
 
 function applyPan(store, lenses, dxFrac, dyFrac) {
@@ -1081,7 +1124,10 @@ function wireMapInteractions(store, lenses) {
     const svgEl = root.querySelector("svg");
     if (!svgEl) return;
     const focal = clientToWorld(svgEl, e.clientX, e.clientY, boxCenter(STATE.viewBox || homeViewBox(store)));
-    applyZoom(store, lenses, e.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, focal);
+    // Throttled path (2026-07-16 fix): a fast scroll/trackpad gesture fires
+    // dozens-to-hundreds of these in under a second — see applyZoomThrottled()'s
+    // own header comment for the reproduced freeze this replaces.
+    applyZoomThrottled(store, lenses, e.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, focal);
   }, { passive: false });
 
   // Entry point 2b: click-and-drag panning — flagged live, 2026-07-14,
@@ -1173,7 +1219,13 @@ function wireMapInteractions(store, lenses) {
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       const focal = clientToWorld(svgEl, midX, midY, boxCenter(pinchStartBox));
       STATE.viewBox = pinchStartBox; // pivot from the gesture's own start each move, not the last frame
-      applyZoom(store, lenses, factor, focal);
+      // Throttled path (2026-07-16 fix, same reason as the wheel handler
+      // above): a real 2-finger pinch fires touchmove just as rapidly as a
+      // wheel gesture does. Safe with the pivot-from-start line above since
+      // computeZoomState() still runs synchronously on every raw event —
+      // only the render itself is batched, so the final result is exactly
+      // as correct as before, just painted at most once per frame.
+      applyZoomThrottled(store, lenses, factor, focal);
     } else if (e.touches.length === 1 && touchPanStart) {
       const rawDx = e.touches[0].clientX - touchPanStart.clientX, rawDy = e.touches[0].clientY - touchPanStart.clientY;
       if (!touchPanStart.moved) {

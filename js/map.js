@@ -364,8 +364,6 @@ function renderMap(store, lenses) {
   const root = document.getElementById("map-root");
   root.innerHTML = "";
   if (!STATE.viewBox) STATE.viewBox = homeViewBox(store);
-  const home = homeViewBox(store);
-  const scale = home.w / STATE.viewBox.w;
 
   const activeLens = resolveLens(store, lenses, STATE.lensId);
   const persona = activeLens ? null : getPersona();
@@ -586,12 +584,18 @@ function renderMap(store, lenses) {
     const circle = document.createElementNS(svgNS, "circle");
     circle.setAttribute("cx", entry.cx);
     circle.setAttribute("cy", entry.cy);
-    // Part 9 item 3: constant on-screen size, not constant map-unit
-    // size — radius/stroke divided by the current zoom scale on every
-    // render (scale=1 at rest, so this is pixel-identical to the
-    // pre-zoom build at the home view).
-    circle.setAttribute("r", (PIN_RADIUS / scale).toFixed(3));
-    circle.style.setProperty("--pin-stroke", (PIN_HALO / scale).toFixed(3));
+    // Part 9 item 3: constant on-screen size, not constant map-unit size.
+    // 2026-07-15 fix: the original idiom (PIN_RADIUS divided by a
+    // zoom-only "scale" ratio) only holds
+    // "constant" for a fixed container width — it silently shrinks on a
+    // narrower viewport, because that ratio never accounts for how many
+    // real CSS pixels the current render's container actually spans.
+    // pxPerWorldUnit (below, same value the hit-circles already use —
+    // §11.3 item 1's own fix for the identical bug class) folds container
+    // width AND zoom into one number, so dividing by it holds the pin at
+    // a true ~PIN_RADIUS CSS-pixel radius on any device, at any zoom.
+    circle.setAttribute("r", (PIN_RADIUS / pxPerWorldUnit).toFixed(3));
+    circle.style.setProperty("--pin-stroke", (PIN_HALO / pxPerWorldUnit).toFixed(3));
     // v8 R3/R4: "gap" (unresearched — gap-ink stroke, css/style.css) and
     // "pin-faded" (R3's presence axis — reduced fill-opacity, --line
     // stroke) are independent, combinable classes, not a single state
@@ -643,17 +647,15 @@ function renderMap(store, lenses) {
       const hit = document.createElementNS(svgNS, "circle");
       hit.setAttribute("cx", entry.cx);
       hit.setAttribute("cy", entry.cy);
-      // Deliberately NOT the legacy PIN_RADIUS/scale idiom: that constant
-      // only approximates real screen pixels because it assumes the map's
-      // rendered container width is close to WORLD_VIEWBOX's own unit
-      // width — true-ish on a typical desktop layout, false on a narrow
-      // phone screen, where it silently shrinks. A real mobile-viewport
-      // Playwright pass caught this concretely (a 22-world-unit radius
+      // pxPerWorldUnit (not the old zoom-only "scale" ratio, since retired
+      // from this file — see makeVisualPin()'s own 2026-07-15 fix note)
+      // is the CURRENT render's own true screen-px-per-world-unit ratio,
+      // already device-width-aware and recomputed every render, so
+      // dividing by it gives a genuinely constant ~HIT_RADIUS_PX CSS
+      // pixels on any device. A real mobile-viewport Playwright pass
+      // caught the old idiom's shrink concretely (a 22-world-unit radius
       // rendered as ~24 real CSS px on a 390px-wide viewport, well under
-      // the ~44px target) — pxPerWorldUnit is the CURRENT render's own
-      // true screen-px-per-world-unit ratio (already device-width-aware,
-      // recomputed every render), so dividing by it gives a genuinely
-      // constant ~HIT_RADIUS_PX CSS pixels on any device.
+      // the ~44px target) before this fix existed.
       hit.setAttribute("r", (HIT_RADIUS_PX / pxPerWorldUnit).toFixed(3));
       hit.setAttribute("fill", "transparent");
       hit.setAttribute("class", "pin-hit-area");
@@ -721,8 +723,9 @@ function renderMap(store, lenses) {
         spreadWorld = Math.max(spreadWorld, Math.sqrt(dx * dx + dy * dy));
       }
       // Real screen pixels for the CURRENT device (see the solo hit-circle
-      // comment above for why pxPerWorldUnit, not the legacy /scale
-      // idiom, is the correct conversion for anything sized in Part 11).
+      // comment above, and makeVisualPin()'s own note, for why
+      // pxPerWorldUnit — not a zoom-only ratio — is the correct
+      // conversion for anything sized on this map).
       const spreadPx = spreadWorld * pxPerWorldUnit;
 
       // §11.4: the "ambient shadow" silhouette — a soft, oxblood-family

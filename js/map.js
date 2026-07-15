@@ -668,7 +668,16 @@ function renderMap(store, lenses) {
         if (engineVerdict) {
           faded = false;
           const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
-          tooltip = `${baseTooltip}\nWaldo's visa/residency check: ${stateText}`;
+          // Same no-bare-no instead-line every other
+          // branch in this file carries, extended here too. Waldo's own pin
+          // color/eliminated channel stays Fit-index-only per Part 15.4 —
+          // untouched — but the tooltip's own text can still read as a bare
+          // hard no, so it gets the same reassurance line, gated on
+          // bandVisual()'s `eliminated` flag exactly like everywhere else.
+          const insteadLine = bandVisual(engineVerdict.overall_band).eliminated
+            ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
+            : "";
+          tooltip = `${baseTooltip}\nWaldo's visa/residency check: ${stateText}${insteadLine}`;
         } else {
           // Defensive fallback only — full 8x38 engine coverage today.
           faded = true;
@@ -709,7 +718,12 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
-        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)`;
+        // Same instead-line as the `if (verdict)`
+        // branch just above, extended to this engine-only case.
+        const insteadLine = visual.eliminated
+          ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
+          : "";
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
       } else {
         // v8 Part 10 Ruling 2: knowledge-first — the general fit headline,
         // then the general Fit index (labeled as such), then the existing
@@ -742,7 +756,13 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         const stateText = STATE_HEADLINE[verdict.overall_state] || verdict.overall_state;
-        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${generalValue != null ? generalValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)`;
+        // Same instead-line as the Wenda/Carmen and
+        // Waldo engine branches above — the five-no-fixture-persona case
+        // (Adira, Teo, Noa, Marek, Marguerite).
+        const insteadLine = visual.eliminated
+          ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
+          : "";
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${generalValue != null ? generalValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
       } else {
         // Defensive fallback only — the engine ships full 8x38 coverage
         // today (verified directly, zero nulls), so this branch is not

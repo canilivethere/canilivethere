@@ -242,10 +242,20 @@ function buildVerdictBlock(store, loc, country, persona) {
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        // The fixture branch above's v5/v7 no-bare-no
+        // instead-line, extended to the engine-only case. The line is pure
+        // page navigation (two anchors already on this page) with no
+        // fixture-specific content, so it transports verbatim — gated on
+        // bandVisual()'s own `eliminated` flag, the engine's equivalent of
+        // verdictVisual()'s `kind === "eliminated"` above.
+        const insteadLine = visual.eliminated
+          ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
+          : "";
         div.innerHTML = `
           <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
+          ${insteadLine}
           ${breakdownLink}
         `;
       } else {
@@ -319,10 +329,16 @@ function buildVerdictBlock(store, loc, country, persona) {
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        // Same instead-line extension as the branch
+        // above (Waldo/Wenda/Carmen's own no-fixture-at-this-location case).
+        const insteadLine = visual.eliminated
+          ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
+          : "";
         div.innerHTML = `
           <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
+          ${insteadLine}
           ${breakdownLink}
         `;
       } else {

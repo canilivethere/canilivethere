@@ -383,6 +383,23 @@ h3 { font-size: 1.05rem; }
    competing visual languages. */
 .judgment-note { border-left: 3px solid var(--conditional); font-size: 0.8rem; color: var(--muted); }
 
+/* The principles page's own six entries — deliberately NOT .fact-item
+   (that component's whole grammar signals "a sourced fact with a
+   confidence tier," and these are method statements, zero new facts on
+   file). Plain flowing paragraphs, vertical rhythm only — no border, no
+   background, no badge slot, no visual promotion of one principle over
+   another (order alone carries the emphasis). */
+.principle { margin: 1.1rem 0; }
+
+/* The principles page's closing line — deliberately NOT .judgment-note.
+   That class's established meaning on this site is a disclosed
+   limitation (amber-coded "here's a caveat on what you just read");
+   this line is a confident affirmation, the opposite valence. Same
+   muted, smaller register as .judgment-note for the same "quiet,
+   reflective beat" feel, but no color accent and no left border —
+   plain, neutral, matching prose color. */
+.principle-closing { font-size: 0.8rem; color: var(--muted); }
+
 /* ---------- map surface ---------- */
 .map-wrap { position: relative; width: 100%; }
 /* v8 Part 2: the map plate now takes the same pasted-plate contract every

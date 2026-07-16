@@ -391,6 +391,7 @@ export function renderFooter(store) {
       ${meta ? `Snapshot extracted ${escapeHtml(meta.extracted_at || "")}.` : ""}
     </p>
     <p><a href="${withPersona(siteUrl("corrections.html"))}">Corrections &amp; changes</a> — every dated update, including what we got wrong.</p>
+    <p><a href="${withPersona(siteUrl("principles.html"))}">How we work</a> — the rules we hold ourselves to, and how to check us on them.</p>
     <p>Anonymous, cookieless visit counts by Cloudflare help us see what's useful.</p>
   `;
   document.body.appendChild(footer);

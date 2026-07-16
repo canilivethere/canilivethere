@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How We Work — CanILiveThere</title>
+<meta name="description" content="The plain rules this site holds itself to — nationality-neutral facts, honest red flags, and everything checkable.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
+</head>
+<body>
+<main>
+  <h1>How We Work</h1>
+  <p id="principles-intro"></p>
+  <div id="principles-list"></div>
+  <p class="principle-closing" id="principles-closing"></p>
+  <p id="principles-onward"></p>
+</main>
+<script type="module" src="js/principles.js"></script>
+</body>
+</html>

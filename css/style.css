@@ -731,6 +731,16 @@ table.rank-table th[aria-sort]::after { content: " ⇅"; color: var(--muted); fo
 table.rank-table th[aria-sort="ascending"]::after { content: " ▲"; }
 table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .rank-fit-cell { display: flex; align-items: center; gap: 0.5rem; }
+
+/* Corrections & changes page: reuses .rank-table's border/sticky-header
+   look, but this table isn't sortable (no click-to-sort wired, unlike
+   Lists) — overriding the pointer cursor so the header doesn't promise an
+   interaction that isn't there (same no-false-affordance standard applied
+   elsewhere on this site: no visual promise without a real interaction
+   behind it). No [aria-sort] attribute is ever set on this table, so the
+   ⇅/▲/▼ decoration rule above never fires here either — this is
+   belt-and-suspenders for the cursor specifically. */
+#corrections-table th { cursor: default; }
 .fit-swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); flex: none; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0; align-items: center; }
 .filters label { font-size: 0.85rem; }

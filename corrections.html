@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corrections &amp; Changes — CanILiveThere</title>
+<meta name="description" content="The dated record of what changed and what we ourselves got wrong, for every researched location on this site.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
+</head>
+<body>
+<main>
+  <h1>Corrections &amp; Changes</h1>
+  <p id="corrections-intro"></p>
+  <table class="rank-table" id="corrections-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Where</th>
+        <th>Category</th>
+        <th>Severity</th>
+        <th>What changed</th>
+      </tr>
+    </thead>
+    <tbody id="corrections-tbody"></tbody>
+  </table>
+  <p class="fact-notes" id="corrections-empty" hidden></p>
+  <p class="judgment-note" id="corrections-closer"></p>
+</main>
+<script type="module" src="js/corrections.js"></script>
+</body>
+</html>

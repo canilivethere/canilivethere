@@ -629,6 +629,40 @@ function routeAsFact(r) {
   };
 }
 
+// Bug fix (2026-07-16): a route_key of shape `{country_id}:visit:{slug}`
+// (the tourist/visitor-entry-category kind) is structurally forbidden
+// from ever carrying a 'threshold' role fact — so `r.threshold_label`/
+// `r.income_threshold` are NULL by design for every ':visit:' row, never
+// a data gap on their own. This render code only expected ':route:'-kind
+// rows (the only kind that existed until a recent data update landed the
+// first two real ':visit:' rows — Colombia's PIP and Morocco's e-Visa
+// nationality carve-outs) and had no branch for the other legal kind, so
+// it rendered escapeHtml(undefined) (empty label) and
+// formatValue({value_raw: undefined}) (the literal string "undefined")
+// for both. isVisitRoute() mirrors the same group-kind signal the export
+// pipeline already keys off
+// (`group_key LIKE '%:visit:%'`) — mechanical, not a new classification.
+function isVisitRoute(routeKey) {
+  return typeof routeKey === "string" && routeKey.includes(":visit:");
+}
+
+// Mechanical de-slug of the route_key's own category-name segment — never
+// a new fact. Per §8F.7, that segment already *is* "the source file's own
+// established name" for the entry category, just written as a URL-safe
+// slug; this only reverses that one mechanical transform (hyphens back to
+// spaces, word-initial capitals) to get a readable label where no
+// human-authored `threshold_label` exists for this row's kind. A doubled
+// hyphen in the source slug (the source's own way of joining two distinct
+// clauses, e.g. "visa-free-entry--most-nationalities") renders as an
+// en-dash-joined pair of phrases rather than one run-on phrase.
+function routeCategoryLabel(routeKey) {
+  const slug = routeKey.split(":visit:")[1] || routeKey;
+  return slug
+    .split("--")
+    .map((clause) => clause.split("-").map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(" "))
+    .join(" – ");
+}
+
 function buildVisaRoutesHtml(store, country) {
   const rows = store.visaRoutesByCountry.get(country.country_id) || [];
   if (!rows.length) return "";
@@ -670,9 +704,23 @@ function buildVisaRoutesHtml(store, country) {
       if (r.age_gate && r.age_gate !== "0") {
         notes.push(`<div class="fact-notes">Minimum age: <strong>${escapeHtml(r.age_gate)}</strong> years</div>`);
       }
+      // ':visit:' rows (see isVisitRoute() above): threshold_label/
+      // income_threshold are structurally NULL by design, not a gap on
+      // this row alone. Label falls back to a mechanical de-slug of the
+      // route_key's own category name (routeCategoryLabel()); the
+      // fact-value line is omitted rather than shown empty or as the
+      // literal "undefined" — same honest-omission convention this file
+      // already uses elsewhere (e.g. age_gate "0", a zero-red-flag
+      // location's badge) rather than fabricating a figure that was
+      // never researched. Confidence/divergence/source-detail still
+      // render: those provenance fields are real, computed values for
+      // every ':visit:' row, not placeholders.
+      const visit = isVisitRoute(r.route_key);
+      const label = visit ? routeCategoryLabel(r.route_key) : r.threshold_label;
+      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact))}</div>`;
       return `
-        <div class="fact-label">${escapeHtml(r.threshold_label)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(asFact))}</div>
+        <div class="fact-label">${escapeHtml(label)}</div>
+        ${valueHtml}
         <div class="fact-meta">${confidenceBadge(asFact)} ${divergenceBadge(asFact)}</div>
         <div class="source-detail">${sourceDetailHtml(asFact)}</div>
         ${notes.join("")}

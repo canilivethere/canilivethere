@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Location — CanILiveThere</title>
+<title>What each score measures — CanILiveThere</title>
+<meta name="description" content="What each of the site's 13 scored criteria actually measures, how it's weighted, and what a 5 means.">
 <!-- See index.html's matching comment: pre-paint dark-theme apply, same
      duplicated "theme"/"dark" literals, same reasoning. -->
 <script>
@@ -20,15 +21,11 @@
 </head>
 <body>
 <main>
-  <!-- Legacy JS-only entry point (?loc=<id>) — location.js still reads
-       this route as a fallback. The primary, crawlable route is now
-       /l/<location_id>.html (real static content, no JS needed) — see
-       tools/prerender-locations.mjs and README.md. -->
-  <div id="loc-root">
-    <p>Loading… if this doesn't update, <a href="lists.html">see every
-    location as a list</a> instead.</p>
-  </div>
+  <h1>What each score measures</h1>
+  <p id="criteria-intro">Every "Score breakdown" chip on a location page links here — one definition per criterion, shared by every location instead of repeated 38 times.</p>
+  <p class="fit-def" id="scale-anchor"></p>
+  <div id="criteria-root"></div>
 </main>
-<script type="module" src="js/location.js"></script>
+<script type="module" src="js/criteria.js"></script>
 </body>
 </html>

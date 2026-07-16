@@ -1,4 +1,4 @@
-import { loadStore, verdictHeadline } from "./data.js";
+import { loadStore, verdictHeadline, sectionForFact } from "./data.js";
 import { scoreToColor, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
@@ -519,6 +519,106 @@ function renderPurposeSelector(store, lenses) {
   }
 }
 
+// v9 Part 1: the two-click pin flow. Top-level (not nested inside
+// renderMap()) since wireMapInteractions() -- wired ONCE, not per render,
+// per this file's own established rule for document-level listeners --
+// needs to call closeTeaser() too. Both operate purely on
+// document.getElementById()/querySelector(), no closure state, so neither
+// needs to live inside any one render's scope.
+//
+// showTeaser(wrap, hitEl, entry): builds and positions the teaser for one
+// pin. Content is the four lines Part 1.3 specs: title, the exact
+// entry.tooltip string already computed for this pin this render (zero
+// new copy), the red-flag badge (only if any), and the "See the full
+// page" CTA -- a real <a href>, not a synthetic click re-dispatch, per
+// this project's own established <a>-over-<button>-for-navigation
+// precedent (v9 Part 5.1) -- its href is the identical destination go()
+// would navigate to, so "clicking the CTA" and "activating the pin again"
+// are two paths to the same place, matching the spec's own "calls the
+// existing go() unchanged" framing in substance even though the CTA is a
+// real link rather than a re-dispatched call.
+function showTeaser(wrap, hitEl, entry) {
+  const teaserEl = document.getElementById("pin-teaser");
+  if (!teaserEl) return;
+  // Only one teaser is ever meaningfully open at a time, but a prior
+  // pin's hit-circle is a real, still-live DOM node (opening a teaser
+  // doesn't itself trigger a renderMap() call) -- clear its aria-expanded
+  // before marking the new one, so two hit-circles never both claim it.
+  document.querySelectorAll('.pin-hit-area[aria-expanded="true"]').forEach((h) => {
+    if (h !== hitEl) { h.setAttribute("aria-expanded", "false"); h.removeAttribute("aria-describedby"); }
+  });
+  const pageHref = withPersona(siteUrl(`l/${entry.loc.location_id}.html`));
+  const redFlagLine = entry.redFlagCount > 0
+    ? `<a class="redflag-pointer" href="${pageHref}#sec-redflags">${entry.redFlagCount} red flag${entry.redFlagCount === 1 ? "" : "s"} noted &#9656;</a>`
+    : "";
+  teaserEl.innerHTML = `
+    <p class="teaser-title">${escapeHtml(entry.loc.display_name)}, ${escapeHtml(entry.country.name)}</p>
+    <p class="teaser-line">${escapeHtml(entry.tooltip)}</p>
+    ${redFlagLine}
+    <p class="teaser-cta"><a href="${pageHref}">See the full page &rarr;</a></p>
+  `;
+  teaserEl.dataset.locId = entry.loc.location_id;
+  teaserEl.setAttribute("aria-label", `${entry.loc.display_name} preview`);
+  // Two-pass positioning: place off-screen-but-measurable first so
+  // offsetWidth reads the real rendered box before the width clamp below
+  // decides the final left. Correction: showTip() -- the hover tooltip --
+  // only clamps left/top to a minimum of 0, it does not already clamp
+  // width against the wrap's right edge. This teaser adds that clamp
+  // itself, since its ~280px width is a real overflow risk on a narrow
+  // viewport that the hover tooltip's shorter one-line text mostly avoids
+  // in practice.
+  teaserEl.style.visibility = "hidden";
+  teaserEl.style.display = "block";
+  const rect = wrap.getBoundingClientRect();
+  const targetRect = hitEl.getBoundingClientRect();
+  // A real bug found by live-rendering this, not reasoned about: showTip()'s
+  // own offset (+10px from the hit-circle's own top-left corner) is fine for
+  // a tooltip nothing needs to click through, but the hit-circle here is
+  // ~44px across (HIT_RADIUS_PX=22 diameter) -- a flat 10px offset buries
+  // almost the entire circle under a 280px-wide teaser, silently breaking
+  // 1.1's own "activating the pin again" second-click path for a mouse user
+  // (confirmed live: a second click landed on the teaser, not the pin,
+  // every time). Anchored off the hit-circle's own right edge instead, so
+  // the whole circle stays exposed and clickable while its teaser is open.
+  let left = Math.max(0, targetRect.right - rect.left + 6);
+  const top = Math.max(0, targetRect.top - rect.top - 10);
+  const maxLeft = Math.max(0, rect.width - teaserEl.offsetWidth - 4);
+  left = Math.min(left, maxLeft);
+  teaserEl.style.left = left + "px";
+  teaserEl.style.top = top + "px";
+  teaserEl.style.visibility = "visible";
+  hitEl.setAttribute("aria-expanded", "true");
+  hitEl.setAttribute("aria-describedby", "pin-teaser");
+  // The hover tooltip is a separate, lighter mechanism (Part 1.5) that can
+  // still be showing from the same pointer that just clicked -- hiding it
+  // here is a small, unspecced polish (not asked for in the text) so the
+  // two don't visually stack on the same pin; the tooltip itself is
+  // otherwise completely unaffected (still shows on hover as before).
+  const tipEl = document.getElementById("pin-tooltip");
+  if (tipEl) tipEl.style.display = "none";
+  const link = teaserEl.querySelector(".teaser-cta a");
+  if (link) link.focus();
+}
+
+// closeTeaser(returnFocus): closes without navigating (click-outside,
+// Escape). returnFocus moves focus back to the pin that opened it (Part
+// 1.4's "or Escape back to the pin") -- click-outside deliberately does
+// NOT steal focus back (the reader clicked somewhere else on purpose).
+function closeTeaser(returnFocus) {
+  const teaserEl = document.getElementById("pin-teaser");
+  if (!teaserEl) return;
+  const wasOpen = teaserEl.style.display !== "none" && !!teaserEl.innerHTML;
+  teaserEl.style.display = "none";
+  teaserEl.innerHTML = "";
+  delete teaserEl.dataset.locId;
+  const openHit = document.querySelector('.pin-hit-area[aria-expanded="true"]');
+  if (openHit) {
+    openHit.setAttribute("aria-expanded", "false");
+    openHit.removeAttribute("aria-describedby");
+    if (returnFocus && wasOpen) openHit.focus();
+  }
+}
+
 function renderMap(store, lenses) {
   const root = document.getElementById("map-root");
   root.innerHTML = "";
@@ -784,7 +884,13 @@ function renderMap(store, lenses) {
       tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
     }
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded });
+    // v9 Part 1.3: the teaser's red-flag line, universal across all 38
+    // locations -- same filter buildVerdictBlock() (location.js) already
+    // uses, computed here so the teaser can show it without a second fetch.
+    const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
+      .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
+
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount });
   }
 
   const wrap = document.createElement("div");
@@ -794,6 +900,15 @@ function renderMap(store, lenses) {
   tip.className = "pin-label-tooltip";
   tip.id = "pin-tooltip";
   wrap.appendChild(tip);
+  // v9 Part 1.2: the teaser card -- same sibling-of-#pin-tooltip
+  // placement, same "built once per renderMap() call" idiom as tip/
+  // zoomControls above. Content is filled in by showTeaser() on first
+  // pin activation (Part 1.1); empty and hidden until then.
+  const teaser = document.createElement("div");
+  teaser.className = "pin-teaser";
+  teaser.id = "pin-teaser";
+  teaser.setAttribute("role", "dialog");
+  wrap.appendChild(teaser);
   const zoomControls = buildZoomControls(store, lenses);
   wrap.appendChild(zoomControls);
   root.appendChild(wrap);
@@ -963,9 +1078,20 @@ function renderMap(store, lenses) {
       hit.setAttribute("tabindex", "0");
       hit.setAttribute("role", "link");
       hit.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
+      hit.setAttribute("aria-expanded", "false");
       const go = () => { location.href = withPersona(siteUrl(`l/${entry.loc.location_id}.html`)); };
-      hit.addEventListener("click", go);
-      hit.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); go(); } });
+      // v9 Part 1.1: solo pins only (knots, below, are unaffected -- 1.6).
+      // First activation opens the teaser (showTeaser, above); a second
+      // activation on this SAME pin -- this hit-circle's own aria-expanded
+      // already true -- calls the existing go() unchanged. The teaser's own
+      // CTA link is a second, independent way to reach the same page
+      // (a real <a href>, not routed through this function at all).
+      const activatePin = () => {
+        if (hit.getAttribute("aria-expanded") === "true") { go(); return; }
+        showTeaser(wrap, hit, entry);
+      };
+      hit.addEventListener("click", activatePin);
+      hit.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); activatePin(); } });
       wireHover(hit, [visualPin], entry.tooltip);
       wireSettle(hit, [visualPin]);
       svg.appendChild(hit);
@@ -1281,6 +1407,28 @@ function wireMapInteractions(store, lenses) {
     else if (e.key === "ArrowDown") { e.preventDefault(); applyPan(store, lenses, 0, PAN_FRACTION); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); applyPan(store, lenses, -PAN_FRACTION, 0); }
     else if (e.key === "ArrowRight") { e.preventDefault(); applyPan(store, lenses, PAN_FRACTION, 0); }
+  });
+
+  // v9 Part 1.1/1.4: click-outside and Escape close an open teaser without
+  // navigating. Wired ONCE here, not inside renderMap() -- #pin-teaser is
+  // torn down and rebuilt fresh by every renderMap() call the same way
+  // #map-root's other children are, so a listener added inside renderMap()
+  // itself would accumulate one per render (this function's own header
+  // comment already names that exact leak class for wheel/touch; closeTeaser()
+  // and showTeaser() operate purely on document.getElementById()/
+  // querySelector(), so neither needs re-wiring per render either).
+  document.addEventListener("click", (e) => {
+    const teaserEl = document.getElementById("pin-teaser");
+    if (!teaserEl || teaserEl.style.display === "none" || !teaserEl.innerHTML) return;
+    if (teaserEl.contains(e.target)) return; // clicks inside the teaser (its own CTA link) navigate normally
+    if (e.target.closest && e.target.closest(".pin-hit-area")) return; // a pin's own activatePin() already decides open-vs-navigate
+    closeTeaser(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const teaserEl = document.getElementById("pin-teaser");
+    if (!teaserEl || teaserEl.style.display === "none" || !teaserEl.innerHTML) return;
+    closeTeaser(true);
   });
 }
 

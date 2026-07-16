@@ -13,6 +13,9 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="../css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body data-loc-id="PT-porto">
 <div class="site-topbar">
@@ -47,7 +50,7 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Foreigner healthcare access route, by stay length</div>
-        <div class="fact-value">D7/D8/Golden-Visa resident: SNS eligibility once registered (real weeks-to-months registration lag; private insurance bridges it). Short-stay visitor/tourist: no SNS eligibility at all — public hospitals treat emergencies but require proof of travel/health insurance or direct payment</div>
+        <div class="fact-value">D7/D8/Golden-Visa resident: national health service (SNS) eligibility once registered (real weeks-to-months registration lag; private insurance bridges it). Short-stay visitor/tourist: no SNS eligibility at all — public hospitals treat emergencies but require proof of travel/health insurance or direct payment</div>
         <div class="fact-notes">Expatica/gov.uk hospital-guide sources, checked 2026-07-11. Stated for both stay lengths per this project's duration-neutral standard — a real, structural access-tier difference, not a footnote, for any reader whose intended stay is shorter than residency</div>
       </li>
       <li class="fact-item">
@@ -72,7 +75,7 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Public-system (SNS) wait-time strain — the real access weak spot</div>
-        <div class="fact-value">30.2% of respondents in a post-pandemic national survey reported waiting 3+ months for a medical appointment; public hospitals commonly run 1+ year waits for a first specialist consultation (ophthalmology cited ~2 years); SNS 24's mandatory telephone-triage line is projected to face up to 1 million unanswered calls over the 2025-26 winter season</div>
+        <div class="fact-value">30.2% of respondents in a post-pandemic national survey reported waiting 3+ months for a medical appointment; public hospitals commonly run 1+ year waits for a first specialist consultation (ophthalmology cited ~2 years); the national health service's telephone-triage line (SNS 24) is projected to face up to 1 million unanswered calls over the 2025-26 winter season</div>
         <div class="fact-notes">Portuguese and Health post-pandemic study (imin-portugal.com/portugalpathways.io); PMC study, checked 2026-07-11. A capacity-strain trajectory on the access layer specifically, not clinical competency — private-sector wait-time satisfaction scores 72.27 nationally on the same Numbeo scale</div>
       </li>
       <li class="fact-item">
@@ -83,7 +86,7 @@
       <li class="fact-item">
         <div class="fact-label">Distance to emergency care</div>
         <div class="fact-value">In-city for both public and private emergency care. Public: Centro Hospitalar Universitário de São João (CHUSJ — Porto's primary 24/7 public emergency center, ~420 emergency episodes/day, full medical/surgical specialties) and Centro Hospitalar Universitário de Santo António (CHUdSA — a second full general hospital, itself a named kidney-transplant center). Private: CUF Porto, Lusíadas</div>
-        <div class="fact-notes">Wikipedia, CHUP's own site, travelinti.com, checked 2026-07-11. Supersedes this row's earlier [GAP — no Porto-specific healthcare-access detail found this pass] placeholder now that named facilities are on file — closes the gap named in the this research pass package, same pattern as Lisbon's own row</div>
+        <div class="fact-notes">Wikipedia, CHUP's own site, travelinti.com, checked 2026-07-11. Supersedes this row's earlier `[GAP — no Porto-specific healthcare-access detail found this pass]` placeholder now that named facilities are on file — closes the gap named in the healthcare-criterion backfill package (Package B), same pattern as Lisbon's own row</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Numbeo Health Care Index (Porto-specific)</div>
@@ -108,7 +111,7 @@
       <li class="fact-item">
         <div class="fact-label">D7/D8/Golden Visa convert to Portuguese permanent residency</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">All three convert to national PR directly under Article 80 of Law 23/2007 after 5 years' legal temporary residence (counted from the first residence card) — confirmed across 3 independent sources per route separately, not one source generalizing across all three. Portugal needs no EU Long-Term Residence Directive backstop the way Crete's Digital Nomad Visa does. (No single group_key assigned — this row spans all three routes at once rather than naming one, so it doesn't cleanly fit the single-route group convention.)</div>
+        <div class="fact-notes">All three convert to national PR directly under Article 80 of Law 23/2007 after 5 years' legal temporary residence (counted from the first residence card) — confirmed across 3 independent sources per route separately, not one source generalizing across all three. Portugal needs no EU Long-Term Residence Directive backstop the way Crete's Digital Nomad Visa does. (No single group_key assigned — this row spans all three routes at once rather than naming one, so it doesn't cleanly fit the single-route group convention; see extraction report.)</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">D8 Visa accepts passive income as qualifying proof</div>
@@ -123,12 +126,17 @@
       <li class="fact-item">
         <div class="fact-label">D8 visa processing time</div>
         <div class="fact-value">6–9 months</div>
-        <div class="fact-notes">Driven by AIMA's backlog — AIMA reports 93%+ of its backlog resolved, but thousands of applicants and outstanding court decisions were still slowing issuance as of May 2026</div>
+        <div class="fact-notes">Driven by backlog at Portugal's immigration and asylum agency (AIMA) — AIMA reports 93%+ of its backlog resolved, but thousands of applicants and outstanding court decisions were still slowing issuance as of May 2026</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">D8 Visa savings requirement</div>
         <div class="fact-value">11040 €</div>
         <div class="fact-notes">Same figure as D7's savings requirement, same dependent add-ons</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Diligence risk — beachfront/dune public maritime domain</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Beachfront/dune property may sit on domínio público marítimo, requiring a concession rather than ordinary freehold — a property-specific diligence question, not a nationality restriction.</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">General residence-permit processing + card-delivery time</div>
@@ -159,8 +167,83 @@
         <div class="fact-label">Portugal has three real, currently active visa/residency routes (index row)</div>
         <div class="fact-value">D7 (passive income); D8 (active remote work); Golden Visa (investment-fund/job-creation/donation — real estate route eliminated 2023)</div>
         <div class="fact-notes">Each route gets its own row-cluster below rather than being collapsed into one row per criterion</div>
-      </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter" open id="sec-community"><summary>Community</summary><p class="chapter-intro">Who else lives here, how you'd actually meet them, and what it's like once the novelty wears off.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter chapter-redflags" open id="sec-redflags"><summary>Red flags</summary><p class="chapter-intro">The hard truths, stated plainly — real risks, sitting right next to everything that's actually going well.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Regime shape</div>
+        <div class="fact-value">open-freehold</div>
+        <div class="fact-notes">Decreto-Lei 348/77's historical rustic/rural-land restriction repealed 1986 by Decreto-Lei 197-D/86; Constitution Article 15's equalization principle is a second, independent citation.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — direct freehold</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">No nationality-based geographic limitation, mainland or islands.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — direct freehold</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Transaction-cost load (closing costs)</div>
+        <div class="fact-value">7–10 %</div>
+        <div class="fact-notes">Runs at the higher end for a non-resident buyer closing after Sept 1, 2026, given the flat 7.5% non-resident property transfer tax (IMT) (a residency-status, not nationality, differential); no fiscal-representative fee or tax identification number (NIF)-only administrative gate folded in here.</div>
+      </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter" open id="sec-community"><summary>Community</summary><p class="chapter-intro">Who else lives here, how you'd actually meet them, and what it's like once the novelty wears off.</p><p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details><details class="chapter chapter-redflags" open id="sec-redflags"><summary>Red flags</summary><p class="chapter-intro">The hard truths, stated plainly — real risks, sitting right next to everything that's actually going well.</p><ul class="fact-list">
+      <li class="fact-item">
+        <div class="fact-label">Dog breed restriction — dangerous and potentially dangerous dog law</div>
+        <div class="fact-value">Breed-blind at the border — Portugal's entry regime does not reference breed at all, so importing a listed-breed dog is not blocked — but a real, ongoing local ownership regime applies once the dog is kept in the country, for seven named breeds and their crosses: Cão de Fila Brasileiro, Dogue Argentino, Pit Bull Terrier, Rottweiler, American Staffordshire Terrier, Staffordshire Bull Terrier, and Tosa Inu. Requirements: a special license from the local parish civil office (Junta de Freguesia), obtainable when the dog is 3-6 months old and revalidated annually; a completed training course for detention of a dangerous dog; muzzle and a leash no longer than 1 metre in public; mandatory civil liability insurance; sterilization for non-pedigree dogs of these breeds between 4 and 6 months of age (pedigree-registered dogs exempt); reported fines of €500-3,750 for non-compliance. Sources diverge on owner-age specifics: one names 18+ as the license-holder age, a second distinguishes license-holding (18+) from the lower bar to actually walk the dog in public (16+)</div>
+        <div class="fact-notes">Legal basis cited directly on DGAV's (Direção-Geral de Alimentação e Veterinária, Portugal's competent veterinary authority) own dangerous-animals information page, fetched and read directly: Decreto-Lei n.º 315/2009 (29 October), amended by Lei n.º 46/2013 (4 July). The breed list is set by Portaria n.º 422/2004, cross-corroborated via a municipal government's own published PDF (Câmara Municipal de Santa Maria da Feira) alongside SEO-aggregator convergence — but the Portaria's and Decreto-Lei's own operative statutory text was not independently read this pass (pgdlisboa.pt gave connection errors on two attempts). Insurance basis: Portaria n.º 585/2004. The 18-vs-16 owner-age split was not independently verified against the amended statute either. Applies identically regardless of which Portugal location (Lisbon, Porto, or Lagos) the dog lives in — a genuinely national fact</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pet import (cat) — species-specific requirement verification</div>
+        <div class="fact-value">Same core EU/DGAV entry framework as dogs (microchip before rabies vaccination, 15-week age floor, titer test waived for listed-country origins including the US, no routine quarantine if compliant, 48-hour PEV advance-notice requirement) — no separate breed-restriction law equivalent to dogs' dangerous-dog statute. One real, lower-confidence divergence found: a single aggregator source states non-5th-generation wolf hybrids, and Savannah and Bengal cats, cannot be imported under Portugal's rules — reads as a wildlife-hybrid-ancestry restriction (CITES-adjacent) rather than the dangerous-animal statute, but was found in exactly one source and not confirmed against DGAV directly</div>
+        <div class="fact-notes">General EU/DGAV framework (Direção-Geral de Alimentação e Veterinária, Portugal's competent veterinary authority) is primary-institutional — same DGAV traveller datasheet as the dog row below; the wolf-hybrid/Savannah/Bengal restriction specifically rests on one aggregator source (pettravel.com) only, graded lower confidence deliberately rather than blended into the primary-sourced framework above it. Flagged in red-flags.md as worth independent verification before a cat owner relies on it</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pet import cost — entry-point fee and EU health certificate</div>
+        <div class="fact-value">Entry-point veterinary inspection fee (non-EU-origin pets, paid on-site at the airport): €42.25 for one pet, €84.50 for two to five pets. EU health certificate cost: €80-300 if obtained from a Portuguese/EU veterinarian, or roughly $510-560 if obtained from a US veterinarian before departure (covers the exam, certificate preparation, and the US Department of Agriculture's own export-endorsement service, USDA-APHIS)</div>
+        <div class="fact-notes">pawsabroad.co, petabroad.eu, 2026 — aggregator-sourced, not confirmed against DGAV's own fee schedule directly. Applies nationally at any of the three designated entry-point airports (Lisbon, Porto, Faro)</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pet import (dog) — rabies titer / quarantine requirement</div>
+        <div class="fact-value">No rabies antibody titer test required for a dog arriving from a country on the EU's titer-exempt list (the US sits on this tier); a titer test is required only from an unlisted-country origin, drawn 30+ days after first vaccination, and the dog cannot travel until 3 months after the sample-collection date. No routine quarantine for a compliant animal. Portugal's own age floor: entry authorised only for dogs over 15 weeks old (12-week minimum rabies-vaccination age + 21-day validity wait), ISO-compliant microchip implanted before or on the vaccination date, and a 10-day-validity EU health certificate. Mandatory 48-hour advance written notice to the specific Traveller's Point of Entry (Ponto de Entrada de Viajantes, PEV) — Lisbon, Porto, and Faro are the three designated PEV airports. Stated consequence of failed compliance: return to origin or, as a last resort, euthanasia under EU legislation</div>
+        <div class="fact-notes">Portugal's competent veterinary authority (DGAV, Direção-Geral de Alimentação e Veterinária) own traveller datasheet (PDF, reviewed Sept 2025), read directly — dgav.pt/wp-content/uploads/2022/12/dog_cats_ferrets.pdf. As of 22 April 2026, the governing EU instrument is Commission Delegated Regulation (EU) 2026/131 (20 January 2026) + Commission Implementing Regulation (EU) 2026/705 (20 March 2026), superseding Regulation (EU) No 576/2013/577/2013 — confirmed 2026-07-14 directly against DGAV's own &quot;Na Europa&quot; page (dgav.pt/vaiviajar/conteudo/conteudo-animais-de-companhia/na-europa/), which cites both instruments by number; closes the gap this row previously left open (a fetch result naming these same instrument numbers had been flagged &quot;suspicious&quot; and deliberately not carried forward on 2026-07-14's first pass, then independently confirmed real by a second verification pass the same day, and now confirmed a third time directly against Portugal's own competent authority rather than EUR-Lex alone). Applies identically regardless of which Portugal location (Lisbon, Porto, or Lagos) is the destination — a genuinely national fact, not location-specific</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pet import — governing EU regulatory instrument (2026 update), Portugal-specific confirmation</div>
+        <div class="fact-value">As of 22 April 2026, non-commercial pet movement into/within the EU, including Portugal, runs on Commission Delegated Regulation (EU) 2026/131 and Commission Implementing Regulation (EU) 2026/705, superseding the 2013-era regulation numbers (576/2013 / 577/2013) most existing pet-relocation literature still cites. Confirmed directly against DGAV's (Direção-Geral de Alimentação e Veterinária, Portugal's competent veterinary authority) own &quot;Na Europa&quot; page, which names both instruments by number. Of Crete's two named 2026 tightenings: (1) the EU pet passport now restricted to owners' EU-member-state habitual residence — CONFIRMED verbatim in DGAV's own text (&quot;emitido no país europeu onde o proprietário do animal reside habitualmente&quot; — issued in the European country where the owner habitually resides); (2) mandatory microchip scan-and-verify at every entry point, replacing spot checks — confirmed as to legal mechanism and Portugal-specific institutional practice (DGAV veterinarians at the Pontos de Entrada de Viajantes, in collaboration with Alfândega/Customs), but DGAV's own text does not use the exact &quot;every entry, replacing spot checks&quot; phrasing found in Crete's source, a narrow residual gap rather than a live doubt about coverage</div>
+        <div class="fact-notes">dgav.pt/vaiviajar/conteudo/conteudo-animais-de-companhia/na-europa/, fetched directly 2026-07-14. Closes an open follow-up item — the successor-regulation citation and the Portugal-specific applicability check for Crete's two confirmed tightenings. Mirrors CR:pet-import-general--regulatory-instrument-2026-update's shape and finding, independently re-derived against Portugal's own primary source rather than assumed by EU-wide analogy. One honest residual: DGAV's own core traveller datasheet (reviewed Sept 2025, the load-bearing source for this file's operational detail) predates these Jan/March 2026 instruments and has not been confirmed to have been refreshed to reflect them — the &quot;Na Europa&quot; page is a different, evidently newer DGAV page, not independently cross-checked against the datasheet line by line this pass</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">UNEF national immigration-enforcement buildup</div>
+        <div class="fact-value">~1,200 PSP officers, fully operational 2025-2026, statutory mandate covering &quot;all foreign nationals&quot;; 33,725 people inspected and 1,307 detained in 2025 (mostly for illegal stay); notices-to-leave jumped from 444 (2024) to 23,134 (2025) — an order-of-magnitude escalation. A separate 2026 operation broke up a ~4,000-person illegal-regularization ring near Lisbon</div>
+        <div class="fact-notes">No operational detail found confirming UNEF's practical targeting excludes documented D7/D8 holders — the statutory language is categorical, a real gap not a manufactured worry. Detention numbers (1,307, overwhelmingly for illegal stay) point to irregular status as the practical target, not compliant visa-holders. New concrete exposure: the EU's Entry/Exit System now automatically logs every Schengen border crossing, and the immigration and asylum agency (AIMA) cross-checks this against the D7/D8's 183-day/year presence requirement at renewal</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Naturalization residence requirement lengthened (Lei Orgânica n.º 1/2026)</div>
+        <div class="fact-value">General naturalization residence extended from 5 to 10 years (7 for EU/CPLP nationals), in force 19 May 2026, counting clock now anchored to residence-permit issuance/legal-residence start rather than application-submission date; transitional regime protects applications already filed before 19 May 2026</div>
+        <div class="fact-notes">Citizenship-track-only tightening — confirmed does NOT touch Article 80's separate 5-year permanent-residence conversion (The Portugal News 2026-05-08: &quot;Although the citizenship rules have been amended, the framework governing Permanent Residency has not been altered by the new law&quot;; independently corroborated by a Macedo Vitorino law-firm practitioner bulletin). The fourth tightening move in roughly a year alongside UNEF's buildup, Chega's continuing fragmentation, and the June 2026 tacit-approval repeal</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Deferimento tácito (tacit approval) administrative remedy — scrapped</div>
+        <div class="fact-value">The legal remedy where a blown immigration and asylum agency (AIMA) decision deadline (60 working days for renewals, 90 for first applications) automatically counted as approval is being repealed. Parliament passed the repeal's first reading 11-12 June 2026 (short of full passage/presidential promulgation as of the source check), but AIMA had already stopped honoring the remedy in practice, citing the pending law as its own justification</div>
+        <div class="fact-notes">apoiojuridico-imigracao.com; The Portugal News, 2026-06-01/02. A real paper-vs-practice divergence running the unusual direction — the administration moving ahead of the statute, not lagging behind it. Anyone stuck in the immigration and asylum agency (AIMA) queue loses this fallback now, regardless of when the repeal formally takes effect</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Immigration and asylum agency (AIMA) staff strike, June 2026</div>
+        <div class="fact-value">The immigration and asylum agency (AIMA)'s own workers struck for four days (June 1, 2, 3, 5 — June 4 was already a public holiday, effectively a full closed week) over understaffing, degraded conditions, and outsourcing pressure; the government publicly conceded some of the union's complaints rather than disputing them</div>
+        <div class="fact-notes">PÚBLICO, 2026-05-27/06-01. A national immigration agency whose own staff struck for a full week is a live, concrete throughput-fragility marker sitting directly underneath the &quot;93% backlog cleared&quot; official narrative</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Political fragmentation — Chega's continued rise</div>
+        <div class="fact-value">André Ventura (Chega) took 23.5% in the first round of the Jan-Feb 2026 presidential election, lost the runoff decisively (Socialist António José Seguro won 67%-33%, the widest margin in modern Portuguese presidential history), but Chega remains Portugal's second-largest party across three parliamentary elections since 2022 — analysts call it &quot;the collapse of centrism,&quot; a continuing trajectory</div>
+        <div class="fact-notes">Wikipedia; NPR, 2026-02-09; Euronews, 2026-01-19. The presidency has limited direct policy reach in Portugal's semi-presidential system, so this doesn't change the immigration and asylum agency (AIMA)/UNEF/D7/D8 mechanics directly — but it's a real, worsening-not-improving fragmentation trend, not a settled closed story just because this particular election resolved comfortably</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">NHR (Non-Habitual Resident) tax regime closed to new applicants</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Closed to new applicants April 2025. Its replacement (IFICI) is narrowly targeted at research/innovation professionals, not remote workers or retirees generally. Anyone carrying over Portugal's old &quot;friendly tax haven&quot; reputation without checking current rules would get this wrong. A rules-of-the-game tax-treatment change, distinct from the visa-mechanics findings above</div>
+      </li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-14</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026 (law reapproved April 1, 2026; signed May 3, 2026)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-14</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2025-2026</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-05-19</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-06-11/12</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-02-08 (runoff)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2025-04</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li><li><a href="AR-buenosaires.html">Buenos Aires (Palermo focus)</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

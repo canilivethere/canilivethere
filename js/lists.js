@@ -5,6 +5,7 @@ import {
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
+  READER_DEPENDENCY_PENDING_LABEL,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -153,7 +154,15 @@ function updatePurposeExplainer(store) {
   const clause = crit.kind === "threshold-shaped"
     ? "how comfortably a place clears this, not just a number"
     : "how strong this factor is here";
-  el.textContent = `Sorted by ${crit.name} — ${clause}, for every researched location. Ranks the place, not you: ${doesntClause}.`;
+  // v10 Part 16.2: the §8J disclosure, extended with the mechanical
+  // field-gloss pattern this function already uses for `kind` — one more
+  // clause, same template-not-hand-written style, appended only when the
+  // sorted criterion's own reader_dependency reads "pending-ruling"
+  // (today: Community & social fabric only).
+  const pendingClause = crit.reader_dependency === "pending-ruling"
+    ? ` Blends several distinct facts into one number — see the criteria page for what's inside it.`
+    : "";
+  el.textContent = `Sorted by ${crit.name} — ${clause}, for every researched location.${pendingClause} Ranks the place, not you: ${doesntClause}.`;
 }
 
 // The "fit" column header's own label, owned by render()'s th[data-sort]
@@ -162,7 +171,16 @@ function updatePurposeExplainer(store) {
 function fitColumnLabel(store) {
   if (!STATE.purposeCriterion) return "Fit index";
   const crit = store.criteriaById.get(STATE.purposeCriterion);
-  return crit ? crit.name : "Fit index";
+  if (!crit) return "Fit index";
+  // v10 Part 16.2: same marker as the location-page chip and the
+  // criteria-page section (16.1/16.3) — a reader scanning the table
+  // itself, not the explainer sentence above it, still sees it on every
+  // row via the column header, not just once at the top. th.textContent
+  // is plain text (no markup possible), so this is a plain-text suffix,
+  // not the styled .scope-tag span the other two surfaces use.
+  return crit.reader_dependency === "pending-ruling"
+    ? `${crit.name} (${READER_DEPENDENCY_PENDING_LABEL})`
+    : crit.name;
 }
 
 // v4 addendum R1 §1.5, coverage honesty: which of the three shapes this

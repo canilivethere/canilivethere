@@ -6,6 +6,7 @@ import {
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
   STATE_HEADLINE, verdictDisclosureSentence,
+  READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -13,7 +14,7 @@ import { siteUrl } from "./site-root.js";
 applyStoredTheme();
 renderTopBar("location");
 wireChapterNav();
-main();
+main().then(openHashTargetIfClosedDetails);
 
 const SECTION_TITLES = {
   overview: "Overview",
@@ -123,6 +124,24 @@ function wireChapterNav() {
     const target = document.getElementById(id);
     if (target && target.tagName === "DETAILS") target.open = true;
   });
+}
+
+// wireChapterNav() above only opens a closed <details> chapter on an
+// in-page click -- a cold cross-page arrival with the hash already in the
+// URL (e.g. the map teaser's own red-flag link) never fires that
+// listener. Tested directly (Chrome 120, --headless=new --dump-dom):
+// native fragment-auto-open does not cover a closed <details> on
+// cross-page arrival. General fix, not a one-off patch for red flags
+// alone -- covers any current or future cross-page hash-into-chapter
+// link. Called once, after main()'s DOM build finishes (the <details>
+// elements this targets don't exist until then).
+function openHashTargetIfClosedDetails() {
+  if (!location.hash) return;
+  const target = document.getElementById(location.hash.slice(1));
+  if (target && target.tagName === "DETAILS" && !target.open) {
+    target.open = true;
+    target.scrollIntoView();
+  }
 }
 
 // Scope-tag disclosure for country-wide facts (v2 addendum §5.1, part 1 —
@@ -405,6 +424,12 @@ function buildScoreBar(store, loc, persona) {
   // block itself no longer branches on this same distinction.
   const personaFixtures = persona ? store.fixturesByPersona.get(persona)?.get(loc.location_id)?.criteria : null;
   const personaLabel = persona ? persona.charAt(0).toUpperCase() + persona.slice(1) : "";
+  // v9 Part 5: every stat is a door -- each chip's own name links one
+  // click deeper to criteria.html, the shared anchor page (5.1: DRY on the
+  // fact layer, one canonical definition per criterion instead of one
+  // copy per location page). withPersona() so the persona active on this
+  // location page is preserved into and back out of that page, same
+  // convention as every other internal link on this site.
   const chips = store.criteria.map((crit) => {
     const scoreRow = scoreRows ? scoreRows.get(crit.criterion_id) : null;
     const fixtureRow = personaFixtures ? personaFixtures.get(crit.criterion_id) : null;
@@ -413,10 +438,31 @@ function buildScoreBar(store, loc, persona) {
     else if (scoreRow && scoreRow.status === "scored") { val = scoreRow.score; }
     else { val = null; }
     swatch = scoreToColor(val);
+    // v10 Part 16.1: the §8J disclosure -- a marker on any criterion whose
+    // reader_dependency reads "pending-ruling" (today: Community & social
+    // fabric only), reusing .scope-tag verbatim (the existing "small
+    // italic muted annotation beside a value" class). Zero new claim: this
+    // renders only when the field is actually present and set, so it's a
+    // silent no-op wherever the export a page loads from doesn't carry it.
+    const pendingTag = crit.reader_dependency === "pending-ruling"
+      ? ` <span class="scope-tag" title="Several distinct facts folded into one number — see the note above">${escapeHtml(READER_DEPENDENCY_PENDING_LABEL)}</span>`
+      : "";
+    const explainHref = withPersona(siteUrl(`criteria.html#${crit.criterion_id}`));
     return `<span class="criterion-chip"><span class="fit-swatch" style="background:${swatch}"></span>
-      ${escapeHtml(crit.name)}: ${val != null ? val + "/5" : "gap"}${tag}</span>`;
+      ${escapeHtml(crit.name)}: ${val != null ? val + "/5" : "gap"}${tag}${pendingTag}
+      <a class="criterion-explain-link" href="${explainHref}">What this measures &rarr;</a></span>`;
   });
-  details.innerHTML = `<summary>Score breakdown</summary><p class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</p><p class="fit-def">${escapeHtml(SCALE_ANCHOR_STRING)}</p><div class="criterion-scorebar">${chips.join("")}</div>`;
+  // v10 Part 16.1: the shared paragraph, once per chapter (not once per
+  // chip), reusing the existing .fit-def pattern already used for
+  // FIT_INDEX_DEFINITION/SCALE_ANCHOR_STRING above -- renders only if at
+  // least one criterion actually carries the field today, so it vanishes
+  // automatically the day this decomposes, keyed off the field rather
+  // than a hardcoded criterion_id.
+  const hasPending = store.criteria.some((c) => c.reader_dependency === "pending-ruling");
+  const pendingParagraph = hasPending
+    ? `<p class="fit-def">${escapeHtml(READER_DEPENDENCY_PENDING_PARAGRAPH)}</p>`
+    : "";
+  details.innerHTML = `<summary>Score breakdown</summary><p class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</p><p class="fit-def">${escapeHtml(SCALE_ANCHOR_STRING)}</p>${pendingParagraph}<div class="criterion-scorebar">${chips.join("")}</div>`;
   return details;
 }
 

@@ -20,6 +20,15 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics: defer, no site-code dependency on it loading
+     or responding, bare cookieless beacon only (no tag manager, no custom
+     events). TOKEN PLACEHOLDER: this is not a real token -- the site owner
+     mints the real one in the Cloudflare dashboard (Sites -> Web Analytics
+     -> "Add a site" -> copy the JS snippet's own token). A public
+     measurement ID grants no read/write access, so it's safe to commit
+     once real, but inventing one here would just silently fail forever --
+     swap the literal string below for the dashboard's real value. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body>
 <main>

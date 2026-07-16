@@ -390,6 +390,7 @@ export function renderFooter(store) {
       periodically — it is never hand-edited here.
       ${meta ? `Snapshot extracted ${escapeHtml(meta.extracted_at || "")}.` : ""}
     </p>
+    <p>Anonymous, cookieless visit counts by Cloudflare help us see what's useful.</p>
   `;
   document.body.appendChild(footer);
 }
@@ -594,6 +595,23 @@ export const WEIGHT_CLASS_LABEL = {
   "Medium-High": "weighted above average in the index",
   Medium: "weighted normally in the index",
 };
+
+// The §8J disclosure for any criterion whose `reader_dependency` field
+// reads "pending-ruling" (today: Community & social fabric only) — a
+// criterion score that structurally blends more than one distinct fact,
+// honestly labeled rather than rendered identically to a single-fact
+// score. One canonical short marker (chip/column-header suffix) and one
+// canonical longer paragraph (chapter/section copy), each reused verbatim
+// across every render home (location.js, lists.js, criteria.html), same
+// idiom as FIT_INDEX_DEFINITION/SCALE_ANCHOR_STRING above. The six named
+// facts are transported verbatim from this project's own internal
+// criterion-scope ruling, not authored here. Word choice: "blends several
+// facts" deliberately avoids "composite" (already used elsewhere for a
+// different, killed concept — a blended-across-readers score) to prevent
+// a vocabulary collision.
+export const READER_DEPENDENCY_PENDING_LABEL = "blends several facts";
+export const READER_DEPENDENCY_PENDING_PARAGRAPH =
+  'Criteria marked "blends several facts" fold more than one distinct thing into a single number — for Community & social fabric today, that\'s expat/foreigner density, language accessibility, family-friendliness, nightlife/social-scene density, LGBTQ+ safety-and-acceptance, and professional-network depth. We\'re working to score these separately; until then, treat the single figure as a rough signal, not a precise read.';
 
 // ---------------------------------------------------------------------
 // Persona verdict-first banding (v4 addendum R1 §1.2, moved here from

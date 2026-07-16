@@ -13,6 +13,9 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="../css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body data-loc-id="AL-sarande">
 <div class="site-topbar">
@@ -63,7 +66,7 @@
       <li class="fact-item">
         <div class="fact-label">Private health insurance enrollment age ceiling</div>
         <div class="fact-value">60 (standard/silver/gold tiers); 79 (travel-oriented 'Live and Travel in Albania' package) years</div>
-        <div class="fact-notes">One insurer's plan structure (SIGAL UNIQA Group, via the Expats in Albania group-rate program) — not independently cross-checked against a second Albanian insurer this pass. A real, lower-than-generically-assumed ceiling: this project's own working assumption going into this research pass was &quot;commonly 65-75,&quot; and Albania's clearest sourced example undercuts that on the standard tiers</div>
+        <div class="fact-notes">One insurer's plan structure (SIGAL UNIQA Group, via the Expats in Albania group-rate program) — not independently cross-checked against a second Albanian insurer this pass. A real, lower-than-generically-assumed ceiling: this project's own working assumption going into this backfill was &quot;commonly 65-75,&quot; and Albania's clearest sourced example undercuts that on the standard tiers</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Public healthcare system access for foreigners</div>
@@ -113,7 +116,7 @@
       <li class="fact-item">
         <div class="fact-label">Private clinic capability</div>
         <div class="fact-value">Intermedica Clinic, Doctors General Clinic (24/7 emergency line) — consultations and non-critical care only; no hospital-tier private facility in town</div>
-        <div class="fact-notes">A materially thinner private tier than Tirana's — see AL-tirana rows below</div>
+        <div class="fact-notes">A materially thinner private tier than Tirana's — see `AL-tirana` rows below</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Where the medevac line sits</div>
@@ -124,11 +127,6 @@
         <div class="fact-label">Agricultural land purchase (foreigners)</div>
         <div class="fact-value">No (direct individual ownership)</div>
         <div class="fact-notes">Off-limits to direct foreign-individual ownership — the real restriction sits on land, not buildings; a workaround structure (Albanian company, or buying only the building on registered residential land) is typically necessary</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Coastal 200m band caution</div>
-        <div class="fact-value">Properties within 200m of shoreline may fall under land-use restrictions even when marketed as an ordinary villa/apartment</div>
-        <div class="fact-notes">A real, specific caution for Sarandë given its coastal character — the same &quot;check which side of the legal line a specific parcel sits on&quot; pattern as Guatemala's 200m lakeshore band</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Employer-sponsored work visa</div>
@@ -156,9 +154,34 @@
         <div class="fact-notes">Feeds the property-owner Unique Permit category, which must still be filed and granted separately</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Regime shape</div>
+        <div class="fact-value">open-freehold</div>
+        <div class="fact-notes">Law No. 7850 — closer to Belize's/Morocco's open regime than Guatemala's/Mexico's band-substitute model.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — corporate structure (agricultural-land workaround)</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Agricultural land is off-limits to direct individual foreign ownership; an Albanian company, or buying only the building on registered residential land, is typically necessary — a category exclusion, not a geographic band.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — direct freehold (buildings/apartments/houses)</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">No reciprocity requirement.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — corporate structure</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — direct freehold</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Tourist/visitor stay allowance — US citizens specifically</div>
         <div class="fact-value">365 days</div>
-        <div class="fact-notes">A genuine, documented outlier — no residence permit needed; after the year, must leave and stay outside 90+ days before another visa-exempt period. Independently re-derived and confirmed here</div>
+        <div class="fact-notes">A genuine, documented outlier — no residence permit needed; after the year, must leave and stay outside 90+ days before another visa-exempt period. This is the figure originally flagged as a &quot;visa-free year,&quot; re-derived and confirmed here</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tourist/visitor stay allowance (most nationalities)</div>
@@ -172,8 +195,8 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Unique Permit — property-owner category converts to permanent residency</div>
-        <div class="fact-value">Same 5-year continuous-residence clock as every other temporary category</div>
-        <div class="fact-notes">Does not itself grant permanent status faster — not independently confirmed against a primary legal text</div>
+        <div class="fact-value">Yes (same 5-year continuous-residence clock as every other temporary Unique Permit category — no faster path to permanent status)</div>
+        <div class="fact-notes">Does not itself grant permanent status faster — not independently confirmed against a primary legal text.</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Unique Permit — remote-worker route accepts passive income as qualifying proof</div>
@@ -204,6 +227,11 @@
         <div class="fact-label">Unique Permit permanent status / naturalization clock</div>
         <div class="fact-value">5 consecutive years of legal residence</div>
         <div class="fact-notes">Onward citizenship timeline/requirements beyond this permanent-residence milestone not swept this pass</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Diligence risk — coastal land-use restriction caution</div>
+        <div class="fact-value">Properties within 200m of shoreline may fall under land-use restrictions even when marketed as an ordinary villa/apartment</div>
+        <div class="fact-notes">Held as a diligence flag, not a confirmed Shape-A band substitute — the source text is a caution, not a mapped legal band with its own substitute vehicle.</div>
       </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Purchase price — detailed property data not yet available</div>
@@ -277,8 +305,8 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">EU institutional read on rule of law</div>
-        <div class="fact-value">European Parliament report + EPP statement (Feb 2026) named ongoing judicial pressure and persistent corruption as active concerns</div>
-        <div class="fact-notes">OSW's own April 2026 analysis titles its read &quot;Rule of law concerns in Albania: an obstacle to EU accession&quot; — a named current obstacle, not resolved</div>
+        <div class="fact-value">European Parliament report + European People's Party (EPP) statement (Feb 2026) named ongoing judicial pressure and persistent corruption as active concerns</div>
+        <div class="fact-notes">The Centre for Eastern Studies (OSW)'s own April 2026 analysis titles its read &quot;Rule of law concerns in Albania: an obstacle to EU accession&quot; — a named current obstacle, not resolved</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">No single-moment regime-change/currency-crisis event</div>
@@ -292,7 +320,7 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Tirana mayor Erion Veliaj — corruption prosecution</div>
-        <div class="fact-value">Arrested by SPAK on corruption/money-laundering charges, ~110M lek (~$1.15M) in illicit income alleged; Constitutional Court rejected appeal, remains in pre-trial detention</div>
+        <div class="fact-value">Arrested by Albania's Special Court Against Corruption and Organised Crime (SPAK) on corruption/money-laundering charges, ~110M lek (~$1.15M) in illicit income alleged; Constitutional Court rejected appeal, remains in pre-trial detention</div>
         <div class="fact-notes">A national anti-corruption institution (SPAK) successfully prosecuting a sitting capital-city mayor — genuinely mixed as a signal: real accountability happening, against a backdrop of broader EU-named rule-of-law concern</div>
       </li>
       <li class="fact-item">
@@ -305,7 +333,7 @@
         <div class="fact-value">Petty theft, inflated tourist-season prices, aggressive driving, alcohol-fueled nightlife incidents in summer</div>
         <div class="fact-notes">Not violent crime against residents/visitors</div>
       </li></ul></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2019-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><a class="source-link" href="https://newholidays.co.uk/best-doctor-saranda-clinic-emergency/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="PT-porto.html">Porto</a> — 3.7/5</li><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

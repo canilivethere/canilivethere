@@ -13,6 +13,9 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="../css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body data-loc-id="MX-cdmx">
 <div class="site-topbar">
@@ -41,9 +44,9 @@
     <nav class="section-nav"><a href="#sec-overview">Overview</a><a href="#sec-visa">Visa & residency</a><a href="#sec-property">Property</a><a href="#sec-cost">Cost of living</a><a href="#sec-community">Community</a><a href="#sec-redflags">Red flags</a></nav>
     <details class="chapter" open id="sec-overview"><summary>Overview</summary><ul class="fact-list">
       <li class="fact-item">
-        <div class="fact-label">IMSS enrollment (legal residents) — public-system backstop</div>
+        <div class="fact-label">Public health-insurance enrollment (IMSS) — public-system backstop</div>
         <div class="fact-value">500-700/year; excludes cancer, chronic degenerative disease, HIV, addictions, mental illness $/year</div>
-        <div class="fact-notes">Common expat pattern: private out-of-pocket for routine care plus IMSS or private insurance as catastrophic backstop, not one system exclusively</div>
+        <div class="fact-notes">Common expat pattern: private out-of-pocket for routine care plus the public system (IMSS) or private insurance as catastrophic backstop, not one system exclusively</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Pet import (cat) — species-specific requirement verification</div>
@@ -67,8 +70,8 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Residency visa — mandatory health-insurance requirement</div>
-        <div class="fact-value">No nationwide INM mandate; consulate-dependent, increasing for Europe/Canada/some US jurisdictions</div>
-        <div class="fact-notes">Checked directly this pass rather than assumed — a real but not uniform compound-gate risk on top of the age-enrollment-ceiling row above; INM can also request updated proof at renewal</div>
+        <div class="fact-value">No nationwide mandate from the immigration authority (INM); consulate-dependent, increasing for Europe/Canada/some US jurisdictions</div>
+        <div class="fact-notes">Checked directly this pass rather than assumed — a real but not uniform compound-gate risk on top of the age-enrollment-ceiling row above; the immigration authority (INM) can also request updated proof at renewal</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Distance to emergency care</div>
@@ -81,9 +84,9 @@
         <div class="fact-notes">Distinct mechanism from CDMX's own ejido-fraud/Judicial-Reform findings (property/institutional, not personal targeting) — not specifically searched for at CDMX</div>
       </li></ul></details><details class="chapter" open id="sec-visa"><summary>Visa & residency</summary><p class="chapter-intro">How you'd actually get to stay — the real routes, their income floors, and how long they realistically take, not the marketing version.</p><ul class="fact-list">
       <li class="fact-item">
-        <div class="fact-label">Ejido-land fraud rate (Quintana Roo specifically)</div>
+        <div class="fact-label">Diligence risk — ejido-land fraud rate (Quintana Roo specifically)</div>
         <div class="fact-value">15–20 % of foreign transactions</div>
-        <div class="fact-notes">Anade (Quintana Roo chapter): 7 in 10 who come to them post-purchase turn out defrauded; concentrated in Playa del Carmen/Tulum, not CDMX/Mérida/Oaxaca</div>
+        <div class="fact-notes">Concentrated in Playa del Carmen/Tulum, confirmed clean at CDMX/Mérida/Oaxaca.</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Permanent Residency direct-from-abroad restricted to retirees/pensioners</div>
@@ -98,7 +101,12 @@
       <li class="fact-item">
         <div class="fact-label">Restricted Zone (coastal/border)</div>
         <div class="fact-value">50km coast / 100km border</div>
-        <div class="fact-notes">Fideicomiso bank-trust workaround inside the zone; ~$500-3,000 setup, ~$500-1,000/yr ongoing, ~21,650 MXN SRE permit fee</div>
+        <div class="fact-notes">Fideicomiso bank-trust workaround inside the zone; ~$500-3,000 setup, ~$500-1,000/yr ongoing, ~21,650 MXN foreign-affairs ministry (SRE) permit fee</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Restricted Zone regime shape</div>
+        <div class="fact-value">geographic-band-substitute</div>
+        
       </li>
       <li class="fact-item">
         <div class="fact-label">Tax residency trigger / worldwide-income taxation</div>
@@ -124,16 +132,46 @@
         <div class="fact-label">Temporary Resident Visa savings/investment alternative</div>
         <div class="fact-value">73000–85000 $</div>
         <div class="fact-notes">Income or savings, not combined — this route's own structure requires one pool to clear the bar, not two separate ones</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism cost — fideicomiso</div>
+        <div class="fact-value">500–3000 $ (setup)</div>
+        <div class="fact-notes">Plus ~500-1000/yr ongoing, and ~21,650 MXN foreign-affairs ministry (SRE) permit fee, already in the original row's own notes.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — fideicomiso bank trust</div>
+        <div class="fact-value">Yes</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — fideicomiso</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — Mexican corporation</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — Mexican corporation</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Named as a second inside-band vehicle in the source file's own prose.</div>
       </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><ul class="fact-list">
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — ejido pre-dominio-pleno land</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Communal tenure, not lawfully transferable title to a foreign buyer without formal conversion (dominio pleno).</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — ejido pre-dominio-pleno land</div>
+        <div class="fact-value">Not yet checked</div>
+        <div class="fact-notes">Named honestly as an open call — the risk here is fraud/title-validity, not a criminal-liability trap the way Thailand's nominee scheme is.</div>
+      </li>
       <li class="fact-item">
         <div class="fact-label">Citywide median purchase price</div>
         <div class="fact-value">~3180 $/m²</div>
         <div class="fact-notes">Citywide median runs well below the Roma Norte/Condesa premium — a comparable-quality purchase further from the gentrification-pressure zone costs substantially less per m²</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Closing costs</div>
-        <div class="fact-value">5–8 %</div>
-        <div class="fact-notes">Lower end of Mexico's national range since no fideicomiso applies</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Condominio regime (compound/group-model fit)</div>
@@ -141,14 +179,19 @@
         <div class="fact-notes">Arguably the cleanest purpose-built legal fit of any country researched for a small-group compound, since it doesn't interact with the Restricted Zone question at all in CDMX</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">Restricted Zone applies</div>
-        <div class="fact-value">No</div>
-        <div class="fact-notes">Inland, entirely outside the 50km coastal band — direct personal-name title, no fideicomiso</div>
+        <div class="fact-label">Restricted-zone applicability (CDMX)</div>
+        <div class="fact-value">outside</div>
+        
       </li>
       <li class="fact-item">
         <div class="fact-label">Purchase price</div>
         <div class="fact-value">251000–782000 $</div>
         <div class="fact-notes">30-140% premium per m² over the citywide median; World Cup 2026 named as a further price tailwind elsewhere in this project's Mexico research</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Transaction-cost load (closing costs)</div>
+        <div class="fact-value">5–8 %</div>
+        <div class="fact-notes">Lower end of Mexico's national range since no fideicomiso applies.</div>
       </li></ul></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">CDMX-specific inflation</div>
@@ -178,7 +221,27 @@
       <li class="fact-item">
         <div class="fact-label">Judicial Reform Phase 2 (direct judicial elections)</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Second round moved from 2027 to June 2028; Business Roundtable/US/Canada flagged USMCA-conflict concerns</div>
+        <div class="fact-notes">Second round moved from 2027 to June 2028; Business Roundtable/US/Canada flagged USMCA-conflict concerns. criterion_id corrected 2026-07-15 (was missing entirely, a real extraction gap even though the underlying red-flags.md content already existed)</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">USMCA 2026 review outcome</div>
+        <div class="fact-value">Trilateral joint review held July 1, 2026 — no consensus to automatically extend the agreement for a further 16 years; US opted for annual reviews instead, citing trade-deficit concerns</div>
+        <div class="fact-notes">CSIS, Holland &amp; Knight, Steptoe, all 2026-07. Hard bargaining continues over automotive rules-of-origin, Chinese content routed through Mexican manufacturing, and existing steel/aluminum/car tariffs. Sheinbaum's stance is de-escalation, not confrontation — no retaliatory tariffs issued, has avoided the most severe blanket tariffs threatened, though under continued unresolved uncertainty</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Peso currency stability, explicitly tied to USMCA review risk</div>
+        <div class="fact-value">Traded in a narrow 17-18 MXN/USD band through 2026 so far, backed by over USD 257 billion in international reserves; risk framed as binary and directly tied to the USMCA outcome — an acrimonious breakdown could push the pair toward 20+</div>
+        <div class="fact-notes">IMF's own ARA adequacy metric rates reserves sufficient to absorb external shocks; ~300 basis-point interest-rate differential favoring peso carry trades; Banxico cut its overnight rate 25bps to 6.50% effective May 8, 2026. FXStreet and Disruption Banking both frame this as a textbook case of political/institutional risk with a directly-acknowledged binary currency-risk attached, unresolved as of one week after the July 1 review meeting</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Political continuity — Sheinbaum administration</div>
+        <div class="fact-value">Sheinbaum (Morena) won a strong 2024 mandate; no near-term election, coup, or leadership-crisis risk — next presidential election is 2030</div>
+        <div class="fact-notes">Real difference from a Milei-style case: no regime-change risk here, just live externally-driven trade/currency-policy uncertainty layered on top of genuinely stable domestic political continuity, plus the separately-tracked, slower-moving judicial-independence erosion (Judicial Reform Phase 2)</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Foreign direct investment (FDI) resilience despite USMCA uncertainty</div>
+        <div class="fact-value">23.6 $ billion, Q1 2026 record US FDI</div>
+        <div class="fact-notes">Foreign Policy, CSIS. EU separately committed to mobilizing ~$5.8 billion aligned with Sheinbaum's &quot;Plan Mexico&quot; strategy. A real counterweight worth naming plainly alongside the currency-risk finding above, not just the risk side — Sheinbaum has explicitly pointed to USMCA's continued (if unextended) validity as the source of investor &quot;certainty&quot;</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">2017 earthquake building-code validation</div>
@@ -200,7 +263,7 @@
         <div class="fact-value">Not yet checked</div>
         <div class="fact-notes">Multiple relocation-guide sites assert this with no checkable neighborhood-level crime rate cited — a real sourcing-quality gap, not a confirmed finding</div>
       </li></ul></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-02-10</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-01</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2025-07 (origin); 2026-06-06 update</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-02-10</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="PT-porto.html">Porto</a> — 3.7/5</li><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

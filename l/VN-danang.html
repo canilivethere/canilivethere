@@ -13,6 +13,9 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="../css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body data-loc-id="VN-danang">
 <div class="site-topbar">
@@ -33,7 +36,7 @@
       <li class="fact-item">
         <div class="fact-label">Foreigner access to public healthcare system</div>
         <div class="fact-value">No — expats ineligible for subsidized public insurance; public facilities usable only at full non-subsidized cash rate</div>
-        <div class="fact-notes">Work-permit holders are compulsorily enrolled in Vietnam's social health insurance (VSS) as a labor-law condition of the permit, but coverage is public-hospital-only with low reimbursement — described as &quot;essentially irrelevant&quot; for expats using private care in practice. No visa/TRC route found this pass conditions the visa itself on insurance proof (contrast Thailand's O-A mandate)</div>
+        <div class="fact-notes">Work-permit holders are compulsorily enrolled in Vietnam's social health insurance (VSS) as a labor-law condition of the permit, but coverage is public-hospital-only with low reimbursement — described as &quot;essentially irrelevant&quot; for expats using private care in practice. No visa or Temporary Residence Card (TRC) route found this pass conditions the visa itself on insurance proof (contrast Thailand's O-A mandate)</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Private/international health insurance — annual premium range</div>
@@ -72,7 +75,7 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Healthcare system capability — routine/standard care</div>
-        <div class="fact-value">JCI Gold Seal-accredited private hospital (Vinmec) + Hoan My deliver Western-standard care across most specialties plus a real 24-hour ER</div>
+        <div class="fact-value">Joint Commission International (JCI) Gold Seal-accredited private hospital (Vinmec) + Hoan My deliver Western-standard care across most specialties plus a real 24-hour ER</div>
         <div class="fact-notes">Internal medicine, surgery, obstetrics, pediatrics, cardiology, cancer care, bariatric surgery, minimally invasive cardiac procedures all named as available in-city</div>
       </li>
       <li class="fact-item">
@@ -111,7 +114,7 @@
         <div class="fact-notes">Generalist 450,000-1,800,000 VND, specialist 690,000-2,500,000 VND; CT/MRI 3,000,000-10,000,000 VND (~€98-325). Alea.care, updated 2026-06-26</div>
       </li></ul></details><details class="chapter" open id="sec-visa"><summary>Visa & residency</summary><p class="chapter-intro">How you'd actually get to stay — the real routes, their income floors, and how long they realistically take, not the marketing version.</p><ul class="fact-list">
       <li class="fact-item">
-        <div class="fact-label">Any TRC route converts to Permanent Residence / naturalization</div>
+        <div class="fact-label">Any Temporary Residence Card (TRC) route converts to Permanent Residence / naturalization</div>
         <div class="fact-value">Not yet researched</div>
         <div class="fact-notes">Vietnam has a PR-card mechanism in principle, but no clear, sourced eligibility timeline or in-practice process description was found this pass</div>
       </li>
@@ -148,7 +151,7 @@
       <li class="fact-item">
         <div class="fact-label">No retirement, passive-income, or digital-nomad visa exists</div>
         <div class="fact-value">Yes (confirmed absent)</div>
-        <div class="fact-notes">Long-term legal stay rests entirely on a Temporary Residence Card (TRC) tied to a qualifying purpose (employment, investment, marriage/family, sponsored org work) — confirmed directly this pass</div>
+        <div class="fact-notes">Long-term legal stay rests entirely on a Temporary Residence Card (TRC) tied to a qualifying purpose (employment, investment, marriage/family, sponsored org work) — confirmed directly, not just inherited from an earlier scan</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Overstay penalty schedule</div>
@@ -156,9 +159,9 @@
         <div class="fact-notes">General understanding is fines/deportation/blacklisting apply, but no specific fine schedule or ban-duration ladder confirmed this pass</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">Property ownership mechanism (foreigners) — leasehold</div>
-        <div class="fact-value">50-year Land Use Right (LUR) leasehold on the unit, renewable once for another 50 years (up to 100 total)</div>
-        <div class="fact-notes">Not a freehold purchase of land — buying a condo means buying the right to occupy the unit for the lease period, not the underlying land. Genuinely different from both India's near-total bar and Guatemala's/Mexico's freehold models</div>
+        <div class="fact-label">Regime shape</div>
+        <div class="fact-value">closed-except-single-vehicle</div>
+        <div class="fact-notes">Flagged: no primary statute number found in this project's Vietnam research this pass — the composite-name fallback per §4's own grammar. A property.md doesn't exist for Vietnam yet either.</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Resale-unit lease-term inheritance</div>
@@ -166,29 +169,44 @@
         <div class="fact-notes">A real, easy-to-miss detail for anyone considering a resale purchase rather than new-build</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">TRC via Employment — structure</div>
-        <div class="fact-value">Requires a Vietnamese work permit; TRC issued 6 months to 5 years depending on underlying category</div>
+        <div class="fact-label">Tenure mechanism — direct freehold (land)</div>
+        <div class="fact-value">No</div>
+        <div class="fact-notes">Genuinely different from both India's near-total bar and Guatemala's/Mexico's freehold models — a defined, if term-limited, purchasable interest exists here. No mechanism_legality companion row added — this is a structural absence of a freehold option, not a punished workaround.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — leasehold (Land Use Right)</div>
+        <div class="fact-value">Yes (50yr, renewable once to 100yr total) years</div>
+        <div class="fact-notes">Not a freehold purchase of land — buying a condo means buying the right to occupy the unit for the lease period. Two separate quotas layered on top: 30% of units per building, 250 houses per ward-equivalent unit. Resale buyer inherits the remaining lease term, not a fresh 50 years.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — leasehold</div>
+        <div class="fact-value">legitimate</div>
+        
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Temporary Residence Card (TRC) via Employment — structure</div>
+        <div class="fact-value">Requires a Vietnamese work permit; a Temporary Residence Card (TRC) is then issued for 6 months to 5 years depending on underlying category</div>
         <div class="fact-notes">Not applicable without a genuine qualifying Vietnamese (or foreign-invested Vietnam-based) employer</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">TRC via Employment accepts passive income as qualifying proof</div>
+        <div class="fact-label">Temporary Residence Card (TRC) via Employment accepts passive income as qualifying proof</div>
         <div class="fact-value">No</div>
         <div class="fact-notes">Active employment only — no passive-income equivalent</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">TRC via Marriage/Family — precondition-gated</div>
+        <div class="fact-label">Temporary Residence Card (TRC) via Marriage/Family — precondition-gated</div>
         <div class="fact-value">Real but conditional — requires a Vietnamese-citizen spouse/family member</div>
         <div class="fact-notes">Not independently researched to the mechanical depth of Thailand's marriage-visa section (financial thresholds, renewal cadence, PR-equivalent eligibility) — a named gap</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">TRC via Registered Investment — capital threshold</div>
+        <div class="fact-label">Temporary Residence Card (TRC) via Registered Investment — capital threshold</div>
         <div class="fact-value">Not yet researched</div>
         <div class="fact-notes">A qualifying registered investment (e.g. establishing/investing in a Vietnamese company) qualifies, but no consistent minimum-capital figure found, unlike Thailand's clearly tiered ฿3M/฿10M/$1M structure</div>
       </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><ul class="fact-list">
       <li class="fact-item">
-        <div class="fact-label">Purchase price — detailed property data not yet available</div>
+        <div class="fact-label">Purchase price — full property.md</div>
         <div class="fact-value">Not yet researched</div>
-        <div class="fact-notes">Vietnam's leasehold structure means dedicated research would need a genuinely different unit than a per-m² freehold price — not yet built</div>
+        <div class="fact-notes">Vietnam's leasehold structure means a real property.md would need a genuinely different unit than a per-m² freehold price — not yet built</div>
       </li></ul></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Comfortable monthly nomad budget</div>
@@ -265,7 +283,7 @@
         <div class="fact-value">Extremely rare — one of the safest cities in Vietnam/SE Asia, well-patrolled tourist areas</div>
         <div class="fact-notes">Regarded by both expats and Vietnamese nationals as the safest, most livable city in the country</div>
       </li></ul></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026 (early)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026 (early)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="PT-porto.html">Porto</a> — 3.7/5</li><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

@@ -13,6 +13,9 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="../css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
 </head>
 <body data-loc-id="AR-buenosaires">
 <div class="site-topbar">
@@ -41,13 +44,8 @@
     <nav class="section-nav"><a href="#sec-overview">Overview</a><a href="#sec-visa">Visa & residency</a><a href="#sec-property">Property</a><a href="#sec-cost">Cost of living</a><a href="#sec-community">Community</a><a href="#sec-redflags">Red flags</a></nav>
     <details class="chapter" open id="sec-overview"><summary>Overview</summary><ul class="fact-list">
       <li class="fact-item">
-        <div class="fact-label">Argentina-wide dangerous-region equivalent to Colombia's conflict zones</div>
-        <div class="fact-value">Not yet researched</div>
-        <div class="fact-notes">Not specifically searched for this pass — a real gap before calling Argentina uniformly safe outside Buenos Aires</div>
-      </li>
-      <li class="fact-item">
         <div class="fact-label">Currency-controls status</div>
-        <div class="fact-value">Most capital controls (cepo cambiario) lifted April 2025, backed by a $20B IMF program — official/MEP/blue-dollar rates within 2-3% of each other as of early 2026, vs. 100%+ gap as recently as 2023</div>
+        <div class="fact-value">Most capital controls (cepo cambiario) lifted April 2025, backed by a $20B IMF program — official, the electronic-payment exchange rate (MEP), and blue-dollar rates within 2-3% of each other as of early 2026, vs. 100%+ gap as recently as 2023</div>
         <div class="fact-notes">The blue-dollar/cueva arbitrage is genuinely gone — a real, structural rules-of-the-game change</div>
       </li>
       <li class="fact-item">
@@ -56,9 +54,19 @@
         <div class="fact-notes">Genuine emergencies are free for everyone, any immigration status, no exception found in any 2026-07-11 source (expatfinancial.com, budgetbucketlist.com, buenosairesherald.com all converge). Distinct from scheduled/non-emergency care, see next row</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Pet import (cat) — species-specific requirement verification</div>
+        <div class="fact-value">Identical entry requirements to dogs — no species-specific divergence found in SENASA's own primary pages</div>
+        <div class="fact-notes">Checked directly 2026-07-14 rather than assumed — SENASA's own traveler-facing pages (the general entry page and the species/destination-requirements tool at mascotas.senasa.gob.ar) state the same International Veterinary Certificate/pet-passport, rabies-vaccination, health-certificate, and deworming requirements for cats as for dogs, with no titer and no quarantine if paperwork is in order (see the companion dog row for the full requirement list, identical for both species). The one genuine dog/cat asymmetry found: Buenos Aires city's (CABA) post-arrival dangerous-breed owner registry (Ley 4.078) is dog-only by its own definition — keyed to breed and physical characteristics (weight, chest circumference) that simply have no cat equivalent; no CABA cat registry, and nothing found suggests any other Argentine city runs one either.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pet import (dog) — rabies titer / quarantine requirement</div>
+        <div class="fact-value">No rabies titer (FAVN) required from any origin country; no quarantine if paperwork is in order</div>
+        <div class="fact-notes">Re-verified 2026-07-14 directly against SENASA's own traveler-facing pages (Servicio Nacional de Sanidad y Calidad Agroalimentaria, Argentina's national food-safety/animal-health agency), not aggregator paraphrase alone. Required regardless: an International Veterinary Certificate (CVI) or legalized pet passport valid 60 days from issuance (Spanish translation required per Resolución SENASA 1354/1994 unless an EU-style pet passport); rabies vaccination current, primary dose at least 21 days pre-arrival for animals over 3 months (age exception for pets from a WOAH-recognized rabies-free country); a health certificate dated within 10 days of the CVI's issuance; deworming within 15 days of the CVI. No import permit required for a pet as accompanied baggage; no national breed restrictions on entry. A real correction of a widely-cited aggregator claim: microchipping is NOT required to enter Argentina (pettravel.com claims otherwise, but neither of SENASA's own primary pages state an entry microchip requirement; microchips become relevant only for pets LEAVING Argentina for the EU or Uruguay). A pet without compliant paperwork faces quarantine (where a facility exists), return to origin, or euthanasia at the importer's cost (pettravel.com, not stated directly on SENASA's own page. Separate, location-specific, post-arrival finding NOT carried by this row: the City of Buenos Aires (CABA) runs a mandatory dangerous-breed owner registry (Ley 4.078) covering specific breeds including German Shepherd, Doberman, and Rottweiler — see the companion CABA fact (AR-buenosaires:caba-dangerous-dog-breed-owner-registry-ley-4078) and Argentina/overview.md's practical-logistics section for detail; this is a post-arrival municipal obligation, not an entry requirement, so it isn't folded into this row's own value.</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Private healthcare quality</div>
         <div class="fact-value">Comparable to European standards, English-speaking staff at internationally-oriented private hospitals (Hospital Alemán, Hospital Italiano, Hospital Británico) — one of the least ambiguous positives found anywhere in this project</div>
-        <div class="fact-notes">Private insurance (prepaga — OSDE, Swiss Medical) runs ~$50-150/month. Care quality more uneven in Argentina's poorer northern provinces — not relevant to Buenos Aires/Bariloche/Mendoza specifically</div>
+        <div class="fact-notes">Private insurance (prepaga — OSDE, Swiss Medical) runs ~$50-150/month. Care quality more uneven in Argentina's poorer northern provinces — not relevant to Buenos Aires/Bariloche/Mendoza specifically. **Relinked 2026-07-11 from `Safety` to `Healthcare quality &amp; access`** now that the 13th criterion exists — Safety was the closest available home at original extraction time, not a miscategorization to correct blame for</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Private insurance (prepaga) — age-based rejection prohibition</div>
@@ -67,13 +75,13 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Scheduled (non-emergency) public healthcare — free-access gate</div>
-        <div class="fact-value">Free for DNI-holding residents (temporary or permanent); billed for non-DNI holders (tourists, transitorios) in CABA + 4 other jurisdictions since March 2025</div>
-        <div class="fact-notes">CABA is the exact jurisdiction in play for Palermo/Recoleta/Belgrano. buenosairesherald.com + batimes.com.ar reporting, cross-corroborated by a baexpats.org community thread on the same policy. New restriction as of March 2025, not previously documented anywhere in this project</div>
+        <div class="fact-value">Free for national ID (DNI)-holding residents (temporary or permanent); billed for non-DNI holders (tourists, transitorios) in Buenos Aires city (CABA) + 4 other jurisdictions since March 2025</div>
+        <div class="fact-notes">Buenos Aires city (CABA) is the exact jurisdiction in play for Palermo/Recoleta/Belgrano. buenosairesherald.com + batimes.com.ar reporting, cross-corroborated by a baexpats.org community thread on the same policy. New restriction as of March 2025, not previously documented anywhere in this project</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Temporary residents (DNI) — free public healthcare access</div>
         <div class="fact-value">No</div>
-        <div class="fact-notes">Decreto 366/2025 (May 2025): temporary-residence DNI holders retain healthcare access but must show private insurance to use the public system free at point of service. Reconfirms, doesn't contradict, visa-legal.md's existing Rentista-specific finding — a second independent source (corporateimmigrationpartners.com) checked this pass</div>
+        <div class="fact-notes">Decreto 366/2025 (May 2025): temporary-residence permit (DNI) holders retain healthcare access but must show private insurance to use the public system free at point of service. Reconfirms, doesn't contradict, visa-legal.md's existing Rentista-specific finding — a second independent source (corporateimmigrationpartners.com) checked this pass</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Bookstores per capita</div>
@@ -91,6 +99,11 @@
         <div class="fact-notes">SpeedGeo/Ookla-sourced, not a vendor claim. Movistar's own network averages 219.4/205.7 Mbps over the most recent 12 months, at 18ms latency</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Buenos Aires city dangerous-dog breed owner registry (CABA, Ley 4.078)</div>
+        <div class="fact-value">Mandatory registration for specific breeds kept in Buenos Aires city, including German Shepherd, Doberman, and Rottweiler — free online registration, liability insurance, and a responsible-ownership course required; leash/muzzle mandatory in public</div>
+        <div class="fact-notes">Confirmed directly on buenosaires.gob.ar's own registry page and cross-corroborated by El Cronista and Ámbito press coverage of the same law. Full breed list: pit bull terrier, Staffordshire bull terrier, American Staffordshire terrier, Dogo Argentino, Fila Brasileño, Tosa Inu, Akita Inu, Doberman, Rottweiler, Bullmastiff, Dogo de Burdeos, Bull Terrier, Gran Perro Japonés, Mastín Napolitano, Presa Canario, Ovejero Alemán (German Shepherd), Cane Corso, plus mixed-breed dogs sharing similar physical traits (over 20kg, 60-80cm chest circumference) or trained for attack. Worth flagging plainly: German Shepherd, Doberman, and Rottweiler — three genuinely common breeds — sit on this list alongside the more stereotyped 'bully' breeds. This is a post-arrival municipal ownership obligation, not a national entry requirement (see the country-scoped pet-import-dog row below) — a foreign dog owner of one of these breeds clears SENASA's own entry process identically to any other dog, then faces this separate, ongoing compliance step once resident in Buenos Aires city specifically. No penalty figure for non-compliance was found in any source checked. Cats have no equivalent registry — this obligation is keyed to breed/physical characteristics that simply have no cat analog.</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Character/positioning</div>
         <div class="fact-value">A genuine world city — ~15 million metro, deepest digital-nomad/remote-worker infrastructure of anywhere in Argentina</div>
         <div class="fact-notes">Palermo Soho is the actual remote-work cluster; Recoleta the formal/older-money &quot;settled expat/retiree&quot; counterpart; Belgrano the quieter, more residential, still-safe third option</div>
@@ -103,7 +116,7 @@
       <li class="fact-item">
         <div class="fact-label">Climate — scorecard score</div>
         <div class="fact-value">3 /5</div>
-        <div class="fact-notes">Scored biome-neutrally per this project's own climate-neutrality convention's confirmed reading: humid subtropical, no dry season, a genuine year-round comfort factor independent of any preference question, not a shortfall against Guatemala's mildness</div>
+        <div class="fact-notes">Scored biome-neutrally per preferences.md's confirmed reading: humid subtropical, no dry season, a genuine year-round comfort factor independent of any preference question, not a shortfall against Guatemala's mildness</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Digital-nomad-specific tech friction</div>
@@ -142,7 +155,7 @@
       </li>
       <li class="fact-item">
         <div class="fact-label">Río de la Plata — water-adjacency quality</div>
-        <div class="fact-value">Wide, brown, silt-heavy estuary — not swimmable or recreational; no real beach culture inside CABA itself</div>
+        <div class="fact-value">Wide, brown, silt-heavy estuary — not swimmable or recreational; no real beach culture inside Buenos Aires city (CABA) itself</div>
         <div class="fact-notes">The weak half of an otherwise real park-nature strength</div>
       </li>
       <li class="fact-item">
@@ -178,7 +191,7 @@
       <li class="fact-item">
         <div class="fact-label">Citizenship-by-investment track (separate, new, 2025)</div>
         <div class="fact-value">Media-reported possible $500,000+ threshold — separate track, does not modify or replace Article 23(d)'s existing route</div>
-        <div class="fact-notes">DNU 366/2025 plus Decreto 524/2025 (published July 31, 2025). No official figure published as of a January 2026 check — aimed at a much wealthier investor tier</div>
+        <div class="fact-notes">A presidential emergency decree (DNU) 366/2025 plus Decreto 524/2025 (published July 31, 2025). No official figure published as of a January 2026 check — aimed at a much wealthier investor tier</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Citizenship residency requirement</div>
@@ -231,6 +244,36 @@
         <div class="fact-notes">Administrative fee-and-exit process, not currently criminal. Valid for 10 consecutive days to depart. Decree 366/2025 removed the informal warning-first grace this used to run on</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Pensionado visa converts to permanent residency</div>
+        <div class="fact-value">Not yet checked</div>
+        <div class="fact-notes">Every source describes Rentista and Pensionado as 'sister programs under the same legal framework' with comparable paths to permanent residency — structurally plausible (same law, same decree) but not independently traced to Pensionado's own primary-text conversion terms the way Rentista's confirmed 2-year clock is. Worth a follow-up primary-source check before treating this as confirmed identical to Rentista's clock, not just analogous</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pensionado visa duration</div>
+        <div class="fact-value">1 year, renewable (one aggregator source describes a possible up-to-3-year grant under the same Disposición 3446/2023 — unresolved discrepancy, not independently re-verified against primary text)</div>
+        <div class="fact-notes">Sourced identically to Rentista's own renewal shape via the official service page for the 1-year figure; the up-to-3-year reading traces to the same regulatory instrument but is a search-result characterization, not independently re-verified</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pensionado visa income threshold</div>
+        <div class="fact-value">1300-2000 $/month</div>
+        <div class="fact-notes">Low end ($1,300) is the statutory 5x the national minimum wage (the SMVM) threshold; high end ($2,000) is the practitioner-recommended buffer. Identical statutory threshold to Rentista's own — 5x SMVM (ARS 1,815,000/month at mid-2026's ARS 363,000 SMVM, ~$1,300/month at this file's ARS/USD convention). Multiple practitioner sources recommend budgeting closer to $2,000/month in practice to absorb peso volatility and clear reviewer scrutiny — the same $2,000/month working figure this file already uses for Rentista, not a separate number for the sister category</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pensionado visa income-type requirement (passive)</div>
+        <div class="fact-value">explicitly_rejected</div>
+        <div class="fact-notes">Ordinary investment/dividend income is explicitly not this route's qualifying basis; Rentista (the separate route) is the fit for ordinary asset-return passive income instead. See companion pension-type row.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pensionado visa income-type requirement (pension)</div>
+        <div class="fact-value">primary_accepted</div>
+        <div class="fact-notes">A genuine employment-linked or state pension, paid 'regular and permanent' by a government, international organization, or private company, for services rendered abroad. Same structural pattern as Colombia's Pensionado route.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Pensionado visa legal basis</div>
+        <div class="fact-value">Ley 25.871, Article 23(c) — a textually distinct provision from Rentista's Article 23(b), same Decreto 616/2010 and a National Directorate of Migration resolution (Disposición DNM 1.732/2023, as modified by Disposición 3446/2023)</div>
+        <div class="fact-notes">Confirmed via direct fetch of argentina.gob.ar's own official service pages for both categories side by side — a genuine second, dedicated pensioner-specific route distinct from Rentista, not Rentista stretched to cover pension income</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Permanent-residency abandonment threshold</div>
         <div class="fact-value">12 consecutive months abroad (reduced from 24)</div>
         <div class="fact-notes">Decree 366/2025 — spending a year outside Argentina after gaining PR now risks losing it, half the previous grace period</div>
@@ -238,7 +281,7 @@
       <li class="fact-item">
         <div class="fact-label">Progressive income tax top rate</div>
         <div class="fact-value">35 % (residents)</div>
-        <div class="fact-notes">Tax authority renamed ARCA (formerly AFIP, as of 2024) — same function</div>
+        <div class="fact-notes">Argentina's tax authority was renamed to the Revenue and Customs Control Agency (ARCA, formerly AFIP) in 2024 — same function</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Property purchase confers residency status</div>
@@ -256,14 +299,14 @@
         <div class="fact-notes">Ended in stages (US removed March 2016, Australia July 2017, Canada January 2018) — nobody currently pays a reciprocity fee to enter as a tourist</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Regime shape</div>
+        <div class="fact-value">open-freehold</div>
+        <div class="fact-notes">Article 20 of the Argentine Constitution — same civil property rights as citizens, no fideicomiso-style trust required.</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Rentista real-world process (timeline/cost/health-insurance)</div>
         <div class="fact-value">Realistic 6-9 month timeline (not the headline 4-6 months); $5,000-7,000 total cost; mandatory private health insurance, minimum $20,000 coverage</div>
         <div class="fact-notes">Decreto 366/2025 (effective July 2025) stripped temporary residents of public healthcare access entirely, creating the mandatory-insurance requirement. Rests on immigration-consultancy client-experience descriptions, not an identified first-hand applicant account — Medium, not High, confidence</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Rentista visa accepts passive income as qualifying proof</div>
-        <div class="fact-value">Yes</div>
-        <div class="fact-notes">Foreign-sourced passive income broadly (investments, annuities, rental income) — no sharper &quot;must be structured as a pension&quot; distinction found the way Colombia/Guatemala carry</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Rentista visa category</div>
@@ -281,29 +324,9 @@
         <div class="fact-notes">~5x Argentina's minimum wage (ARS 363,000/month). Moved ~45% in about a year (a March 2025 source cited $1,390/month for the same visa) — pegged to minimum wage, expect continued movement, not a fixed dollar figure</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">Pensionado visa legal basis</div>
-        <div class="fact-value">Ley 25.871, Article 23, inciso c) — a textually distinct provision from Rentista's inciso b), same Decreto 616/2010 and Disposición DNM 1.732/2023 (as modified by Disposición 3446/2023)</div>
-        <div class="fact-notes">Confirmed via direct fetch of argentina.gob.ar's own official service pages for both categories side by side — a genuine second, dedicated pensioner-specific route distinct from Rentista, not Rentista stretched to cover pension income</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Pensionado visa accepts passive income as qualifying proof</div>
-        <div class="fact-value">No</div>
-        <div class="fact-notes">Pension-specific income only. Requires a pension paid on a 'regular and permanent' basis by a government, international organization, or private company, for services rendered abroad — a genuine employment-linked or state pension, not ordinary investment/dividend income. Rentista (this file's separate route) is the fit for ordinary asset-return passive income instead</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Pensionado visa income threshold</div>
-        <div class="fact-value">1300-2000 $/month</div>
-        <div class="fact-notes">Low end ($1,300) is the statutory 5x SMVM threshold; high end ($2,000) is the practitioner-recommended buffer. Identical statutory threshold to Rentista's own — 5x SMVM (ARS 1,815,000/month at mid-2026's ARS 363,000 SMVM, ~$1,300/month at this file's ARS/USD convention). Multiple practitioner sources recommend budgeting closer to $2,000/month in practice to absorb peso volatility and clear reviewer scrutiny — the same $2,000/month working figure this file already uses for Rentista, not a separate number for the sister category</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Pensionado visa converts to permanent residency</div>
-        <div class="fact-value">Not yet checked</div>
-        <div class="fact-notes">Every source describes Rentista and Pensionado as ‘sister programs under the same legal framework’ with comparable paths to permanent residency — structurally plausible (same law, same decree) but not independently traced to Pensionado's own primary-text conversion terms the way Rentista's confirmed 2-year clock is. Worth a follow-up primary-source check before treating this as confirmed identical to Rentista's clock, not just analogous.</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Pensionado visa duration</div>
-        <div class="fact-value">1 year, renewable (one aggregator source describes a possible up-to-3-year grant under the same Disposición 3446/2023 — unresolved discrepancy, not independently re-verified against primary text)</div>
-        <div class="fact-notes">Sourced identically to Rentista's own renewal shape via the official service page for the 1-year figure; the up-to-3-year reading traces to the same regulatory instrument but is a search-result characterization, not independently re-verified</div>
+        <div class="fact-label">Rentista visa income-type requirement (passive)</div>
+        <div class="fact-value">primary_accepted</div>
+        <div class="fact-notes">Foreign-sourced passive income broadly (investments, annuities, rental income) — no sharper 'must be structured as a pension' distinction found the way Colombia/Guatemala carry.</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Rural/border-zone land restriction (Law 26.737)</div>
@@ -314,6 +337,16 @@
         <div class="fact-label">Tax residency basis</div>
         <div class="fact-value">Residency-based, not territorial; triggers at PR grant or ~12 months physical presence (also see the separate 183-day tourist-time trigger above)</div>
         <div class="fact-notes">Opposite of Guatemala's territorial system, same structural shape as Colombia's. Worldwide income in scope once triggered</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism — direct freehold</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Buenos Aires city property unrestricted for foreign buyers.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tenure mechanism legality — direct freehold</div>
+        <div class="fact-value">legitimate</div>
+        
       </li>
       <li class="fact-item">
         <div class="fact-label">Tourist-stay extension</div>
@@ -338,7 +371,7 @@
       <li class="fact-item">
         <div class="fact-label">Urban residential property — foreign-ownership rights</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Article 20 of the Constitution — same rights as citizens, no fideicomiso-style trust required (unlike Mexico's coastal zone), no nationwide coastal restriction. Buenos Aires city property unrestricted for foreign buyers</div>
+        <div class="fact-notes">Article 20 of the Constitution — same rights as citizens, no fideicomiso-style trust required (unlike Mexico's coastal Restricted Zone), no nationwide coastal restriction. Buenos Aires city property unrestricted for foreign buyers</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Visa &amp; legal pathway ease — scorecard score</div>
@@ -351,24 +384,14 @@
         <div class="fact-notes">Only the registered escritura pública (public deed) conveys ownership and priority over other claims — described as the most common wrong assumption foreign buyers make</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">CDI (tax ID) requirement to close a purchase</div>
-        <div class="fact-value">Required from AFIP/ARCA — described as the single document that trips up more foreign buyers than any visa or residency issue</div>
+        <div class="fact-label">Tax ID (CDI) requirement to close a purchase</div>
+        <div class="fact-value">Required from Argentina's tax authority (AFIP/ARCA) — described as the single document that trips up more foreign buyers than any visa or residency issue</div>
         <div class="fact-notes">People don't learn about it until closing</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Closing costs</div>
-        <div class="fact-value">6–9 % of purchase price</div>
-        <div class="fact-notes">Genuinely lower than Belize's 10-12% or Crete's 7-10%, though methodology differences make precise cross-country comparison imprecise. Escribano (notary) is mandatory for every transaction — buyer's own independently-chosen escribano is standard fraud-prevention practice</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Condominio (undivided co-ownership) legal regime</div>
         <div class="fact-value">Código Civil y Comercial Articles 1983-2036 (enacted 2014, effective 2015) — same underlying shape as Guatemala's/Colombia's proindiviso, Mexico's copropiedad en indiviso, just a different name</div>
         <div class="fact-notes">Each co-owner holds an undivided share; ending the arrangement without every co-owner's agreement requires a judicial división de condominio (court-supervised partition)</div>
-      </li>
-      <li class="fact-item">
-        <div class="fact-label">Fraud-risk rate on foreign-buyer leads</div>
-        <div class="fact-value">~5 %</div>
-        <div class="fact-notes">Fake ownership documents, an unauthorized seller, or pressure to pay through unofficial channels. Most commonly targets remote buyers shopping via online listings, communicating mainly via WhatsApp, relying on the seller's own agent</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Propiedad Horizontal (formal condominium-unit regime)</div>
@@ -381,9 +404,14 @@
         <div class="fact-notes">Complex title issues, inheritance situations, or border-zone approvals can extend this by several months</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Diligence risk — fraud-risk rate on foreign-buyer leads</div>
+        <div class="fact-value">~5 %</div>
+        <div class="fact-notes">Fake ownership documents, unauthorized sellers, or pressure to pay through unofficial channels — most commonly targeting remote/WhatsApp-only buyers.</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Land/property access — scorecard score</div>
         <div class="fact-value">4 /5</div>
-        <div class="fact-notes">Open ownership, no restricted zone for CABA property; Law 26.737's repeal is itself frozen by judicial order (moot for city property either way). Held below 5 for the CDI trip-point and no residency conferred by purchase</div>
+        <div class="fact-notes">Open ownership, no restricted zone for Buenos Aires city (CABA) property; Law 26.737's repeal is itself frozen by judicial order (moot for city property either way). Held below 5 for the tax-ID (CDI) trip-point and no residency conferred by purchase</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">New-build price premium</div>
@@ -409,6 +437,11 @@
         <div class="fact-label">Purchase price per m² — Recoleta</div>
         <div class="fact-value">3000–7000 (citywide-comparison figure); 2500–3500 (typical 2-3 ambiente units); 3800–4500 (renovated heritage units, prime blocks) $/m²</div>
         <div class="fact-notes">Typical unit: $120,000-$500,000. Wide range reflects buyers paying for location/walkability/architecture, per the source's own framing</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Transaction-cost load (closing costs)</div>
+        <div class="fact-value">6–9 %</div>
+        <div class="fact-notes">Escribano (notary) mandatory for every transaction.</div>
       </li></ul></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Cost of living — scorecard score</div>
@@ -436,14 +469,14 @@
         <div class="fact-notes">A week's groceries ~$30-50</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">INDEC Canasta Básica Total (poverty-line floor, single adult)</div>
+        <div class="fact-label">Basic-basket poverty line (INDEC's Canasta Básica Total, single adult)</div>
         <div class="fact-value">485030 ARS/month (~$320-325)</div>
         <div class="fact-notes">A bare, government-defined non-poverty floor, not a comfortable-lifestyle budget — useful only as a sanity-check floor. Family-of-four figure (ARS 1,498,741, ~$990-1,000) independently confirms the peso-vs-dollar divide named from anecdote elsewhere in this file</div>
       </li>
       <li class="fact-item">
-        <div class="fact-label">INDEC IPC (official inflation)</div>
+        <div class="fact-label">Official inflation index (INDEC IPC)</div>
         <div class="fact-value">+2.1 (May 2026 MoM); +33.2 (YoY); +14.7 (Jan-May 2026 accumulated) %</div>
-        <div class="fact-notes">INDEC (Instituto Nacional de Estadística y Censos) — Argentina's official statistics agency. A real deceleration trend (Jan +2.9% → May +2.1%), not flat</div>
+        <div class="fact-notes">Argentina's official statistics agency (INDEC, Instituto Nacional de Estadística y Censos). A real deceleration trend (Jan +2.9% → May +2.1%), not flat</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Numbeo — 1BR rent (city-centre / outside-centre)</div>
@@ -506,6 +539,11 @@
         <div class="fact-notes">Currency stabilization's durability depends on the Central Bank's ability to keep building reserves — not yet a settled, durable equilibrium</div>
       </li>
       <li class="fact-item">
+        <div class="fact-label">Argentina-wide dangerous-region equivalent to Colombia's conflict zones</div>
+        <div class="fact-value">Not yet researched</div>
+        <div class="fact-notes">Not specifically searched for this pass — a real gap before calling Argentina uniformly safe outside Buenos Aires</div>
+      </li>
+      <li class="fact-item">
         <div class="fact-label">Business closures / job losses since Milei took office</div>
         <div class="fact-value">2,000+ businesses closed, ~73,000 jobs lost, concentrated in manufacturing</div>
         <div class="fact-notes">The backdrop the &quot;currency arbitrage is gone&quot; headline sits on top of, not a separate story</div>
@@ -538,7 +576,7 @@
       <li class="fact-item">
         <div class="fact-label">October 26, 2026 midterm election result</div>
         <div class="fact-value">Milei's La Libertad Avanza won 40%+ nationally, 15 of 24 electoral districts — calmed markets, strengthened his governing hand</div>
-        <div class="fact-notes">Political-transition watchlist scan, 2026-07-07. A real, direct signal distinct from and more informative than the separate ~35% approval-rating figure</div>
+        <div class="fact-notes">A real, direct signal distinct from and more informative than the separate ~35% approval-rating figure</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Petty theft — the actual common risk</div>
@@ -555,7 +593,7 @@
         <div class="fact-value">-9 % (inflation-adjusted change)</div>
         <div class="fact-notes">Currency stabilization has come with a real, measurable cost to ordinary Argentines' purchasing power</div>
       </li></ul></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026 (early)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-01 (checked)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026 (early)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-09</span></div></li><li class="fact-item"><div class="fact-value"><a class="source-link" href="https://www.argentina.gob.ar/senasa" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-14</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><a class="source-link" href="https://batimes.com.ar/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2015 (study)</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-07</span></div></li><li class="fact-item"><div class="fact-value"><a class="source-link" href="https://www.buenosaires.gob.ar/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-14</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li><li class="fact-item"><div class="fact-value"><span class="source-onfile">Source noted — no link available yet</span> <span class="scope-tag">2026-07-06</span></div></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="PT-porto.html">Porto</a> — 3.7/5</li><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

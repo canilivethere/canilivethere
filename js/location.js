@@ -88,7 +88,8 @@ async function main() {
   }
 
   for (const sectionKey of SECTION_ORDER) {
-    root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || []));
+    const extraHtml = sectionKey === "visa" ? buildVisaRoutesHtml(store, country) : "";
+    root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || [], extraHtml));
   }
 
   root.appendChild(buildScoreBar(store, loc, persona));
@@ -524,6 +525,122 @@ function buildIllegalRoutesHtml(facts) {
   return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
 }
 
+// "Your realistic paths in" per location — the
+// website-brief's own §4 spec for this chapter ("Visa & residency
+// (routes, thresholds, ... last-verified)"), sourced from the rules
+// layer's own complete route export (derived/visa-routes.jsonl, now
+// fetched — see data.js) rather than the fact-group mechanism below.
+// General figures only, same as every other figure on this page before
+// a persona is read against it — the persona-specific eligibility read
+// (verdict block, above) is a separate, already-built surface, not
+// duplicated here.
+//
+// A real finding from checking live, not assumed: every one of
+// visa-routes.jsonl's 52 rows traces back (via threshold_fact_key) to a
+// fact that ALSO already renders below via the older group-key route
+// cards — a direct check against every derived/facts/*.jsonl file found
+// zero rows this export covers that the older mechanism doesn't. So
+// this is not a coverage-gap fill (an earlier finding, "7 of 51 render
+// nothing," may since have been closed on the data side — not verified
+// either way here, just found not to apply to this file's own 52 rows
+// today); it is the same underlying facts through a second, structured
+// pipeline. Rendering both in full would be genuine, confusing
+// duplication — the two-click law's own "no dead ends, never pours"
+// spirit argues against it as much as against a gap. Resolved here as
+// **overview-then-detail** (this chapter's own established doctrine —
+// v7 work order law 5, "depth is opt-in"): this list renders FIRST, as
+// a compact, comparable quick-reference table across every route on
+// file; the older mechanism's fuller narrative cards (with each
+// threshold's own sourced notes) render immediately below as the
+// detail a reader opts into. This is an interpretive call made after
+// finding the overlap live rather than routing it as an open question
+// — named honestly as a judgment call in the build log, not a settled
+// design ruling.
+const INCOME_TYPE_LABEL = {
+  primary_accepted: "accepted as primary qualifying income",
+  supplementary_only: "accepted only as supplementary income",
+  explicitly_rejected: "explicitly not accepted",
+  not_stated_by_source: "not stated by the source",
+};
+
+// Adapts a visa-routes.jsonl row into the fact-shaped object
+// formatValue()/confidenceBadge()/divergenceBadge()/sourceDetailHtml()
+// already expect — same field meanings, different column names
+// (income_threshold/threshold_label in place of value_raw/fact_label).
+// Zero new formatting logic: every one of these helpers is reused
+// verbatim, not reimplemented.
+function routeAsFact(r) {
+  return {
+    value_raw: r.income_threshold,
+    unit: r.unit,
+    value_num_low: r.value_num_low,
+    value_num_high: r.value_num_high,
+    confidence: r.confidence,
+    source_count: r.source_count,
+    source_url: null, // visa-routes.jsonl carries source_ref (a filename), never a URL, same as every fact on file today
+    date: r.date,
+    divergence_flag: r.divergence_flag,
+  };
+}
+
+function buildVisaRoutesHtml(store, country) {
+  const rows = store.visaRoutesByCountry.get(country.country_id) || [];
+  if (!rows.length) return "";
+  // Grouped by route_key so a route documented as several sub-thresholds
+  // (Thailand's LTR categories, its O-A/O-X tiers) renders as one card
+  // with each threshold as its own row — mirrors the existing
+  // fact-group route-card idiom above exactly, applied to this data
+  // source instead.
+  const byRoute = new Map();
+  for (const r of rows) {
+    if (!byRoute.has(r.route_key)) byRoute.set(r.route_key, []);
+    byRoute.get(r.route_key).push(r);
+  }
+  const cards = [...byRoute.values()].map((group) => {
+    const rowsHtml = group.map((r) => {
+      const asFact = routeAsFact(r);
+      const notes = [];
+      if (r.converts_to_pr) {
+        const v = r.converts_to_pr === "[GAP]" ? "Not yet researched" : r.converts_to_pr;
+        notes.push(`<div class="fact-notes">Converts to permanent residency: <strong>${escapeHtml(v)}</strong></div>`);
+      }
+      if (r.accepts_passive_income) {
+        const v = r.accepts_passive_income === "[GAP]" ? "Not yet researched" : r.accepts_passive_income;
+        notes.push(`<div class="fact-notes">Accepts passive income: <strong>${escapeHtml(v)}</strong></div>`);
+      }
+      if (r.income_type_passive) {
+        notes.push(`<div class="fact-notes">Passive income treatment: <strong>${escapeHtml(INCOME_TYPE_LABEL[r.income_type_passive] || r.income_type_passive)}</strong></div>`);
+      }
+      if (r.income_type_pension) {
+        notes.push(`<div class="fact-notes">Pension income treatment: <strong>${escapeHtml(INCOME_TYPE_LABEL[r.income_type_pension] || r.income_type_pension)}</strong></div>`);
+      }
+      // age_gate "0" is the one real case on file (Thailand's Privilege
+      // visa) and reads as this schema's own floor value, not a genuine
+      // "must be over 0" finding — rendering it as a real age would
+      // manufacture a claim nobody researched. Omitted rather than
+      // guessed at, same honest-omission convention this page already
+      // uses elsewhere (e.g. a zero-red-flag location shows no badge at
+      // all rather than "0 red flags").
+      if (r.age_gate && r.age_gate !== "0") {
+        notes.push(`<div class="fact-notes">Minimum age: <strong>${escapeHtml(r.age_gate)}</strong> years</div>`);
+      }
+      return `
+        <div class="fact-label">${escapeHtml(r.threshold_label)}</div>
+        <div class="fact-value">${escapeHtml(formatValue(asFact))}</div>
+        <div class="fact-meta">${confidenceBadge(asFact)} ${divergenceBadge(asFact)}</div>
+        <div class="source-detail">${sourceDetailHtml(asFact)}</div>
+        ${notes.join("")}
+      `;
+    }).join("<hr>");
+    return `<div class="fact-item">${rowsHtml}</div>`;
+  }).join("");
+  return `
+    <h3>Visa routes at a glance</h3>
+    <p class="fact-notes">Every documented route into ${escapeHtml(country.name)}, compared side by side — general figures, not checked against any one persona (see the verdict above for a persona-specific read where one exists). The full write-up for each, with sourced notes, is right below.</p>
+    <div class="fact-list">${cards}</div>
+  `;
+}
+
 // v7 §2.4: each fact section is now a <details class="chapter">, closed
 // by default, every location, no exceptions — including Overview, which
 // gets no silent default-open exemption (the verdict block + portrait
@@ -531,7 +648,7 @@ function buildIllegalRoutesHtml(facts) {
 // line (js/portraits.js's CHAPTER_INTROS, verbatim source copy) sits
 // right under the summary where one exists (5 of 6 sections this pilot;
 // Overview has none drafted, renders without one).
-function buildSection(key, facts) {
+function buildSection(key, facts, extraHtml = "") {
   const details = document.createElement("details");
   details.id = `sec-${key}`;
   // Red Flags keeps its stronger heading treatment even while collapsed
@@ -543,7 +660,7 @@ function buildSection(key, facts) {
     ? `<p class="chapter-intro">${escapeHtml(CHAPTER_INTROS[key])}</p>`
     : "";
 
-  if (!facts.length) {
+  if (!facts.length && !extraHtml) {
     details.innerHTML = `<summary>${title}</summary>${introHtml}<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
     return details;
   }
@@ -569,7 +686,7 @@ function buildSection(key, facts) {
     }
   }
 
-  let bodyHtml = introHtml;
+  let bodyHtml = introHtml + extraHtml;
   if (routeGroups.size) {
     bodyHtml += `<div class="fact-list">`;
     for (const [, byRole] of routeGroups) {

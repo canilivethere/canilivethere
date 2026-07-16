@@ -70,7 +70,7 @@ async function fetchJson(path) {
 }
 
 async function buildStore(basePath) {
-  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, meta] =
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
@@ -84,6 +84,14 @@ async function buildStore(basePath) {
       // already stripped before this file ever reaches derived/, not
       // filtered here.
       fetchJsonl(basePath + "verdicts.jsonl"),
+      // The rules layer's complete route export — one
+      // row per documented threshold, country-scoped (route_key/
+      // threshold_fact_key already public, no new exposure). Previously
+      // published but never fetched client-side; this is the first
+      // consumer. rules.jsonl (the engine's own parameter table, one row
+      // today) is not fetched here — nothing on this site renders it
+      // directly yet; see the location-page build notes.
+      fetchJsonl(basePath + "visa-routes.jsonl"),
       fetchJson(basePath + "meta.json"),
     ]);
 
@@ -147,6 +155,15 @@ async function buildStore(basePath) {
 
   const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));
 
+  // visaRoutesByCountry: country_id -> [route rows] — the general,
+  // non-persona "visa routes on file" list. Grouping only,
+  // no filtering or reshaping — every row transports as exported.
+  const visaRoutesByCountry = new Map();
+  for (const r of visaRoutes) {
+    if (!visaRoutesByCountry.has(r.country_id)) visaRoutesByCountry.set(r.country_id, []);
+    visaRoutesByCountry.get(r.country_id).push(r);
+  }
+
   // verdictsByPersona: persona_id -> location_id -> verdict row (v9 Part
   // 6/7 — the five no-fixture personas' only source of a real, rule-derived
   // read; `routes_detail` stays a JSON-string-of-a-list on the row exactly
@@ -177,6 +194,7 @@ async function buildStore(basePath) {
     changeEventsByLocation,
     fixturesByPersona,
     verdictsByPersona,
+    visaRoutesByCountry,
     profilesById,
     meta,
   };

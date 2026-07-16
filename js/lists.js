@@ -5,7 +5,7 @@ import {
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
-  READER_DEPENDENCY_PENDING_LABEL,
+  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -447,7 +447,12 @@ function renderRow(store, row, persona, tbody) {
     // together with no separation. Caught live, by screenshot, not assumed.
     const visual = bandVisual(row.engineVerdict.overall_band);
     const stateText = STATE_HEADLINE[row.engineVerdict.overall_state] || row.engineVerdict.overall_state;
-    verdictHtml = `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span><br>`;
+    // Sourcing-confidence tier badge, same skip-on-data-gap rule as
+    // location.js's own verdict block (a data-gap band already says "not
+    // enough to judge" — a tier badge there would wrongly imply one exists).
+    const tierBadge = row.engineVerdict.overall_band === "data_gap"
+      ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
+    verdictHtml = `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}<br>`;
   }
 
   // Visit-layer affordance (§1.6): the honest interim pointer to the one

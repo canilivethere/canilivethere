@@ -579,7 +579,11 @@ export function formatValue(fact) {
   return out;
 }
 
-const CONF_LABEL = { High: "High confidence", Medium: "Medium confidence", Speculative: "Speculative" };
+// Exported (not just module-local) so the map's plain-text hover tooltip
+// (which can't carry a styled <span> badge) can append the identical
+// wording as a text suffix — one vocabulary, two render shapes, never a
+// second copy of these three strings.
+export const CONF_LABEL = { High: "High confidence", Medium: "Medium confidence", Speculative: "Speculative" };
 
 // Plain-language glosses for the site's own internal sourcing vocabulary —
 // one lookup per field, reused everywhere that field is rendered, so a
@@ -675,6 +679,23 @@ export function confidenceBadge(fact, { interactive = true } = {}) {
   // separate always-visible elements doing half a job each.
   if (!interactive) return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
   return `<span class="badge ${cls}" data-toggle-source tabindex="0" role="button" aria-expanded="false" title="How do we know this? Click for source and date.">${escapeHtml(label)}</span>`;
+}
+
+// Same three-value vocabulary as confidenceBadge() above, applied to a
+// verdict's own sourcing tier instead of a single fact's. Reuses CONF_LABEL
+// and the badge-high/medium/speculative/neutral classes verbatim — no
+// second confidence system for a reader to learn. Non-interactive only for
+// this ship: no click-to-expand "which route set this" affordance yet.
+// A verdict with no tier (data-gap rows, and some non-gap rows the engine
+// found no single deciding route for) renders nothing at all, matching the
+// skip behavior a caller should also apply for overall_band === "data_gap"
+// before calling this at all — see call sites in location.js/lists.js/map.js.
+export function verdictConfidenceBadge(tier) {
+  if (!tier) return "";
+  const label = CONF_LABEL[tier] || "confidence not stated";
+  const cls = tier === "High" ? "badge-high" : tier === "Medium" ? "badge-medium"
+    : tier === "Speculative" ? "badge-speculative" : "badge-neutral";
+  return `<span class="badge ${cls}" title="Sourcing confidence for the route(s) behind this verdict">${escapeHtml(label)}</span>`;
 }
 
 // The expand content for the confidence-badge pull affordance above —

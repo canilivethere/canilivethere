@@ -5,7 +5,7 @@ import {
   renderFooter, getPersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
-  STATE_HEADLINE, verdictDisclosureSentence,
+  STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
@@ -271,8 +271,14 @@ function buildVerdictBlock(store, loc, country, persona) {
         const insteadLine = visual.eliminated
           ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
           : "";
+        // Sourcing-confidence tier for this verdict, same three-value
+        // vocabulary as the per-fact badges elsewhere on this page. Never
+        // shown for a data-gap band — that band already says "not enough to
+        // judge," so a tier badge there would wrongly imply a tier exists.
+        const tierBadge = engineVerdict.overall_band === "data_gap"
+          ? "" : verdictConfidenceBadge(engineVerdict.confidence_tier);
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}
@@ -354,8 +360,12 @@ function buildVerdictBlock(store, loc, country, persona) {
         const insteadLine = visual.eliminated
           ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
           : "";
+        // Same sourcing-confidence tier badge as the no-fixture branch
+        // above — skip on a data-gap band for the identical reason.
+        const tierBadge = engineVerdict.overall_band === "data_gap"
+          ? "" : verdictConfidenceBadge(engineVerdict.confidence_tier);
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span></p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}

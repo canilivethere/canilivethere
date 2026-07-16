@@ -5,7 +5,17 @@ import {
   renderFooter, getPersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   BAND_ORDER, BAND_LABEL, formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
+  CONF_LABEL,
 } from "./app-shared.js";
+
+// Plain-text equivalent of app-shared.js's verdictConfidenceBadge(), for
+// the hover tooltip specifically (showTip() sets .textContent, which
+// cannot carry a styled <span>). Same skip rules: no tier, or a data-gap
+// band (already says "not enough to judge"), renders nothing.
+function verdictConfidenceSuffix(tier, overallBand) {
+  if (!tier || overallBand === "data_gap") return "";
+  return ` — ${CONF_LABEL[tier] || tier}`;
+}
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
 import { TERRAIN_FEATURES } from "./terrain-data.js";
 import { siteUrl } from "./site-root.js";
@@ -777,7 +787,8 @@ function renderMap(store, lenses) {
           const insteadLine = bandVisual(engineVerdict.overall_band).eliminated
             ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
             : "";
-          tooltip = `${baseTooltip}\nWaldo's visa/residency check: ${stateText}${insteadLine}`;
+          const confSuffix = verdictConfidenceSuffix(engineVerdict.confidence_tier, engineVerdict.overall_band);
+          tooltip = `${baseTooltip}\nWaldo's visa/residency check: ${stateText}${confSuffix}${insteadLine}`;
         } else {
           // Defensive fallback only — full 8x38 engine coverage today.
           faded = true;
@@ -823,7 +834,8 @@ function renderMap(store, lenses) {
         const insteadLine = visual.eliminated
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
-        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
+        const confSuffix = verdictConfidenceSuffix(engineVerdict.confidence_tier, engineVerdict.overall_band);
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}${confSuffix}\n(Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
       } else {
         // v8 Part 10 Ruling 2: knowledge-first — the general fit headline,
         // then the general Fit index (labeled as such), then the existing
@@ -862,7 +874,8 @@ function renderMap(store, lenses) {
         const insteadLine = visual.eliminated
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
-        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}\n(Fit index shown: ${generalValue != null ? generalValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
+        const confSuffix = verdictConfidenceSuffix(verdict.confidence_tier, verdict.overall_band);
+        tooltip = `${loc.display_name}, ${country.name} — ${displayName}'s check: ${stateText}${confSuffix}\n(Fit index shown: ${generalValue != null ? generalValue.toFixed(1) : "n/a"}/5 — a different question, place quality not eligibility)${insteadLine}`;
       } else {
         // Defensive fallback only — the engine ships full 8x38 coverage
         // today (verified directly, zero nulls), so this branch is not

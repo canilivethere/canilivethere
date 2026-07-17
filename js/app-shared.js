@@ -28,6 +28,126 @@ export function getPersona() {
   return p && VALID_PERSONAS.includes(p) ? p : null;
 }
 
+// ---------------------------------------------------------------------
+// Reader-preferences localStorage envelope (v11 Part 21, format ruled at
+// 8P.3) — the third door's own reader-built weight vector, the
+// first occupant of a versioned, namespaced envelope future preferences
+// features (custom colors, hidden pins) will get their own sibling key
+// inside, not a dedicated flat key each. One bare key ("reader-preferences",
+// unprefixed — matches THEME_KEY/DOOR_SEEN_KEY's own existing bare-key
+// convention), one JSON object, versioned by an internal `schema_version`
+// field rather than the key name (mirrors derived/meta.json's own
+// versioning shape). Every touch wrapped in try/catch, failing open to "no
+// stored profile, behave as general" — same discipline THEME_KEY/
+// DOOR_SEEN_KEY's own read/write functions already use, never a thrown
+// error blocking page render for a reader with storage disabled.
+// ---------------------------------------------------------------------
+const READER_PREFS_KEY = "reader-preferences";
+const READER_PREFS_SCHEMA_VERSION = 1;
+
+function readReaderPreferences() {
+  try {
+    const raw = localStorage.getItem(READER_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // A schema_version mismatch (an old stored blob under a newer site
+    // build) fails the same way as no stored value at all — safer than
+    // guessing at a shape the running code doesn't recognize; the reader
+    // just re-answers the door once (8P.3's own ruled read/write rule).
+    if (!parsed || parsed.schema_version !== READER_PREFS_SCHEMA_VERSION) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+// The custom_profile sub-object ({ weights, answers, created_at,
+// updated_at }), or null if none is stored / the stored value doesn't
+// parse / the version doesn't match.
+export function loadCustomProfile() {
+  const prefs = readReaderPreferences();
+  return prefs && prefs.custom_profile ? prefs.custom_profile : null;
+}
+
+// Presence of a valid custom_profile object in the envelope IS the
+// completion marker 21.8 item 2 asks for — no separate flag (the ruled
+// reconciliation between the two spec authorities this build reads
+// from). Used by the door's trigger-condition third clause (21.9) and by
+// the switcher's own "Your priorities" entry-detection, both below.
+export function hasCustomProfile() {
+  const profile = loadCustomProfile();
+  return !!(profile && profile.weights);
+}
+
+// weights: the 13-key criterion_id -> 0-3 vector (8P.1). answers: the raw
+// per-question answer trail (8P.3's own forward-compatibility field, for a
+// future "revisit your answers" affordance) — stored alongside the
+// computed vector, not instead of it, since the vector is a deterministic
+// function of the answers and storing both costs a few dozen bytes.
+// created_at is preserved across an edit (only set fresh the first time);
+// updated_at always reflects this write. Returns true/false rather than
+// throwing, matching this module's fail-open discipline throughout.
+export function saveCustomProfile(weights, answers) {
+  try {
+    const now = new Date().toISOString();
+    const existing = readReaderPreferences();
+    const createdAt = existing?.custom_profile?.created_at || now;
+    const payload = {
+      schema_version: READER_PREFS_SCHEMA_VERSION,
+      custom_profile: { weights, answers, created_at: createdAt, updated_at: now },
+    };
+    localStorage.setItem(READER_PREFS_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Attaches store.customWeights (or null) onto an already-built store —
+// runtime-layered, same category as fixturesByPersona/verdictsByPersona,
+// never a derived/ fetch (data.js's own header comment names this
+// exception). Must run after loadStore() resolves and before any call to
+// store.personaIndex("custom", ...) — call once per page, right after
+// awaiting loadStore().
+export function applyStoredCustomWeights(store) {
+  const profile = loadCustomProfile();
+  store.customWeights = profile ? profile.weights : null;
+}
+
+// The one place precedence between an explicit URL persona and a stored
+// custom weight vector gets decided (8P.2's own ruling) — deliberately
+// NOT folded into getPersona() itself, since "custom" is deliberately kept
+// out of VALID_PERSONAS (see that export's own comment). URL persona
+// always wins (same "explicit signal beats stored state" precedent
+// perspective-door.js's own shouldShowDoor() already uses for ?persona=
+// vs. door-seen); falls back to "custom" only when no URL persona is set
+// AND a stored vector exists; falls back to null (general) otherwise.
+export function getActivePersona() {
+  const urlPersona = getPersona();
+  if (urlPersona) return urlPersona;
+  return hasCustomProfile() ? "custom" : null;
+}
+
+// Display label for any persona id this site can render, including the
+// reserved "custom" identity — one place this mapping lives, so "custom"
+// never leaks to a reader as the literal capitalized word "Custom" (which
+// a bare `persona.charAt(0).toUpperCase()+...` call would otherwise
+// produce at any of this site's several such call sites).
+export function personaDisplayLabel(id) {
+  if (!id) return "General";
+  if (id === "custom") return "Your priorities";
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+// The 21.6 item 2 disclosure suffix — appended wherever a custom-weighted
+// number renders (map tooltip, Lists column, location-page score readout),
+// the same idiom as the existing "(general figures)" suffix elsewhere on
+// this site. Placeholder shape, flagged as such in the build record — the
+// load-bearing decision is the placement (next to the
+// number itself), not these exact five words; a copy-voice pass may revise
+// the string without touching any call site.
+export const CUSTOM_ESTIMATE_SUFFIX = "your own quick estimate";
+
 // Preserve the persona (and, when given, other params) across internal
 // navigation — the brief's "shareable profile URLs" rule, MVP-scoped to a
 // query-string persona id since there are no accounts/saved scenarios yet.
@@ -292,14 +412,32 @@ function personaSlotInnerHtml() {
   const options = VALID_PERSONAS.map(
     (id) => `<option value="${id}">${escapeHtml(PERSONA_LABELS[id])}</option>`
   ).join("");
+  // v11 Part 21.9: a ninth, reserved switcher entry — "Your priorities" —
+  // appears only once a reader has actually built a custom weight vector.
+  // Deliberately NOT part of VALID_PERSONAS/the loop above (8P.2's own
+  // ruling: "custom" never flows through the URL-persona machinery those
+  // arrays feed) — a separate, conditional <option> instead, appended
+  // after the eight named ones per this Part's own ordering.
+  const customOption = hasCustomProfile()
+    ? `<option value="custom">Your priorities — your own weighted read from your quick answers</option>`
+    : "";
+  // "Edit your answers" (21.9): only rendered once a profile exists,
+  // reopens the door's own questionnaire (perspective-door.js), pre-filled
+  // — reuses that already-built, already-gated flow rather than a second
+  // one on this page.
+  const editControl = hasCustomProfile()
+    ? `<button type="button" class="btn-chip" id="edit-priorities-btn">Edit your answers</button>`
+    : "";
   return `
     <div class="persona-block">
       <label for="persona-select">Pick whichever of these eight example relocators is closest to you:</label>
       <select id="persona-select">
         <option value="">General — see every location's own score, unfiltered</option>
         ${options}
+        ${customOption}
       </select>
       <p class="persona-blurb" id="persona-blurb"></p>
+      ${editControl}
     </div>
     <details class="recede">
       <summary>Information, not advice — read what this site is and isn't</summary>
@@ -314,7 +452,7 @@ function personaSlotInnerHtml() {
 
 function wirePersonaSlot(container, persona) {
   const select = container.querySelector("#persona-select");
-  select.value = persona || "";
+  select.value = persona === "custom" ? "custom" : persona || "";
   const blurb = container.querySelector("#persona-blurb");
   // Default (nothing selected) is now a one-line pointer, not the old
   // three-descriptor wall — the descriptors already live individually as
@@ -329,7 +467,10 @@ function wirePersonaSlot(container, persona) {
   // simplification of existing authored copy, not a silent change —
   // named here and in the build record for ratification or correction,
   // same as an earlier wording-alignment precedent on this same file.
-  if (persona) {
+  if (persona === "custom") {
+    blurb.textContent =
+      "Every score below is weighted the way you told us matters, from your own quick answers.";
+  } else if (persona) {
     blurb.textContent = PERSONA_LABELS[persona] || "";
   } else {
     blurb.textContent =
@@ -337,11 +478,31 @@ function wirePersonaSlot(container, persona) {
   }
   select.addEventListener("change", () => {
     const params = new URLSearchParams(location.search);
-    if (select.value) params.set("persona", select.value);
+    // "custom" is never a URL value (8P.2's own ruling keeps it out of
+    // VALID_PERSONAS/getPersona() entirely) — selecting it just clears any
+    // ?persona= override, same action as selecting "General." A named
+    // simplification, not silently made: once a custom weight vector is
+    // stored, getActivePersona()'s own ruled precedence means BOTH options
+    // resolve to the custom read from here on — there is no v1 switcher
+    // path back to genuinely blank general figures short of clearing the
+    // browser's own stored preferences. Flagged in the build record, not
+    // fixed here (no escape hatch was specced, and inventing new URL
+    // semantics to build one is outside this change's own scope).
+    if (select.value && select.value !== "custom") params.set("persona", select.value);
     else params.delete("persona");
     const qs = params.toString();
     location.search = qs ? `?${qs}` : "";
   });
+  const editBtn = container.querySelector("#edit-priorities-btn");
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      // Reopens the door's own questionnaire, pre-filled — index.html-only
+      // by construction (perspective-door.js is only ever imported by
+      // js/map.js), so this always navigates there regardless of which
+      // page the switcher is on today.
+      location.href = `${siteUrl("index.html")}?edit-priorities=1`;
+    });
+  }
 }
 
 // index.html / lists.html: a static `<div id="persona-slot"></div>`

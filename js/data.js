@@ -11,6 +11,16 @@
 // over already-scored criteria (see the comment on WEIGHT_NUMERIC below),
 // clearly labeled wherever it's shown, not a new fact and not a rules-engine
 // verdict.
+//
+// One honest exception to "transports and indexes what's already in
+// derived/," added when the reader-built weight vector shipped: a reader's
+// own locally-stored priority weights (store.customWeights, populated by
+// whichever module owns the localStorage read — see app-shared.js) are a
+// reader-authored input, not a derived/ file. This module still fetches and
+// authors nothing itself — that input is layered onto the already-built
+// store the same way its other runtime indexes are — but the module-level
+// claim above is no longer literally "everything," so it's qualified here
+// rather than left to go quietly stale.
 
 import { siteUrl } from "./site-root.js";
 
@@ -204,16 +214,21 @@ async function buildStore(basePath) {
   return store;
 }
 
-// The unpersonalized "general relocation-friendliness index": a weighted
-// average of every scored (status='scored') criterion for a location,
-// weighted by the scorecard's own High / Medium-High / Medium weight
-// classes (3 / 2 / 1). This weighting formula is a site-build judgment
-// call, not part of the data layer's own contract — flagged as such in
-// the build notes. It
-// operates only on already-judged criterion scores (scores.jsonl), never
-// on raw facts, and skips any criterion in status='gap' rather than
-// silently zero-filling it.
-function generalIndex(store, locationId) {
+// Shared weighted-average loop, extracted per the ruled format at 8P.2
+// when the third door needed a THIRD weight/value source alongside
+// the two below: generalIndex() and personaIndex() (and now the reader-
+// built custom-weight branch) were near-identical loops over
+// store.criteria, differing only in where each criterion's VALUE comes
+// from and, as of the third door, where its WEIGHT comes from. One loop,
+// three thin wrappers — not three hand-rolled copies that could quietly
+// drift from each other (the same one-true-source-applied-to-logic
+// doctrine this codebase already uses elsewhere for a materialized SQL
+// view). `gaps` counts every criterion this walk didn't use, whether
+// because no score row exists at all or because one exists but carries
+// no usable value — a coarser count than the pre-extraction code kept for
+// generalIndex() specifically, harmless since nothing downstream reads
+// `.gaps` today (confirmed: only `.value` is ever consumed by a caller).
+function weightedCriteriaAverage(store, locationId, valueForCriterion, weightForCriterion) {
   const rows = store.scoresByLocation.get(locationId);
   if (!rows) return null;
   let weightedSum = 0;
@@ -222,13 +237,13 @@ function generalIndex(store, locationId) {
   const used = [];
   for (const crit of store.criteria) {
     const row = rows.get(crit.criterion_id);
-    if (!row) continue;
-    if (row.status === "gap" || row.score == null) {
+    const val = valueForCriterion(crit, row);
+    if (val == null) {
       gaps++;
       continue;
     }
-    const w = WEIGHT_NUMERIC[crit.weight_class] || 1;
-    weightedSum += row.score * w;
+    const w = weightForCriterion(crit);
+    weightedSum += val * w;
     weightTotal += w;
     used.push(crit.criterion_id);
   }
@@ -239,6 +254,38 @@ function generalIndex(store, locationId) {
     criteriaTotal: store.criteria.length,
     gaps,
   };
+}
+
+// A criterion's own site-wide default weight (High/Medium-High/Medium ->
+// 3/2/1) — exported so the door's own weight-vector build (perspective-
+// door.js) can fill in the untouched criteria the reader's own question
+// flow never asks about, using the SAME number this file already uses as
+// every criterion's baseline, rather than a second, hand-copied mapping
+// that could drift from this one.
+export function defaultWeightForCriterion(crit) {
+  return WEIGHT_NUMERIC[crit.weight_class] || 1;
+}
+
+// A criterion's own already-scored value (status='scored' only, gap-
+// skipping unchanged from the pre-extraction generalIndex()) — the value
+// source both generalIndex() and the custom-weight branch share; the
+// fixture-override branch below layers a persona's own VALUE override on
+// top of this same fallback.
+function scoredValueFor(crit, row) {
+  if (!row || row.status === "gap" || row.score == null) return null;
+  return row.score;
+}
+
+// The unpersonalized "general relocation-friendliness index": a weighted
+// average of every scored (status='scored') criterion for a location,
+// weighted by the scorecard's own High / Medium-High / Medium weight
+// classes (3 / 2 / 1). This weighting formula is a site-build judgment
+// call, not part of the data layer's own contract — flagged as such in
+// the build notes. It operates only on already-judged criterion scores
+// (scores.jsonl), never on raw facts, and skips any criterion with no
+// usable score rather than silently zero-filling it.
+function generalIndex(store, locationId) {
+  return weightedCriteriaAverage(store, locationId, scoredValueFor, defaultWeightForCriterion);
 }
 
 // Shared per-criterion value resolution (fixture override -> scored
@@ -274,7 +321,31 @@ function resolvedCriterionValues(store, personaId, locationId) {
 // visa-legal-pathway-ease) — swap those into the general-index computation.
 // Wenda/Carmen have ONLY a verdict-shaped fixture (no criterion overrides),
 // per the runbook: rendered as "verification pending", never computed.
+//
+// Ruled at 8P.2: "custom" is a reserved personaId,
+// checked FIRST — the third door's own reader-built weight vector. It is
+// deliberately NOT one of the 8 curated personas in VALID_PERSONAS (never
+// flows through the URL-persona/switcher machinery those names feed) —
+// see app-shared.js's getActivePersona() for the one place that decides
+// when "custom" applies. Its value source is the plain scored row (a
+// reader-built profile has no specialist-authored fixture overrides,
+// same as the general reading); only its WEIGHT source differs, reading
+// the reader's own stored vector with a defensive per-key fallback to
+// this criterion's ordinary site-wide weight (belt-and-suspenders: the
+// vector is ruled to always carry all 13 keys at save time, but a stale
+// vector from before a future 14th criterion existed should degrade to
+// the normal weight for that one unrecognized key, not to a silent
+// zero-weight or an outright crash).
 function personaIndex(store, personaId, locationId) {
+  if (personaId === "custom") {
+    const weights = store.customWeights;
+    return weightedCriteriaAverage(
+      store,
+      locationId,
+      scoredValueFor,
+      (crit) => (weights && weights[crit.criterion_id] != null ? weights[crit.criterion_id] : defaultWeightForCriterion(crit))
+    );
+  }
   const perLoc = store.fixturesByPersona.get(personaId);
   const entry = perLoc ? perLoc.get(locationId) : null;
   if (!entry || entry.criteria.size === 0) {
@@ -287,22 +358,20 @@ function personaIndex(store, personaId, locationId) {
     const general = generalIndex(store, locationId);
     return general ? { ...general, personaAdjusted: false } : null;
   }
-  const { entries, gaps } = resolvedCriterionValues(store, personaId, locationId);
-  let weightedSum = 0;
-  let weightTotal = 0;
-  for (const e of entries) {
-    const w = WEIGHT_NUMERIC[e.weight_class] || 1;
-    weightedSum += e.val * w;
-    weightTotal += w;
-  }
-  if (weightTotal === 0) return null;
-  return {
-    value: weightedSum / weightTotal,
-    criteriaUsed: entries.length,
-    criteriaTotal: store.criteria.length,
-    gaps,
-    personaAdjusted: true,
-  };
+  // Fixture value overrides never touch weight (unchanged doctrine) — only
+  // the VALUE source differs from generalIndex(), same shared loop, same
+  // default weight function.
+  const result = weightedCriteriaAverage(
+    store,
+    locationId,
+    (crit, row) => {
+      const fixtureRow = entry.criteria.get(crit.criterion_id);
+      if (fixtureRow) return Number(fixtureRow.expected);
+      return scoredValueFor(crit, row);
+    },
+    defaultWeightForCriterion
+  );
+  return result ? { ...result, personaAdjusted: true } : null;
 }
 
 // Tooltip voice (v2 addendum §4.1): the location's own

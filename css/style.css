@@ -676,21 +676,25 @@ h3 { font-size: 1.05rem; }
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
+/* v11 Part 21.2: circular avatars, not square/card tiles — the card box
+   (--paper background, 1px border, padding) is removed; .door-portrait
+   below is already a circle and now carries the tile's visual weight
+   alone. Hover/focus accent moves onto the circle itself (see the
+   .door-portrait rule immediately below .door-tile:hover/:focus here). */
 .door-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 0.4rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.75rem 0.6rem;
+  background: transparent;
+  border: none;
+  padding: 0.4rem;
   cursor: pointer;
   color: var(--ink);
   font: inherit;
 }
-.door-tile:hover, .door-tile:focus { border-color: var(--accent); }
+.door-tile:hover .door-portrait, .door-tile:focus .door-portrait { border-color: var(--accent); }
 /* Neutral stub (Part 17): visible even with no portrait file present —
    never a broken-image icon (perspective-door.js removes a failed <img>
    on error, leaving this background showing through).
@@ -713,8 +717,50 @@ h3 { font-size: 1.05rem; }
   justify-content: center;
 }
 .door-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* v11 Part 21.3: the ninth tile's own icon — an abstract "adjustable"
+   glyph, not a photo/silhouette (see perspective-door.js's own comment
+   on why). Inherits .door-portrait's circle/ring/shadow frame unchanged;
+   only centers the inline SVG and sets its color via currentColor. */
+.door-portrait-icon { color: var(--muted); }
 .door-name { font-family: "Fraunces", serif; font-weight: 700; font-size: 1rem; }
 .door-descriptor { font-size: 0.8rem; color: var(--muted); }
+
+/* v11 Part 21.4: the questionnaire's own two sub-screens, swapped into
+   .door-panel's own content in place of the tile grid — same panel, same
+   overlay mechanics, no second modal. */
+.door-back {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0 0.75rem;
+  text-decoration: underline;
+}
+.door-back:hover, .door-back:focus { color: var(--ink); }
+.door-disclosure p { margin: 0 0 0.7rem; max-width: 46em; }
+.door-intro-list { font-size: 0.85rem; color: var(--muted); }
+.door-questions { display: flex; flex-direction: column; gap: 1.1rem; margin: 0.5rem 0 1.25rem; }
+.door-question { border: none; padding: 0; margin: 0; }
+.door-question legend { font-weight: 600; font-size: 0.95rem; padding: 0; margin: 0 0 0.4rem; max-width: 42em; }
+.priority-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.priority-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: var(--paper);
+}
+.priority-choice:hover { border-color: var(--accent); }
+.priority-choice input { accent-color: var(--accent); margin: 0; }
+.priority-choice input:checked + span { font-weight: 700; }
+.door-submit[disabled] { opacity: 0.5; cursor: not-allowed; }
 /* v8 Part 4 item 4: the escape hatch, promoted — a full-width row beneath
    the grid, in the card family (--panel background, 1px --line border,
    3px radius, same hover-to-accent-border treatment as the tiles), no

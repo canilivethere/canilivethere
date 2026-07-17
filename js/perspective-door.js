@@ -41,16 +41,18 @@ const ESCAPE_HATCH_LABEL = "See the facts as they are.";
 // Medium-High weight-class criteria per that Part's own reasoning (the
 // criteria that actually move generalIndex()'s weighted average the
 // most — confirmed against derived/criteria.jsonl directly, not
-// asserted: these seven ARE exactly that tier). Structural draft copy,
-// mine, per the dispatch's own explicit allowance ("ships as the
-// stopgap") — not yet run through a copy-voice pass.
+// asserted: these seven ARE exactly that tier). Copy-voice pass applied
+// (2026-07-17): five questions reworded, two kept verbatim. Q6
+// deliberately names both short and long stays — a baked-in "long-term"
+// was dropped on purpose: shorter stays are in scope, not a lesser case
+// (a same-day product decision, not drift).
 const CUSTOM_QUESTIONS = [
-  { criterion_id: "community-social-fabric", question: "How much does feeling like part of a real community there — knowing your neighbors, an easy social life — matter to you?" },
-  { criterion_id: "nature-water-adjacency", question: "How much do mountains, ocean, or green space right outside your door matter to you?" },
+  { criterion_id: "community-social-fabric", question: "How much does being part of a real community — neighbors who know you, a social life that comes easily — matter to you?" },
+  { criterion_id: "nature-water-adjacency", question: "How much do mountains, water, or green space right outside your door matter to you?" },
   { criterion_id: "income-viability", question: "How much does being able to actually earn a living there matter to you?" },
-  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does the day-to-day pace of life — something you could keep up for years — matter to you?" },
-  { criterion_id: "cost-of-living-affordability", question: "How much does your money stretching further matter to you?" },
-  { criterion_id: "visa-legal-pathway-ease", question: "How much does an easy, low-friction path to stay long-term matter to you?" },
+  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does the day-to-day pace of life — a rhythm you could settle into and keep — matter to you?" },
+  { criterion_id: "cost-of-living-affordability", question: "How much does your money going further — rent, groceries, the ordinary bills — matter to you?" },
+  { criterion_id: "visa-legal-pathway-ease", question: "How much does simple paperwork — a visa that's easy to get and easy to keep, whether for a season or for good — matter to you?" },
   { criterion_id: "room-for-others-group-viability", question: "How much does having room for friends or family to join you later matter to you?" },
 ];
 // Most-important option first, left to right (21.5's own ordering
@@ -60,22 +62,26 @@ const TIER_CHOICES = [
   { value: 3, label: "Matters a lot" },
   { value: 2, label: "Matters some" },
   { value: 1, label: "Not a big factor" },
-  { value: 0, label: "Doesn't matter to me." },
+  // No trailing period — matches the other three pills' punctuation
+  // pattern (a review nit, fixed for uniformity across all four).
+  { value: 0, label: "Doesn't matter to me" },
 ];
 
-// 21.4 screen 1's three fixed parts, in order, plus the topic list and
-// controls. Structural draft copy, mine — flagged the same as
-// CUSTOM_QUESTIONS above.
+// 21.4 screen 1's three fixed parts, in order, plus the scope line.
+// Copy-voice pass applied (2026-07-17): the "what it does" line now
+// carries the seven topics AND the no-hard-filter limit inline (this
+// retired the separate topics line and the scope line's own "never show
+// me X" sentence — same substance, one home each, no duplication). The
+// remaining scope sentence is the eligibility boundary (21.7), kept
+// verbatim apart from the site-wide "Fit index" casing fix.
 const CUSTOM_INTRO_WHAT =
-  "This weighs the same facts the rest of the site uses by what matters to you — not the closest of eight example people.";
+  "Seven quick questions — community, nature, making a living, pace, cost, visas, and room for company — and the same facts every visitor sees get weighed by what matters to you, not by which of the eight examples you most resemble. One limit, worth knowing up front: this tips scales, it doesn't hide places. You can't tell it “never show me X” — only “this matters more, that matters less.” Every place stays on the map.";
 const CUSTOM_INTRO_HONESTY =
-  "A short question set is a rougher read on something as real as your own life — not a full profile.";
+  "Seven answers make a quick sketch of what you care about, not a full profile. Read the result as a rough first fit, not a verdict.";
 const CUSTOM_INTRO_FALLBACK =
-  "A fuller version — where you set every priority yourself, not just these seven — is on the way.";
-const CUSTOM_INTRO_TOPICS =
-  "Seven quick questions: community, nature, income, pace of life, cost, visa ease, and room for others.";
+  "A fuller version is coming — one where you set every priority yourself, not just these seven.";
 const CUSTOM_INTRO_SCOPE =
-  "This can't yet say “never show me X” — only “care more or less about X.” It builds a Fit Index, not a visa verdict; no eligibility check runs off these answers.";
+  "It builds a Fit index, not a visa verdict; no eligibility check runs off these answers.";
 
 // Asset handoff (Part 17): portrait face images are supplied directly,
 // not fetchable at build time. Read mechanically off VALID_PERSONAS ids,
@@ -253,10 +259,9 @@ export function initPerspectiveDoor() {
       <button type="button" class="door-back" id="door-back">&lsaquo; Back</button>
       <div class="door-disclosure">
         <p>${escapeHtml(CUSTOM_INTRO_WHAT)}</p>
+        <p class="door-intro-list">${escapeHtml(CUSTOM_INTRO_SCOPE)}</p>
         <p>${escapeHtml(CUSTOM_INTRO_HONESTY)}</p>
         <p>${escapeHtml(CUSTOM_INTRO_FALLBACK)}</p>
-        <p class="door-intro-list">${escapeHtml(CUSTOM_INTRO_TOPICS)}</p>
-        <p class="door-intro-list">${escapeHtml(CUSTOM_INTRO_SCOPE)}</p>
       </div>
       <button type="button" class="door-escape door-start" id="door-start">Start</button>
     `;

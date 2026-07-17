@@ -142,11 +142,14 @@ export function personaDisplayLabel(id) {
 // The 21.6 item 2 disclosure suffix — appended wherever a custom-weighted
 // number renders (map tooltip, Lists column, location-page score readout),
 // the same idiom as the existing "(general figures)" suffix elsewhere on
-// this site. Placeholder shape, flagged as such in the build record — the
-// load-bearing decision is the placement (next to the
-// number itself), not these exact five words; a copy-voice pass may revise
-// the string without touching any call site.
-export const CUSTOM_ESTIMATE_SUFFIX = "your own quick estimate";
+// this site. Wording finalized by the 2026-07-17 copy-voice pass,
+// replacing the earlier placeholder shape: names the provenance (which
+// answers produced it) rather than characterizing the estimate — a
+// stranger seeing it next to a score knows exactly how much weight to
+// give it. Same grammatical ride as "(general figures)". The load-bearing
+// decision is still the placement, next to the number itself, at every
+// call site.
+export const CUSTOM_ESTIMATE_SUFFIX = "from your seven answers";
 
 // Preserve the persona (and, when given, other params) across internal
 // navigation — the brief's "shareable profile URLs" rule, MVP-scoped to a
@@ -430,7 +433,7 @@ function personaSlotInnerHtml() {
     : "";
   return `
     <div class="persona-block">
-      <label for="persona-select">Pick whichever of these eight example relocators is closest to you:</label>
+      <label for="persona-select">Pick the point of view closest to your own:</label>
       <select id="persona-select">
         <option value="">General — see every location's own score, unfiltered</option>
         ${options}
@@ -468,8 +471,12 @@ function wirePersonaSlot(container, persona) {
   // named here and in the build record for ratification or correction,
   // same as an earlier wording-alignment precedent on this same file.
   if (persona === "custom") {
+    // The result-side repetition of the intro screen's honesty line
+    // (copy-voice pass, 2026-07-17): rides directly under the switcher
+    // on every page where the reader's own weighted read is active — the
+    // nearest always-present surface to the recomputed result itself.
     blurb.textContent =
-      "Every score below is weighted the way you told us matters, from your own quick answers.";
+      "Weighed from your seven answers — a rough read, not a verdict. The facts underneath haven't changed; only how much each one counts.";
   } else if (persona) {
     blurb.textContent = PERSONA_LABELS[persona] || "";
   } else {

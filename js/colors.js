@@ -1,29 +1,24 @@
 // CanILiveThere — color logic for the map, lists, and score chips.
 //
-// Light-mode Fit-index scale. **v10 Part 11 (2026-07-15) retires the v7
-// Part 16 red->green ramp entirely** — deep blue (weakest) through a
-// warm-neutral pivot to deep amber/gold (strongest), replacing every hue
-// in the array, not just repositioning stops the way Part 16 did.
-// Provenance: a live conversation asking the ramp to read intuitively
-// without color-normal vision. Validated hexes, computed this pass (real
-// WCAG relative-luminance + CIE76 ΔE, not eyeballed) — transported
-// verbatim, no new hex work done here:
-//   #1d3f5c 9.01:1   #3f6478 5.23:1   #7d6b45 4.25:1
-//   #8f6a1f 4.07:1   #6b4a10 6.61:1   (all vs. parchment #F2E8D5 — every
-//   stop clears the 3:1 non-text floor with real margin, beating all but
-//   two of the OLD ramp's five stops).
-// Adjacent-stop ΔE (16.8/40.6/22.2/15.3) and a cross-check against every
-// other meaning-color already on this site (min ΔE 16.6) both confirm no
-// collision. The real accessibility argument: this ramp carries ~81% of
-// its Lab color separation on the blue-yellow axis instead of the
-// red-green axis red-green colorblindness collapses — the OLD ramp put
-// ~71% of its separation on exactly the axis that fails, the worst-case
-// construction. **Named honestly, not oversold:** this is a computed
-// axis-decomposition argument, not a rendered Machado-2009 (or
-// equivalent) CVD simulation — stronger than every prior pass's bare
-// "mitigates," short of "validated." Revisit with an actual simulation
-// pass if that gap ever needs fully closing, not decided here.
-const SCALE_STOPS_LIGHT = ["#1d3f5c", "#3f6478", "#7d6b45", "#8f6a1f", "#6b4a10"];
+// Light-mode Fit-index scale. **INTERIM REVERT (2026-07-17, direct
+// product instruction): back to the v7 Part 16 red->green ramp** — the
+// v10 Part 11 blue-amber CVD-safe ramp above this comment (dc037437,
+// 2026-07-15) is retired FOR NOW, not deleted from history. Framed
+// plainly by whoever called it: "less terrible, not the solution" —
+// this is a same-day stopgap, not a re-litigation of Part 11's real
+// accessibility argument (still true, still the eventual target). The
+// real fix, scheduled next, is an OKLab-built ramp from felt-read
+// anchor-pair picks — that retires this revert in turn once it ships.
+// Minimal scope, per the instruction itself: swap the five hex values
+// back to their real prior values (pulled from git history, commit
+// dc037437's own parent — not re-derived, not new hex work), touch
+// nothing else in this file (dark-mode ramp untouched, same out-of-scope
+// status it's carried since v6; SCALE_STOP_MEANING labels below stay as
+// meaning-labels, not reverted back to hue names — that was a genuinely
+// separate improvement bundled into the same v10 Part 11 commit, not
+// itself part of tonight's color-only ask, and meaning labels stay
+// honest regardless of which hex ramp is live under them).
+const SCALE_STOPS_LIGHT = ["#7a2213", "#a35a0e", "#ae7d00", "#596e00", "#006726"];
 const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"];
 // v10 Part 11: color-NAME labels ("Red"/"Green", v7 Part 16) are retired
 // in favor of MEANING labels — reusing FIT_INDEX_DEFINITION's own already-

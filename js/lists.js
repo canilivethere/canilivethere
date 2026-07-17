@@ -2,16 +2,16 @@ import { loadStore, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
-  renderFooter, getPersona, withPersona, escapeHtml,
+  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
-  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge,
+  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
 applyStoredTheme();
 renderTopBar("lists");
-renderPersonaSlot(document.getElementById("persona-slot"), getPersona());
+renderPersonaSlot(document.getElementById("persona-slot"), getActivePersona());
 main();
 
 let STATE = { sortKey: "fit", sortDir: "desc", country: "", purposeCriterion: null };
@@ -65,8 +65,9 @@ function engineVerdictGroup(overallBand) {
 
 async function main() {
   const store = await loadStore();
+  applyStoredCustomWeights(store);
   renderFooter(store);
-  const persona = getPersona();
+  const persona = getActivePersona();
 
   const countrySelect = document.getElementById("country-filter");
   countrySelect.innerHTML =
@@ -135,14 +136,21 @@ function renderPurposeSelector(store, persona) {
 // (computed, so a 14th criterion never needs a second manual edit).
 function updatePurposeExplainer(store) {
   const el = document.getElementById("purpose-explainer");
-  const persona = getPersona();
+  const persona = getActivePersona();
   // "groups below" (not the spec's original "band below"): aligned to the
   // vocabulary the page actually renders — the group headers read
   // Clears/Near-miss/Doesn't clear/Not checked yet and the coverage
   // sentence above already calls them groups; "band" had no visible
   // referent on the page (review finding). Minimal referent-word change
   // only, meaning intact — flagged for the spec author's ratification.
-  const doesntClause = persona
+  // v11 Part 21: "custom" never renders those verdict groups at all
+  // (21.7's own scope boundary — a flat table, same shape as no persona)
+  // — its own clause names that directly rather than reusing the
+  // eight-persona wording, which would wrongly imply a "groups below" a
+  // custom-weighted view never has.
+  const doesntClause = persona === "custom"
+    ? "it doesn't check your own visa, budget, or eligibility either — this sort only reweights the same facts by what you told us matters"
+    : persona
     ? "it doesn't decide the groups below — that's a separate, persona-specific read, unaffected by this sort"
     : "it doesn't check your own visa, budget, or eligibility — pick a persona above for that";
   if (!STATE.purposeCriterion) {
@@ -274,7 +282,16 @@ function buildRows(store, persona) {
       // the page's own promise ("labeled per row") that this flag exists to
       // honor in the render below.
       let personaAdjusted = null;
-      if (persona) {
+      if (persona === "custom") {
+        // v11 Part 21 / 8P: no fixture, no engine verdict, ever, for this
+        // identity (21.7's own scope boundary) — the fit value comes
+        // straight from the reader's own weight vector, personaAdjusted
+        // reads true (a real, computed reweighting, just not a fixture
+        // rescore), verdict/engineVerdict stay null.
+        const idx = store.personaIndex("custom", loc.location_id);
+        fitValue = idx ? idx.value : null;
+        personaAdjusted = true;
+      } else if (persona) {
         const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
         if (perLoc && perLoc.criteria.size > 0) {
           const idx = store.personaIndex(persona, loc.location_id);
@@ -324,14 +341,19 @@ function render(store, persona) {
 
   // §1.5 coverage line, recomputed every render (not just once in main())
   // so a country filter narrows the claim correctly.
-  document.getElementById("persona-context").textContent = persona
-    ? personaCoverageLine(store, persona, rows)
-    : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.";
+  document.getElementById("persona-context").textContent =
+    persona === "custom"
+      ? `Ranked by your own priorities — the same facts, weighted the way you told us matters (${CUSTOM_ESTIMATE_SUFFIX}).`
+      : persona
+      ? personaCoverageLine(store, persona, rows)
+      : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.";
 
   const tbody = document.getElementById("rank-tbody");
   tbody.innerHTML = "";
 
-  if (persona) {
+  // v11 Part 21: "custom" never bands by verdict (21.7 — no eligibility
+  // concept for this identity) — same flat, sorted table as no persona.
+  if (persona && persona !== "custom") {
     renderBanded(store, persona, rows, tbody);
   } else {
     rows.sort(compareRows);
@@ -411,12 +433,19 @@ function renderRow(store, row, persona, tbody) {
   const fallbackTag = row.personaAdjusted === false && !STATE.purposeCriterion
     ? ` <span class="scope-tag">(no rescore for this persona yet — general figure shown)</span>`
     : "";
+  // 21.6 item 2: the disclosure suffix rides wherever the custom-weighted
+  // number itself renders — here, not on the purpose-criterion view (that
+  // column shows one raw, unweighted score, unrelated to the reader's own
+  // weight vector).
+  const customTag = persona === "custom" && !STATE.purposeCriterion
+    ? ` <span class="scope-tag">(${CUSTOM_ESTIMATE_SUFFIX})</span>`
+    : "";
   // While a purpose view is active, the column shows that criterion's own
   // score directly — the whole point of §3 is answering "just the visa
   // question" (etc.) without opening the breakdown row to find the number.
   const displayValue = STATE.purposeCriterion ? row.purposeScore : row.fitValue;
   const fitCellHtml = displayValue != null
-    ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}`
+    ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}${customTag}`
     : `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> not scored`;
 
   let verdictHtml = "";
@@ -540,5 +569,5 @@ document.addEventListener("click", (e) => {
   const key = th.dataset.sort;
   if (STATE.sortKey === key) STATE.sortDir = STATE.sortDir === "asc" ? "desc" : "asc";
   else { STATE.sortKey = key; STATE.sortDir = key === "name" || key === "country" ? "asc" : "desc"; }
-  loadStore().then((store) => render(store, getPersona()));
+  loadStore().then((store) => render(store, getActivePersona()));
 });

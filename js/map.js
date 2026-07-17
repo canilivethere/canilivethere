@@ -2,10 +2,10 @@ import { loadStore, verdictHeadline, sectionForFact } from "./data.js";
 import { scoreToColor, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
-  renderFooter, getPersona, withPersona, escapeHtml,
+  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   BAND_ORDER, BAND_LABEL, formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
-  CONF_LABEL,
+  CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX,
 } from "./app-shared.js";
 
 // Plain-text equivalent of app-shared.js's verdictConfidenceBadge(), for
@@ -67,7 +67,7 @@ const LABEL_LINE_HEIGHT_PX = LABEL_FONT_SIZE_PX * 1.3;
 
 applyStoredTheme();
 renderTopBar("map");
-renderPersonaSlot(document.getElementById("persona-slot"), getPersona());
+renderPersonaSlot(document.getElementById("persona-slot"), getActivePersona());
 // v7 Part 10: index.html-only by construction (this is the one page that
 // imports this module) — decides on its own whether to show, this call
 // site doesn't branch on anything.
@@ -477,6 +477,7 @@ function coincidenceNudgePx(locationId) {
 
 async function main() {
   const store = await loadStore();
+  applyStoredCustomWeights(store);
   renderFooter(store);
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
   const lenses = buildFeaturedLenses(store);
@@ -525,8 +526,15 @@ function renderPurposeSelector(store, lenses) {
     // site's own look." Only overrides the default line for that one
     // state; every other state (fixture-bearing persona, or no persona at
     // all) keeps the existing line unchanged.
-    const persona = getPersona();
-    if (persona && !store.fixturesByPersona.has(persona)) {
+    const persona = getActivePersona();
+    if (persona === "custom") {
+      // v11 Part 21: a reader-built weight vector reweights the general
+      // Fit index only — no eligibility read, ever (21.7's own scope
+      // boundary) — so this gets its own line rather than falling into
+      // the no-fixture-persona branch below, which would wrongly claim
+      // a rule-derived eligibility check that never runs for this identity.
+      explainerEl.textContent = `Pins colored by your own weighted Fit index (${CUSTOM_ESTIMATE_SUFFIX}).`;
+    } else if (persona && !store.fixturesByPersona.has(persona)) {
       // v9 Part 6.3: retired, not softened — full 8x38 verdict-engine
       // coverage means there is no "we haven't looked" case left for these
       // five personas, so the old faded-pins confession is now false for
@@ -659,7 +667,7 @@ function renderMap(store, lenses) {
   if (!STATE.viewBox) STATE.viewBox = homeViewBox(store);
 
   const activeLens = resolveLens(store, lenses, STATE.lensId);
-  const persona = activeLens ? null : getPersona();
+  const persona = activeLens ? null : getActivePersona();
 
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
@@ -872,6 +880,21 @@ function renderMap(store, lenses) {
         const generalHeadline = buildFitHeadline(store, null, loc, country, underlyingValue);
         tooltip = `${generalHeadline}\nFit index: ${underlyingValue != null ? underlyingValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
+    } else if (persona === "custom") {
+      // v11 Part 21 / 8P: a reader-built weight vector never renders a
+      // visa/eligibility verdict (21.7's own scope boundary) — this pin's
+      // color/tooltip come from the exact same generalIndex()-shaped
+      // computation every other pin uses, just weighted by the reader's
+      // own answers instead of the site's fixed weight classes. No
+      // fixture, no engine verdict, ever, for this identity — eliminated/
+      // gap/faded all stay at their default (false) the same way the
+      // no-persona branch below leaves them.
+      const idx = store.personaIndex("custom", loc.location_id);
+      const value = idx ? idx.value : null;
+      fill = scoreToColor(value);
+      gap = isGapValue(value);
+      const headline = buildFitHeadline(store, null, loc, country, value);
+      tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${CUSTOM_ESTIMATE_SUFFIX})`;
     } else if (persona) {
       // v9 Part 6: the five personas with zero hand fixtures anywhere now
       // get a real, rule-derived read from the verdict-coverage engine
@@ -1695,6 +1718,18 @@ function renderLegend(el, persona, activeLens, store) {
     // verdict rows (a lens suppresses the persona read entirely).
     el.innerHTML = `
       <div class="legend-scale">Pin color — ${escapeHtml(activeLens.label)}, general figures: ${scaleHtml}</div>
+      <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
+    `;
+    return;
+  }
+
+  if (persona === "custom") {
+    // v11 Part 21: same general ramp as the no-persona case below, just
+    // titled and disclosed as the reader's own weighted read — never a
+    // verdict-band legend (21.7's own scope boundary: no eligibility
+    // concept exists for this identity).
+    el.innerHTML = `
+      <div class="legend-scale">Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)}): ${scaleHtml}</div>
       <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
     `;
     return;

@@ -2,11 +2,12 @@ import { loadStore, sectionForFact, verdictHeadline } from "./data.js";
 import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
-  renderFooter, getPersona, withPersona, escapeHtml,
+  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
   STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
+  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -34,8 +35,9 @@ async function main() {
   // trip. loadFxRates() never rejects (every failure path inside it is
   // caught and swallowed), so this Promise.all can't itself throw.
   const [store] = await Promise.all([loadStore(), loadFxRates()]);
+  applyStoredCustomWeights(store);
   renderFooter(store);
-  const persona = getPersona();
+  const persona = getActivePersona();
 
   const params = new URLSearchParams(location.search);
   // v7's no-JS prerender step (tools/prerender-locations.mjs) sets
@@ -229,7 +231,20 @@ function buildVerdictBlock(store, loc, country, persona) {
     : "";
   const breakdownLinkGeneral = `<p class="fit-link-line"><a href="#sec-breakdown">See the general score breakdown</a></p>`;
 
-  if (persona) {
+  if (persona === "custom") {
+    // v11 Part 21 / 8P: no verdict, ever, for this identity (21.7's own
+    // scope boundary — a weight vector reweights the general Fit index
+    // only) — same "no persona selected" honest-gap voice the site
+    // already ships for any view with no fixture and no engine input,
+    // reused verbatim, just fed the custom-weighted value and disclosed.
+    const idx = store.personaIndex("custom", loc.location_id);
+    const headline = buildFitHeadline(store, null, loc, country, idx ? idx.value : null);
+    div.innerHTML = `
+      <p class="verdict-headline">${escapeHtml(headline)} (${CUSTOM_ESTIMATE_SUFFIX})</p>
+      ${redFlagBadge}
+      ${breakdownLink}
+    `;
+  } else if (persona) {
     const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
     const verdict = perLoc?.verdict;
     const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
@@ -433,7 +448,7 @@ function buildScoreBar(store, loc, persona) {
   // not just Waldo - see buildVerdictBlock's comment for why the verdict
   // block itself no longer branches on this same distinction.
   const personaFixtures = persona ? store.fixturesByPersona.get(persona)?.get(loc.location_id)?.criteria : null;
-  const personaLabel = persona ? persona.charAt(0).toUpperCase() + persona.slice(1) : "";
+  const personaLabel = persona ? personaDisplayLabel(persona) : "";
   // v9 Part 5: every stat is a door -- each chip's own name links one
   // click deeper to criteria.html, the shared anchor page (5.1: DRY on the
   // fact layer, one canonical definition per criterion instead of one
@@ -886,7 +901,7 @@ function buildNextBest(store, loc, persona) {
     .filter((c) => c.val >= 0)
     .sort((a, b) => b.val - a.val)
     .slice(0, 5);
-  const personaLabel = persona ? ` for ${persona.charAt(0).toUpperCase() + persona.slice(1)}` : "";
+  const personaLabel = persona === "custom" ? ` matching your own priorities` : persona ? ` for ${persona.charAt(0).toUpperCase() + persona.slice(1)}` : "";
   div.innerHTML = `<h2>Where now?</h2><p>Ranked next-best alternatives${personaLabel}:</p>
     <ul>${candidates.map((c) => `<li><a href="${withPersona(siteUrl(`l/${c.l.location_id}.html`))}">
       ${escapeHtml(c.l.display_name)}</a> — ${c.val.toFixed(1)}/5</li>`).join("")}</ul>

@@ -370,6 +370,30 @@ function clusterPins(pinEntries, pxPerWorldUnit) {
   return [...groups.values()];
 }
 
+// v11 Part 20.2: predicts whether this knot's own
+// resolving zoom (the exact call zoomToCluster() makes, below in
+// renderMap()) leaves every member mutually solo, so the knot's own
+// aria-label never promises a separation this click won't deliver. Reuses
+// computeViewBoxForLocations() (the real next viewBox) and the identical
+// pairwise-distance check clusterPins() already runs, above -- no new
+// geometry, no new threshold. containerWidthPx is this render's own
+// already-measured value, used as a same-session proxy for the next
+// render's container width -- named as an approximation, not hidden, in
+// the spec (same craft-latitude class as ZOOM_STEP/CLUSTER_PX_THRESHOLD
+// themselves).
+function knotWillFullySeparate(group, containerWidthPx) {
+  const nextViewBox = parseViewBox(computeViewBoxForLocations(group.map((p) => p.loc)));
+  const nextPxPerWorldUnit = containerWidthPx / nextViewBox.w;
+  for (let i = 0; i < group.length; i++) {
+    for (let j = i + 1; j < group.length; j++) {
+      const dx = (group[i].cx - group[j].cx) * nextPxPerWorldUnit;
+      const dy = (group[i].cy - group[j].cy) * nextPxPerWorldUnit;
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PX_THRESHOLD) return false;
+    }
+  }
+  return true;
+}
+
 // v10 Part 12.3: which solo pins' persistent labels get suppressed because
 // they'd visually collide with another one at borderline distances (a real,
 // flagged gap in the spec's own review — a named minimum fallback, not left
@@ -1225,7 +1249,16 @@ function renderMap(store, lenses) {
       hit.setAttribute("tabindex", "0");
       hit.setAttribute("role", "button");
       const names = group.map((p) => p.loc.display_name).join(", ");
-      hit.setAttribute("aria-label", `${group.length} locations close together: ${names}. Activate to zoom in and separate them.`);
+      // v11 Part 20.2: the label's own "and separate
+      // them" claim only renders when this knot's own resolving zoom will
+      // actually leave every member mutually solo (knotWillFullySeparate(),
+      // above) -- otherwise the mechanically-true "for a closer look" runs
+      // instead, so the label never promises a separation the click won't
+      // deliver. Same member names either way; only the closing promise
+      // changes.
+      const separates = knotWillFullySeparate(group, containerWidthPx);
+      const promise = separates ? "Activate to zoom in and separate them." : "Activate to zoom in for a closer look.";
+      hit.setAttribute("aria-label", `${group.length} locations close together: ${names}. ${promise}`);
       const zoomToCluster = () => {
         STATE.viewBox = parseViewBox(computeViewBoxForLocations(group.map((p) => p.loc)));
         renderMap(store, lenses);

@@ -1,5 +1,5 @@
 import { loadStore, verdictHeadline } from "./data.js";
-import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
+import { scoreToColor, indexToColor, calibrateIndexBands, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
@@ -337,6 +337,19 @@ function compareRows(a, b) {
 }
 
 function render(store, persona) {
+  // v12 Part 22.7: calibrate the fit-index color bands over the FULL
+  // location set under the active view's index basis — deliberately not
+  // the country-filtered rows (the comparative claim is against every
+  // researched place, and a 3-row country filter would otherwise flip
+  // the colors to a different basis than the map's). Same basis rule as
+  // map.js's own render; personaIndex() already falls back to the
+  // general figure wherever no persona-specific read exists, which is
+  // exactly the value buildRows() puts in each row's fit column.
+  calibrateIndexBands(store.locations.map((l) => {
+    const idx = persona ? store.personaIndex(persona, l.location_id) : store.generalIndex(l.location_id);
+    return idx ? idx.value : null;
+  }));
+
   const rows = buildRows(store, persona);
 
   // §1.5 coverage line, recomputed every render (not just once in main())
@@ -443,10 +456,16 @@ function renderRow(store, row, persona, tbody) {
   // While a purpose view is active, the column shows that criterion's own
   // score directly — the whole point of §3 is answering "just the visa
   // question" (etc.) without opening the breakdown row to find the number.
+  //
+  // v12 Part 22.7 consumer split: the blended fit value colors by the
+  // calibrated index bands (indexToColor); a purpose-view criterion score
+  // is a raw, absolute, authored number and keeps the linear mapping
+  // (scoreToColor) — two honest mappings, one stop set.
   const displayValue = STATE.purposeCriterion ? row.purposeScore : row.fitValue;
+  const colorFor = STATE.purposeCriterion ? scoreToColor : indexToColor;
   const fitCellHtml = displayValue != null
-    ? `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}${customTag}`
-    : `<span class="fit-swatch" style="background:${scoreToColor(displayValue)}"></span> not scored`;
+    ? `<span class="fit-swatch" style="background:${colorFor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}${customTag}`
+    : `<span class="fit-swatch" style="background:${colorFor(displayValue)}"></span> not scored`;
 
   let verdictHtml = "";
   if (row.verdict) {

@@ -95,6 +95,91 @@ export function isGapValue(value) {
   return value == null || Number.isNaN(value);
 }
 
+// v12 Part 22.7: the BLENDED Fit index gets its five stops from z-bands
+// around the live distribution's mean (boundaries at mean ± 0.5σ and
+// ± 1.5σ, population σ), not from the fixed 1.5/2.5/3.5/4.5 midpoints —
+// under the fixed bands the measured live occupancy was [0, 2, 34, 2, 0]
+// (one stop carrying 34 of 38 locations, both end stops dead), which made
+// the ruled comparative meaning-labels ("Below-average fit" etc.) false
+// in fact. Z-bands make them literally true: below the average of the
+// researched set. Two transparent statistics (mean, σ), recomputable by
+// any reader from the published data.
+//
+// The consumer split, ruled: this calibrated mapping applies ONLY to
+// blended fit-index values (map pins, Lists' fit column). Raw
+// per-criterion scores keep scoreToColor()'s linear mapping above — a
+// criterion's 5 is an absolute, reachable, authored 5; the blended
+// index's 5.0 is practically unreached. Two entry points, one generated
+// stop set, two honest mappings.
+//
+// Calibration is a RUNTIME act, recomputed at every render from the
+// values actually rendered under the active view (general index by
+// default, a persona's or the reader's own custom index when active) —
+// one basis per view, never mixed, no hand constant that can go stale.
+// A returning visitor may find a location's color shifted because OTHER
+// locations landed: that is the comparative claim being honest, not
+// drift — the exact number stays the fact, rendered as text alongside.
+let indexCalibration = null;
+
+export function calibrateIndexBands(values) {
+  const vals = values.filter((v) => v != null && !Number.isNaN(v));
+  const n = vals.length;
+  if (n < 8) {
+    // Guard (ruled): with almost no population, the absolute linear
+    // reading is the honest degrade — comparative bands over a handful
+    // of values would amplify noise into fake extremes.
+    if (n > 0) console.warn(`Fit-index band calibration: only ${n} scored values (needs 8) — using the linear 1-5 bands instead.`);
+    indexCalibration = { calibrated: false, n };
+    return indexCalibration;
+  }
+  const mean = vals.reduce((a, b) => a + b, 0) / n;
+  const sigma = Math.sqrt(vals.reduce((a, v) => a + (v - mean) * (v - mean), 0) / n);
+  if (sigma < 0.1) {
+    // Guard (ruled): a five-band structure spanning less than ±0.15
+    // index points would read noise as meaning.
+    console.warn(`Fit-index band calibration: σ ${sigma.toFixed(3)} < 0.1 — using the linear 1-5 bands instead.`);
+    indexCalibration = { calibrated: false, n, mean, sigma };
+    return indexCalibration;
+  }
+  indexCalibration = {
+    calibrated: true,
+    n,
+    mean,
+    sigma,
+    boundaries: [mean - 1.5 * sigma, mean - 0.5 * sigma, mean + 0.5 * sigma, mean + 1.5 * sigma],
+  };
+  return indexCalibration;
+}
+
+export function getIndexCalibration() {
+  return indexCalibration;
+}
+
+// Blended-fit-index sibling of scoreToColor(): same five stops, same gap
+// voice, calibrated band assignment. Values beyond the outer boundaries
+// clamp to stops 1 and 5. Falls back to scoreToColor()'s linear mapping
+// whenever no calibration is in effect (guards above, or a page that
+// never calibrates).
+export function indexToColor(value) {
+  if (value == null || Number.isNaN(value)) return isDarkTheme() ? GAP_BG_DARK : GAP_BG_LIGHT;
+  if (!indexCalibration || !indexCalibration.calibrated) return scoreToColor(value);
+  const b = indexCalibration.boundaries;
+  let idx = 0;
+  while (idx < 4 && value >= b[idx]) idx++;
+  return currentScaleStops()[idx];
+}
+
+// v12 Part 22.8: one additive legend line disclosing the comparative
+// basis — the ruled meaning-labels themselves stay verbatim. {N} is the
+// live calibration count, no new fact. Returns "" when no calibration is
+// active (the comparative claim would be false under the linear
+// fallback, so the line only renders when it is true). Draft copy;
+// copy-voice register pass pending, non-blocking.
+export function indexBandDisclosure() {
+  if (!indexCalibration || !indexCalibration.calibrated) return "";
+  return `Colors compare the ${indexCalibration.n} researched places with each other — the strongest color marks the strongest fits among them, not a perfect score. Every exact number is shown alongside.`;
+}
+
 // Recomputed on every call (not a cached const) so it reflects the
 // current theme at render time — call sites re-read this each render,
 // same as scoreToColor.

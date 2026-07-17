@@ -1,5 +1,5 @@
 import { loadStore, verdictHeadline, sectionForFact } from "./data.js";
-import { scoreToColor, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
+import { scoreToColor, indexToColor, calibrateIndexBands, indexBandDisclosure, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
@@ -669,6 +669,21 @@ function renderMap(store, lenses) {
   const activeLens = resolveLens(store, lenses, STATE.lensId);
   const persona = activeLens ? null : getActivePersona();
 
+  // v12 Part 22.7: calibrate the fit-index color bands over the values
+  // this render will actually show — the full location set under the
+  // active view's own index basis (a persona's or the reader's custom
+  // index when one is active, the general index otherwise; personaIndex()
+  // already falls back to the general figure wherever no persona-specific
+  // read exists, which is exactly the value each pin branch below
+  // renders). Recomputed here, every render, so a persona/lens switch
+  // recalibrates at the same moment the pins already recolor — one basis
+  // per view, never mixed. Score-kind lens pins are raw per-criterion
+  // values and keep the linear scoreToColor() mapping (consumer split).
+  calibrateIndexBands(store.locations.map((l) => {
+    const idx = persona ? store.personaIndex(persona, l.location_id) : store.generalIndex(l.location_id);
+    return idx ? idx.value : null;
+  }));
+
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("id", "worldmap");
@@ -798,7 +813,7 @@ function renderMap(store, lenses) {
       const idx = store.personaIndex("waldo", loc.location_id);
       const value = idx ? idx.value : null;
       const hasPersonaRescore = !!(idx && idx.personaAdjusted === true);
-      fill = scoreToColor(value);
+      fill = indexToColor(value);
       gap = isGapValue(value);
       const headline = buildFitHeadline(store, "waldo", loc, country, value);
       const baseTooltip = `${headline}\nWaldo's Fit index: ${value != null ? value.toFixed(1) : "n/a"}/5`;
@@ -841,7 +856,7 @@ function renderMap(store, lenses) {
       // already uses.
       const engineVerdict = !verdict ? store.verdictsByPersona.get(persona)?.get(loc.location_id) : null;
       const hasRealRead = !!verdict || hasCriterionFixtures || !!engineVerdict;
-      fill = scoreToColor(underlyingValue);
+      fill = indexToColor(underlyingValue);
       gap = isGapValue(underlyingValue);
       faded = !hasRealRead;
       if (verdict) {
@@ -891,7 +906,7 @@ function renderMap(store, lenses) {
       // no-persona branch below leaves them.
       const idx = store.personaIndex("custom", loc.location_id);
       const value = idx ? idx.value : null;
-      fill = scoreToColor(value);
+      fill = indexToColor(value);
       gap = isGapValue(value);
       const headline = buildFitHeadline(store, null, loc, country, value);
       tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${CUSTOM_ESTIMATE_SUFFIX})`;
@@ -930,7 +945,7 @@ function renderMap(store, lenses) {
         // Kept so a genuinely missing verdict row, or a future ninth
         // no-fixture persona the engine hasn't run for yet, degrades to
         // the pre-v9 honest "not checked" shape instead of a blank pin.
-        fill = scoreToColor(generalValue);
+        fill = indexToColor(generalValue);
         gap = isGapValue(generalValue);
         faded = true;
         const headline = buildFitHeadline(store, null, loc, country, generalValue);
@@ -938,7 +953,7 @@ function renderMap(store, lenses) {
       }
     } else {
       const general = store.generalIndex(loc.location_id);
-      fill = scoreToColor(general ? general.value : null);
+      fill = indexToColor(general ? general.value : null);
       gap = isGapValue(general ? general.value : null);
       const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
@@ -1731,6 +1746,7 @@ function renderLegend(el, persona, activeLens, store) {
     el.innerHTML = `
       <div class="legend-scale">Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)}): ${scaleHtml}</div>
       <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
+      ${bandDisclosureHtml()}
     `;
     return;
   }
@@ -1750,6 +1766,7 @@ function renderLegend(el, persona, activeLens, store) {
       el.innerHTML = `
         <div class="legend-scale">Pin color — Waldo's Fit index, rescored where we have real data for him: ${scaleHtml}</div>
         <span>${escapeHtml(SCALE_ANCHOR_STRING)} Where we've also checked his visa/residency path, that separate read shows in the tooltip and on his page — place quality and eligibility never share one pin color.</span>
+        ${bandDisclosureHtml()}
       `;
       return;
     }
@@ -1820,7 +1837,20 @@ function renderLegend(el, persona, activeLens, store) {
     <div class="legend-scale">Pin color — general Fit index: ${scaleHtml}</div>
     <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
     <span>${escapeHtml(FIT_INDEX_DEFINITION)}</span>
+    ${bandDisclosureHtml()}
   `;
+}
+
+// v12 Part 22.8: the comparative-basis disclosure, rendered below the
+// swatches on every legend branch whose pin colors use the calibrated
+// index bands (general / custom / Waldo — NOT the score-kind lens branch,
+// whose per-criterion colors stay on the absolute linear mapping, and not
+// the verdict-band legends, which carry no ramp at all). Empty string
+// whenever calibration fell back to linear, so the line only renders
+// while its claim is true.
+function bandDisclosureHtml() {
+  const line = indexBandDisclosure();
+  return line ? `<span>${escapeHtml(line)}</span>` : "";
 }
 
 function renderJudgmentNote(el) {

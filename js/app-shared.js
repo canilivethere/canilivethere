@@ -908,6 +908,24 @@ export function verdictConfidenceBadge(tier) {
   return `<span class="badge ${cls}" title="Sourcing confidence for the route(s) behind this verdict">${escapeHtml(label)}</span>`;
 }
 
+// Perspective-disclosure law (2026-07-17) applied to the two table
+// surfaces (the Lists banded view and a location page's own verdict
+// block) that render a persona's verdict text. A hand-checked fixture
+// (today: Wenda/Carmen, only at the handful of locations each actually
+// has one on file) and a rule-derived engine read (every other verdict
+// on the site — the majority) render as two different prose registers
+// with nothing on the page saying which one a reader is looking at.
+// The map's own hand-checked ring + legend already disclose this exact
+// distinction (v12 Part 23.9's own line: "hand-checked where we've
+// verified it, rule-derived elsewhere") — this reuses that same,
+// already-cleared vocabulary verbatim for the two surfaces a ring
+// can't reach, rather than inventing new copy.
+export function verdictProvenanceBadge(isHandChecked, displayName) {
+  return isHandChecked
+    ? `<span class="badge badge-neutral" title="We reviewed ${escapeHtml(displayName)}'s own case here directly, not just the general rule.">Hand-checked for ${escapeHtml(displayName)}</span>`
+    : `<span class="badge badge-neutral" title="Computed from this site's own documented rules against ${escapeHtml(displayName)}'s stated profile — not individually reviewed by us.">Rule-derived read</span>`;
+}
+
 // The expand content for the confidence-badge pull affordance above —
 // source name/link plus last-checked date, the two pieces that used to
 // render as separate, always-visible elements next to the badge.

@@ -7,7 +7,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
   STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
-  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
+  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -260,7 +260,7 @@ function buildVerdictBlock(store, loc, country, persona) {
         ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
         : "";
       div.innerHTML = `
-        <p class="verdict-headline"><span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span></p>
+        <p class="verdict-headline"><span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span> ${verdictProvenanceBadge(true, displayName)}</p>
         <p class="verdict-prose">${displayName}: ${glossaryWrap(verdict.expected, store)}</p>
         ${redFlagBadge}
         ${insteadLine}
@@ -303,7 +303,7 @@ function buildVerdictBlock(store, loc, country, persona) {
           ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
           : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}${scopeNote}</p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}
@@ -395,7 +395,7 @@ function buildVerdictBlock(store, loc, country, persona) {
           ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
           : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}${scopeNote}</p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}

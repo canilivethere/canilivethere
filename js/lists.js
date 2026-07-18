@@ -6,7 +6,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
-  personaDisplayLabel,
+  personaDisplayLabel, verdictProvenanceBadge,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -493,7 +493,7 @@ function renderBanded(store, persona, rows, tbody) {
         if (emittedCountries.has(cid)) continue;
         emittedCountries.add(cid);
         const countryRows = countryRowsSeen.get(cid);
-        renderCountrySubheader(store, countryRows[0], countryRows.length, tbody);
+        renderCountrySubheader(store, countryRows[0], countryRows.length, tbody, persona);
         for (const r of countryRows) renderRow(store, r, persona, tbody, { suppressVerdict: true });
       } else {
         renderRow(store, row, persona, tbody);
@@ -507,7 +507,14 @@ function renderBanded(store, persona, rows, tbody) {
 // at country grain, instead of each location row re-deriving its own copy
 // of an identical string. Zero behavior change for the row-level callers —
 // same branches, same strings, same order.
-function buildVerdictHtml(store, row) {
+// `persona` (added for the provenance-label fix below): the caller
+// always has a real, non-custom persona locked whenever row.verdict or
+// row.engineVerdict is populated (buildRows() only fills either field
+// inside its own `else if (persona)` branch) — so this never needs a
+// null-persona fallback the way personaCoverageLine()'s display-name
+// convention does elsewhere in this file.
+function buildVerdictHtml(store, row, persona) {
+  const displayName = personaDisplayLabel(persona);
   if (row.verdict) {
     const headline = verdictHeadline(row.verdict.expected);
     const v = verdictVisual(headline);
@@ -515,7 +522,10 @@ function buildVerdictHtml(store, row) {
     // under the chip, not gated behind the breakdown toggle. Zero new text
     // authored — the exact string verdictHeadline() already splits out,
     // shown in full instead of truncated.
-    return `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span>
+    // Provenance label (perspective-disclosure law): this
+    // is the hand-checked branch — reuses the map's own already-cleared
+    // "hand-checked" vocabulary, not new copy.
+    return `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span> ${verdictProvenanceBadge(true, displayName)}
       <div class="verdict-prose">${glossaryWrap(row.verdict.expected, store)}</div>`;
   }
   if (row.engineVerdict) {
@@ -535,7 +545,9 @@ function buildVerdictHtml(store, row) {
     // enough to judge" — a tier badge there would wrongly imply one exists).
     const tierBadge = row.engineVerdict.overall_band === "data_gap"
       ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
-    return `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}`;
+    // Provenance label, same fix as above: this is the rule-derived
+    // branch — the majority case, 5 of 8 personas at every location.
+    return `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}`;
   }
   return "";
 }
@@ -548,7 +560,7 @@ function buildVerdictHtml(store, row) {
 // `.band-header-row` shape, one level narrower via a modifier class),
 // never string-matching prose to detect the duplication (the spec's own
 // hard constraint) — this groups by the data's own scope+join key instead.
-function renderCountrySubheader(store, sourceRow, count, tbody) {
+function renderCountrySubheader(store, sourceRow, count, tbody, persona) {
   const tr = document.createElement("tr");
   tr.className = "band-header-row country-subheader-row";
   const td = document.createElement("td");
@@ -557,7 +569,7 @@ function renderCountrySubheader(store, sourceRow, count, tbody) {
   // states the scope explicitly rather than leaving it to indentation
   // alone — the perspective-disclosure law's own point (a grouping is
   // itself a claim about what the number covers).
-  td.innerHTML = `<span class="country-subheader-label">${escapeHtml(sourceRow.country.name)} — one verdict, applying to every location below.</span> ${buildVerdictHtml(store, sourceRow)}`;
+  td.innerHTML = `<span class="country-subheader-label">${escapeHtml(sourceRow.country.name)} — one verdict, applying to every location below.</span> ${buildVerdictHtml(store, sourceRow, persona)}`;
   tr.appendChild(td);
   tbody.appendChild(tr);
 }
@@ -614,9 +626,9 @@ function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {})
   if (suppressVerdict) {
     verdictHtml = `<span class="scope-tag">—</span><br>`;
   } else if (row.verdict) {
-    verdictHtml = buildVerdictHtml(store, row);
+    verdictHtml = buildVerdictHtml(store, row, persona);
   } else if (row.engineVerdict) {
-    verdictHtml = buildVerdictHtml(store, row) + "<br>";
+    verdictHtml = buildVerdictHtml(store, row, persona) + "<br>";
   }
 
   // Visit-layer affordance (§1.6): the honest interim pointer to the one

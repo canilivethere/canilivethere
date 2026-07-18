@@ -744,8 +744,19 @@ export function glossaryWrap(text, store) {
   });
 }
 
-export function formatValue(fact) {
-  if (fact.value_raw === "[GAP]") return "Not yet researched";
+// Part 23.3 (F4, the double-stamp fix): confidenceBadge()'s own gap branch
+// already renders "Not yet researched" as a chip. A template that renders
+// BOTH this function's value line AND that badge for the same fact used to
+// print the identical four words twice, side by side. The fix is scoped to
+// the co-occurrence, not the phrase — a caller that renders formatValue()
+// WITHOUT an adjacent confidenceBadge() must NOT pass this (it's the only
+// gap signal on that surface, unchanged from before). Checked exhaustively
+// this build: every formatValue() call site in this codebase renders
+// confidenceBadge() for the same fact right alongside it (grepped, not
+// assumed) — flagged in the build report as a live fact worth re-checking
+// if a new call site is ever added without the badge.
+export function formatValue(fact, { suppressGapText = false } = {}) {
+  if (fact.value_raw === "[GAP]") return suppressGapText ? "—" : "Not yet researched";
   const raw = formatNumbersInText(String(fact.value_raw));
   // Only append the unit if value_raw doesn't already carry it as text —
   // some facts' own value_raw already spells out its unit inline (e.g.

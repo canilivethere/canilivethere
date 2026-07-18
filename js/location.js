@@ -757,7 +757,7 @@ function buildVisaRoutesHtml(store, country) {
       // every ':visit:' row, not placeholders.
       const visit = isVisitRoute(r.route_key);
       const label = visit ? routeCategoryLabel(r.route_key) : r.threshold_label;
-      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact))}</div>`;
+      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact, { suppressGapText: true }))}</div>`;
       return `
         <div class="fact-label">${escapeHtml(label)}</div>
         ${valueHtml}
@@ -836,7 +836,7 @@ function buildSection(key, facts, extraHtml = "") {
       // renders, none silently wins over another.
       bodyHtml += thresholds.map((t) => `
         <div class="fact-label">${escapeHtml(t.fact_label)}${scopeTagHtml(t)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(t))}</div>
+        <div class="fact-value">${escapeHtml(formatValue(t, { suppressGapText: true }))}</div>
         <div class="fact-meta">${confidenceBadge(t)} ${divergenceBadge(t)}</div>
         <div class="source-detail">${sourceDetailHtml(t)}</div>
         ${t.notes ? `<div class="fact-notes">${escapeHtml(t.notes)}</div>` : ""}
@@ -855,7 +855,7 @@ function buildSection(key, facts, extraHtml = "") {
   bodyHtml += `<ul class="fact-list">` + plain.map((f) => `
     <li class="fact-item">
       <div class="fact-label">${escapeHtml(f.fact_label)}${scopeTagHtml(f)}</div>
-      <div class="fact-value">${escapeHtml(formatValue(f))}</div>
+      <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true }))}</div>
       <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)}</div>
       <div class="source-detail">${sourceDetailHtml(f)}</div>
       ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}

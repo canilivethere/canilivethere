@@ -1,10 +1,10 @@
 import { loadStore, verdictHeadline, sectionForFact, resolveVerdict } from "./data.js";
-import { scoreToColor, indexToColor, calibrateIndexBands, indexBandDisclosure, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
+import { scoreToColor, indexToColor, calibrateIndexBands, indexBandDisclosure, getScaleLegend, verdictVisual, bandVisual, eliminatedColor, isGapValue, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
-  BAND_ORDER, BAND_LABEL, formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
+  formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
   CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX,
 } from "./app-shared.js";
 
@@ -27,6 +27,12 @@ import { initPerspectiveDoor } from "./perspective-door.js";
 // apart the way the spec's own "7+2=9" arithmetic assumes they won't.
 const PIN_RADIUS = 7;
 const PIN_HALO = 2;
+// Part 23.9: the hand-checked verification ring — gap between the pin's
+// own outer edge and the ring's inner edge, plus the ring's own stroke
+// width, both constant on-screen (pxPerWorldUnit-scaled at the actual draw
+// site, same idiom as PIN_RADIUS/PIN_HALO above).
+const HAND_CHECKED_RING_GAP = 3;
+const HAND_CHECKED_RING_STROKE_PX = 1.5;
 
 // v10 Part 13: real-world km -> world-viewBox units, for terrain sizing
 // only (pins/hit-areas never use this — they hold constant SCREEN size via
@@ -759,7 +765,14 @@ function renderMap(store, lenses) {
     const cy = PROJECTION.y(loc.lat);
     const country = store.countriesById.get(loc.country_id);
 
-    let fill, tooltip, eliminated = false, gap = false, faded = false;
+    // Part 23.9: verification status as a pin-level modifier, not a second
+    // legend block. True only when this specific pin's persona verdict
+    // came from a hand fixture (Wenda/Carmen, wherever one exists for this
+    // location) — never for Waldo (a different claim type by design, his
+    // fill is always the Fit index, never a verdict) and never for the
+    // five no-fixture personas (they have no hand fixture anywhere, so
+    // this stays false for them by construction, not a special case).
+    let fill, tooltip, eliminated = false, gap = false, faded = false, handChecked = false;
 
     // Tooltip voice (v2 addendum §4): a one-line human answer leads every
     // tooltip, built only from data already computed.
@@ -860,6 +873,7 @@ function renderMap(store, lenses) {
       gap = isGapValue(underlyingValue);
       faded = !hasRealRead;
       if (verdict) {
+        handChecked = true;
         const vHeadline = verdictHeadline(verdict.expected);
         const visual = verdictVisual(vHeadline);
         if (visual.kind === "eliminated") { eliminated = true; }
@@ -965,7 +979,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked });
   }
 
   const wrap = document.createElement("div");
@@ -1069,6 +1083,29 @@ function renderMap(store, lenses) {
     return circle;
   }
 
+  // Part 23.9: the verification-status ring — a second, unfilled,
+  // slightly-larger-radius stroke circle, same pxPerWorldUnit-scaled idiom
+  // the visible pin's own radius/stroke already use (constant on-screen
+  // size at any zoom/device width). Pure geometry (presence/absence of a
+  // stroke), zero reliance on hue — survives any CVD simulation by
+  // construction, and doesn't collide with any existing encoded channel
+  // (fill carries verdict meaning; the hatch/gap-stroke carry the
+  // hard_fail/data_gap distinction; pin-faded's opacity carries a
+  // different claim — "no read exists at all," not "how was this
+  // answered"). Returns null (nothing appended) whenever the entry isn't
+  // hand-checked — the common case, so most pins pay zero extra markup.
+  function makeHandCheckedRing(entry) {
+    if (!entry.handChecked) return null;
+    const ring = document.createElementNS(svgNS, "circle");
+    ring.setAttribute("cx", entry.cx);
+    ring.setAttribute("cy", entry.cy);
+    ring.setAttribute("r", ((PIN_RADIUS + PIN_HALO + HAND_CHECKED_RING_GAP) / pxPerWorldUnit).toFixed(3));
+    ring.style.setProperty("--ring-stroke", (HAND_CHECKED_RING_STROKE_PX / pxPerWorldUnit).toFixed(3));
+    ring.setAttribute("class", "hand-checked-ring");
+    ring.setAttribute("aria-hidden", "true");
+    return ring;
+  }
+
   // Shared by both the solo hit-circle and the knot's own shared hit-shape
   // below: toggles a "lifted" look on the paired visual pin(s) while the
   // hit-circle itself has mouse/keyboard focus (§11.4 item 3 — reactive
@@ -1134,6 +1171,8 @@ function renderMap(store, lenses) {
       const entry = group[0];
       const visualPin = makeVisualPin(entry);
       svg.appendChild(visualPin);
+      const ring = makeHandCheckedRing(entry);
+      if (ring) svg.appendChild(ring);
 
       const hit = document.createElementNS(svgNS, "circle");
       hit.setAttribute("cx", entry.cx);
@@ -1267,6 +1306,8 @@ function renderMap(store, lenses) {
         const pin = makeVisualPin(drawEntry);
         svg.appendChild(pin);
         visualPins.push(pin);
+        const ring = makeHandCheckedRing(drawEntry);
+        if (ring) svg.appendChild(ring);
       }
 
       // Ruling 3: one shared invisible hit-shape wrapping the group's real
@@ -1661,32 +1702,17 @@ function renderOrmenLange(svg, svgNS) {
   svg.appendChild(g);
 }
 
-// v6 addendum R2's color-for-band lookup for the persona legend — the
-// hatch-demo swatch (doesn't-clear/eliminated) is a distinct markup shape
-// from the plain color swatches, so it's branched below rather than
-// forced into this map.
-const BAND_LEGEND_COLOR = {
-  clears: () => clearsColor(),
-  "near-miss": () => CONDITIONAL_COLOR,
-  "not-checked": () => pendingColor(),
-};
-
-// v10 Part 15.5: a short chip-style label parallel to STATE_HEADLINE,
-// keyed the same way (STATE_HEADLINE's own six states). Built for the
-// Wenda/Carmen legend's own rule-derived row specifically, where
+// v10 Part 15.5, short form kept as the single legend vocabulary by Part
+// 23.9: a short chip-style label parallel to STATE_HEADLINE, keyed the
+// same way (STATE_HEADLINE's own six states) -- built because
 // STATE_HEADLINE's full sentences (one 17-word conditional clause among
-// them) read at a genuinely different density/register than the
-// hand-verified row's short BAND_LABEL chips stacked directly above them
-// -- confirmed against real data, not a hypothetical mismatch: both a
-// real "not-checked" fixture verdict and a real "data_gap" engine row
-// exist for the same persona at real locations today. Meaning preserved,
-// not shortened away -- QUALIFIES_CONDITIONAL and UNCERTAIN_TYPE stay
-// distinct in text even though they share one color, matching
-// STATE_HEADLINE's own doctrine (text carries the finer read, color only
-// the coarser one). Not used by the five-no-fixture-persona legend row
-// below, which still renders STATE_HEADLINE's full sentences unchanged --
-// that row has no hand-verified row above it to read short against, so
-// the density mismatch this label set exists to fix doesn't apply there.
+// them) read at a genuinely different density/register than a compact
+// legend list needs. Meaning preserved, not shortened away --
+// QUALIFIES_CONDITIONAL and UNCERTAIN_TYPE stay distinct in text even
+// though they share one color, matching STATE_HEADLINE's own doctrine
+// (text carries the finer read, color only the coarser one). Now the one
+// shared vocabulary every persona's legend uses (renderVerdictKey(),
+// below) -- no longer split across two differently-worded legend blocks.
 const STATE_CHIP_LABEL = {
   QUALIFIES_AND_CONVERTS: "Clears, leads to permanent residency",
   QUALIFIES_CONDITIONAL: "Clears, with conditions",
@@ -1695,6 +1721,39 @@ const STATE_CHIP_LABEL = {
   DEAD_END_BLOCKING: "Confirmed dead end",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet",
 };
+
+// Part 23.9: one shared verdict-meaning key — replaces the duplicated
+// swatch-building logic the hasFixtures branch and the five-no-fixture
+// branch used to each carry independently (a DRY win, not just a display
+// fix). STATE_CHIP_LABEL's six short strings (already-written UI copy),
+// each swatched by its band's already-proven-identical color (bandVisual()
+// — confirmed live, this session: a hand-checked pin and a rule-derived
+// pin sharing the same verdict meaning render byte-for-byte identical
+// fill/hatch). `includePending` appends a real, honest seventh row for the
+// one legend meaning the closed six-state engine enum can't express
+// ("checked, but the verdict itself hasn't been confirmed" — a human-
+// process state, distinct from data_gap) — shown only where reachable
+// (fixture-bearing personas, the only place `verdictVisual()`'s own
+// "pending"/"unverified" kind can ever fire; confirmed live against real
+// fixture data, 3 rows).
+function renderVerdictKey(displayName, includePending) {
+  const items = Object.entries(STATE_CHIP_LABEL).map(([state, label]) => {
+    const band = STATE_HEADLINE_BAND[state];
+    if (band === "hard_fail") {
+      return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(label)}</span>`;
+    }
+    const color = bandVisual(band).color;
+    const swatchClass = band === "data_gap" ? "legend-swatch legend-gap-demo" : "legend-swatch";
+    return `<span class="legend-item"><span class="${swatchClass}" style="background:${color}"></span> ${escapeHtml(label)}</span>`;
+  });
+  if (includePending) {
+    items.push(`<span class="legend-item"><span class="legend-swatch" style="background:${pendingColor()}"></span> Hand-checked, verdict not yet confirmed</span>`);
+  }
+  const ringLine = includePending
+    ? `<span>A ring around a pin means we hand-checked that answer for ${escapeHtml(displayName)}. No ring means the rule-derived read.</span>`
+    : "";
+  return `<div class="legend-scale">What each pin color means for ${escapeHtml(displayName)}: ${items.join("")}</div>${ringLine}`;
+}
 
 // v8 R7: the legend becomes mode-aware — three mutually exclusive shapes,
 // never overlaid on each other, so the colors on screen and the words
@@ -1756,8 +1815,8 @@ function renderLegend(el, persona, activeLens, store) {
 
     if (persona === "waldo") {
       // v10 Part 15.5: a genuine pre-existing bug, independent of tonight's
-      // fade fix — Waldo's pins have never been colored by BAND_LEGEND_COLOR
-      // or any clears/near-miss vocabulary. His own pin/tooltip branch above
+      // fade fix — Waldo's pins have never been colored by any clears/
+      // near-miss verdict vocabulary. His own pin/tooltip branch above
       // colors by scoreToColor() over his own Fit index, the same blue-amber
       // ramp the no-persona/lens legends already show (scaleHtml, built once
       // at the top of this function and reused here, not reinvented). Peeled
@@ -1771,64 +1830,18 @@ function renderLegend(el, persona, activeLens, store) {
       return;
     }
 
+    // Part 23.9: ONE legend, verification carried as a pin-level ring
+    // modifier, never a second block — Wenda/Carmen (hasFixtures) and the
+    // five no-fixture personas used to get two visually distinct legends
+    // implying two vocabularies exist ("hand-verified" vs. "rule-derived"),
+    // when the pins themselves only ever paint from one shared six/seven-
+    // value channel (bandVisual()/STATE_CHIP_LABEL, confirmed live this
+    // session — a hand-checked pin and a rule-derived pin sharing the same
+    // verdict meaning render byte-for-byte identical fill/hatch). Both
+    // branches now call the one shared key; only whether the honest
+    // seventh "pending" row is reachable differs.
     const hasFixtures = store.fixturesByPersona.has(persona);
-    if (hasFixtures) {
-      // Wenda/Carmen only, now that Waldo is peeled off above. Two rows,
-      // both real states a reader can actually be shown, not one real row
-      // plus one stale fallback: a hand-verified fixture row (unchanged
-      // swatch vocabulary) plus a rule-derived engine row, closing the
-      // stale-fade tension v9 Part 6.4 named and left open (both personas
-      // now fall back to the engine wherever no hand fixture exists, so the
-      // old "faded pins, not checked" row was no longer true).
-      const swatches = BAND_ORDER.filter((b) => b !== "unclassified").map((band) => {
-        if (band === "doesnt-clear") {
-          return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
-        }
-        const color = BAND_LEGEND_COLOR[band]();
-        return `<span class="legend-item"><span class="legend-swatch" style="background:${color}"></span> ${escapeHtml(BAND_LABEL[band])}</span>`;
-      }).join("");
-      const checkedRow = `<div class="legend-scale">Solid pins, hand-verified — checked for ${escapeHtml(displayName)}: ${swatches}</div>`;
-      // Two findings from a pre-build review of this exact row, both folded
-      // in: (1) this row's own header now says the pins are solid too,
-      // matching checkedRow's own framing — per the pin/tooltip logic above,
-      // `faded` is only ever true in the now-effectively-unreachable
-      // defensive fallback (full engine coverage today), so every real pin a
-      // reader sees under this row is solid, same as checkedRow's, and the
-      // header shouldn't leave that unconfirmed. (2) the items below use the
-      // short STATE_CHIP_LABEL set instead of STATE_HEADLINE's full-sentence
-      // text — confirmed against real data, not hypothetical, that stacking
-      // six full sentences directly under checkedRow's four short chip
-      // labels was a genuine density/register jump the old one-line faded
-      // row never carried.
-      const engineItems = Object.entries(STATE_CHIP_LABEL).map(([state, label]) => {
-        const band = STATE_HEADLINE_BAND[state];
-        if (band === "hard_fail") {
-          return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(label)}</span>`;
-        }
-        const color = bandVisual(band).color;
-        const swatchClass = band === "data_gap" ? "legend-swatch legend-gap-demo" : "legend-swatch";
-        return `<span class="legend-item"><span class="${swatchClass}" style="background:${color}"></span> ${escapeHtml(label)}</span>`;
-      }).join("");
-      const engineRow = `<div class="legend-scale">Also solid — rule-derived, everywhere else: ${engineItems}</div>`;
-      el.innerHTML = checkedRow + engineRow;
-      return;
-    }
-    // v9 Part 6.5: the five no-fixture personas — a new third branch, one
-    // swatch row keyed to STATE_HEADLINE's six labels, grouped under their
-    // four overall_band colors (mirrors BAND_LEGEND_COLOR's own pattern
-    // above; hard_fail reuses the existing hatch-demo markup, data_gap
-    // reuses the existing gap-demo swatch class). No faded row here —
-    // nothing is faded for these five anymore (6.3).
-    const items = Object.entries(STATE_HEADLINE).map(([state, text]) => {
-      const band = STATE_HEADLINE_BAND[state];
-      if (band === "hard_fail") {
-        return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(text)}</span>`;
-      }
-      const color = bandVisual(band).color;
-      const swatchClass = band === "data_gap" ? "legend-swatch legend-gap-demo" : "legend-swatch";
-      return `<span class="legend-item"><span class="${swatchClass}" style="background:${color}"></span> ${escapeHtml(text)}</span>`;
-    }).join("");
-    el.innerHTML = `<div class="legend-scale">${escapeHtml(displayName)}'s rule-derived read: ${items}</div>`;
+    el.innerHTML = renderVerdictKey(displayName, hasFixtures);
     return;
   }
 

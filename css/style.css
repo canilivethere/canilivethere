@@ -471,6 +471,13 @@ h3 { font-size: 1.05rem; }
    specificity: fade is the broader "not checked for you" state and takes
    visual precedence over the narrower gap-ink stroke in that one combo. */
 .location-pin.pin-faded { fill-opacity: 0.55; stroke: var(--line); stroke-opacity: 1; }
+/* Part 23.9: the hand-checked verification ring — pure geometry (stroke
+   presence/absence), zero reliance on hue, so it survives any CVD
+   simulation by construction and never collides with the fill/hatch/
+   opacity channels above, each of which already carries a different
+   claim. Never itself a pointer target (pointer-events: none — the
+   pin/hit-area underneath keep handling all interaction, unchanged). */
+.hand-checked-ring { fill: none; stroke: var(--ink); stroke-width: var(--ring-stroke, 1.5); opacity: 0.55; pointer-events: none; }
 /* v8 Part 11 §11.3 item 1: the visible pin no longer receives its own
    mouse/keyboard events (a larger invisible .pin-hit-area sits on top and
    carries them instead) — map.js toggles this class on the paired visual

@@ -924,30 +924,33 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
    isolated row still has the expansion one hover/tap away. */
 abbr[title] { text-decoration: underline dotted; cursor: help; }
 .criterion-scorebar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.75rem 0; }
-.criterion-chip { border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.82rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
-/* v9 Part 5.1: "every stat is a door" -- styled to *read* as a button
-   (filled --panel background, 1px --line border, hover lift) though
-   implemented as a real <a> (the correct element for navigation; a
-   <button> here would lose middle-click-to-open-in-new-tab and announce
-   the wrong role). Correcting this Part's own cited precedent: this is
-   NOT the same treatment .redflag-pointer gets (checked directly against
-   that class -- three properties, no border/background/focus-ring/hover-
-   lift) -- new authorship for this class, not a transported pattern.
-   Visible focus ring comes free from the site-wide a:focus rule above,
-   no new CSS needed for that part. */
-.criterion-explain-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.74rem;
-  font-weight: 600;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--ink);
-  text-decoration: none;
-}
-.criterion-explain-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+/* Part 23.1: an explicit basis so each chip claims its own visual column
+   at common widths instead of packing arbitrarily edge-to-edge with only
+   the scorebar's own 0.4rem gap between it and the next chip -- the fix
+   for the chip-vs-toggle boundary ambiguity a screenshot review circled.
+   `align-items: center` dropped in favor of default (stretch) now that a
+   flex-wrap: wrap child line can hold the toggle on its own row at
+   narrower widths; `flex-wrap: wrap` stays so long criterion names still
+   wrap inside one chip rather than overflowing it. */
+.criterion-chip { border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.82rem; display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1 1 280px; }
+/* Part 23.1/23.7: the toggle that replaces the old .criterion-explain-link
+   <a> at the chip's own face -- pinned to *this chip's* right edge
+   (margin-left: auto, inside the chip's own flex row) regardless of how
+   much the name/value/tags content before it wraps, so it can never
+   visually drift toward a neighboring chip. Reuses .expand-toggle's own
+   look (lists.js) rather than a third button style on this site. */
+.criterion-receipt-toggle { margin-left: auto; }
+/* Part 23.7: the score-receipts panel -- a full-width flex child inside
+   .criterion-scorebar (flex: 1 1 100% forces a line break both before and
+   after it, so it always renders directly beneath its own chip's row,
+   pushing later chips down rather than sitting beside them). Empty/hidden
+   until its own toggle's first click (lazy render -- zero byte cost for a
+   reader who never opens it). */
+.receipt-panel { flex: 1 1 100%; border: 1px solid var(--line); border-radius: 6px; padding: 0.6rem 0.75rem; background: var(--panel); margin: -0.2rem 0 0.2rem; }
+.receipt-panel[hidden] { display: none; }
+.receipt-header { margin: 0 0 0.4rem; }
+.receipt-more-toggle { background: none; border: none; padding: 0.2rem 0; font-size: 0.8rem; color: var(--accent); cursor: pointer; text-align: left; }
+.receipt-scope-line { font-style: italic; }
 /* .next-best's own plate treatment (bg/border/radius/shadow) comes from
    the shared panel-card contract above — margin-top kept here since it's
    a spacing need specific to this module's position on the page. */

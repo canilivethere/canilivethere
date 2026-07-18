@@ -450,6 +450,57 @@ function buildPortrait(loc) {
   return div;
 }
 
+// Part 23.7: one fact-item <li>, byte-for-byte the same shape
+// buildSection()'s own plain-facts list already uses (confidenceBadge() +
+// sourceDetailHtml() + notes, suppressGapText since a badge sits right
+// alongside per 23.3) — extracted here so the receipts panel below reuses
+// it instead of hand-copying a second markup shape for the same claim.
+function factItemHtml(f) {
+  return `
+      <li class="fact-item">
+        <div class="fact-label">${escapeHtml(f.fact_label)}</div>
+        <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true }))}</div>
+        <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)}</div>
+        <div class="source-detail">${sourceDetailHtml(f)}</div>
+        ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
+      </li>`;
+}
+
+// Part 23.7: the score-receipts panel's own content, lazy-built on first
+// expand (never pre-rendered — a reader who doesn't open any chip pays
+// zero byte cost for this feature). "Evidence on file," never "what built
+// this number": the join (every fact tagged with this criterion_id at this
+// location) is real and computable today, but not proven causal for an
+// already-existing score — the header/footer wording says exactly that,
+// nothing stronger.
+function buildReceiptPanelHtml(store, crit, loc) {
+  const facts = (store.factsByLocation.get(loc.location_id) || [])
+    .filter((f) => f.criterion_id === crit.criterion_id)
+    // Most-recently-checked first — an available, non-interpretive field
+    // (recency), not a claim about which fact contributed most. Plain
+    // string comparison: dates on file mostly share the YYYY-MM-DD-leading
+    // shape; a handful of free-text dates ("2026 (early)") sort by that
+    // same lexical rule as everywhere else this file already compares
+    // dates (buildSourcesSection above), not a new convention.
+    .slice()
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const header = `<p class="receipt-header"><strong>Evidence on file — ${escapeHtml(crit.name)} at ${escapeHtml(loc.display_name)}</strong></p>`;
+  const criteriaHref = withPersona(siteUrl(`criteria.html#${crit.criterion_id}`));
+  const globalLink = `<p class="fit-link-line"><a href="${criteriaHref}">What does ${escapeHtml(crit.name)} mean, in general? &rarr;</a></p>`;
+  if (!facts.length) {
+    return `${header}<p class="fact-notes">No facts on file for ${escapeHtml(crit.name)} here yet — we haven't done that digging.</p>${globalLink}`;
+  }
+  const LEAD_COUNT = 3;
+  const lead = facts.slice(0, LEAD_COUNT);
+  const rest = facts.slice(LEAD_COUNT);
+  const restHtml = rest.length
+    ? `<button type="button" class="receipt-more-toggle" aria-expanded="false">+${rest.length} more fact${rest.length === 1 ? "" : "s"} on file</button>
+       <ul class="fact-list receipt-more-list" hidden>${rest.map(factItemHtml).join("")}</ul>`
+    : "";
+  const scopeLine = `<p class="fact-notes receipt-scope-line">These are the facts on file for ${escapeHtml(crit.name)} here — the evidence behind the number, not a line-by-line calculation of it.</p>`;
+  return `${header}<ul class="fact-list">${lead.map(factItemHtml).join("")}</ul>${restHtml}${scopeLine}${globalLink}`;
+}
+
 // v7 §2.1 item 7: the old always-on 13-chip score bar is now its own
 // collapsed chapter, linked from the verdict block's Fit-index line
 // rather than rendered inline at full weight (law 4's index demotion,
@@ -464,12 +515,19 @@ function buildScoreBar(store, loc, persona) {
   // block itself no longer branches on this same distinction.
   const personaFixtures = persona ? store.fixturesByPersona.get(persona)?.get(loc.location_id)?.criteria : null;
   const personaLabel = persona ? personaDisplayLabel(persona) : "";
-  // v9 Part 5: every stat is a door -- each chip's own name links one
-  // click deeper to criteria.html, the shared anchor page (5.1: DRY on the
-  // fact layer, one canonical definition per criterion instead of one
-  // copy per location page). withPersona() so the persona active on this
-  // location page is preserved into and back out of that page, same
-  // convention as every other internal link on this site.
+  // Part 23.1/23.7: the chip's own explain-link used to sit at the
+  // boundary between two adjacent, independently-bordered chips (no
+  // explicit width on either) — close enough to read as ambiguous about
+  // which chip it belonged to, the exact collision a screenshot review
+  // circled. Fixed as one build, not two: `.criterion-chip` gets an
+  // explicit flex-basis (css/style.css) so each chip claims its own
+  // column, and the old <a> is replaced by a toggle button pinned to
+  // *this chip's own* right edge (margin-left: auto, same rule) — there is
+  // no longer a second bordered control riding the boundary between
+  // chips. The toggle also answers a different, more useful question
+  // first: not "what does this mean in general" but "why is THIS place a
+  // 2" — the local receipts panel, global definition moved one click
+  // deeper inside it (23.7's own two-questions framing).
   const chips = store.criteria.map((crit) => {
     const scoreRow = scoreRows ? scoreRows.get(crit.criterion_id) : null;
     const fixtureRow = personaFixtures ? personaFixtures.get(crit.criterion_id) : null;
@@ -487,10 +545,14 @@ function buildScoreBar(store, loc, persona) {
     const pendingTag = crit.reader_dependency === "pending-ruling"
       ? ` <span class="scope-tag" title="Several distinct facts folded into one number — see the note above">${escapeHtml(READER_DEPENDENCY_PENDING_LABEL)}</span>`
       : "";
-    const explainHref = withPersona(siteUrl(`criteria.html#${crit.criterion_id}`));
-    return `<span class="criterion-chip"><span class="fit-swatch" style="background:${swatch}"></span>
+    // Own word choice, same craft-latitude tier as every other short UI
+    // control label on this site — matches the existing "breakdown"/"hide"
+    // toggle idiom (lists.js) exactly, rather than inventing a new one.
+    return `<span class="criterion-chip">
+      <span class="fit-swatch" style="background:${swatch}"></span>
       ${escapeHtml(crit.name)}: ${val != null ? val + "/5" : "gap"}${tag}${pendingTag}
-      <a class="criterion-explain-link" href="${explainHref}">What this measures &rarr;</a></span>`;
+      <button type="button" class="expand-toggle criterion-receipt-toggle" aria-expanded="false" data-criterion-id="${crit.criterion_id}">evidence</button>
+      </span><div class="receipt-panel" hidden></div>`;
   });
   // v10 Part 16.1: the shared paragraph, once per chapter (not once per
   // chip), reusing the existing .fit-def pattern already used for
@@ -503,6 +565,42 @@ function buildScoreBar(store, loc, persona) {
     ? `<p class="fit-def">${escapeHtml(READER_DEPENDENCY_PENDING_PARAGRAPH)}</p>`
     : "";
   details.innerHTML = `<summary>Score breakdown</summary><p class="fit-def">${escapeHtml(FIT_INDEX_DEFINITION)}</p><p class="fit-def">${escapeHtml(SCALE_ANCHOR_STRING)}</p>${pendingParagraph}<div class="criterion-scorebar">${chips.join("")}</div>`;
+
+  // Part 23.7: lazy render on first expand only — the panel element
+  // already exists (empty, hidden) from the template above; content is
+  // built and inserted the first time its own toggle is clicked, never
+  // before, confirmed by construction (no .receipt-panel markup is
+  // present until then — the panel-content build only ever runs inside
+  // this listener).
+  details.querySelectorAll(".criterion-receipt-toggle").forEach((btn) => {
+    const critId = btn.dataset.criterionId;
+    const crit = store.criteriaById.get(critId);
+    const panel = btn.closest(".criterion-chip").nextElementSibling;
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") === "true";
+      if (!open && !panel.dataset.built) {
+        panel.innerHTML = buildReceiptPanelHtml(store, crit, loc);
+        panel.dataset.built = "1";
+        const moreToggle = panel.querySelector(".receipt-more-toggle");
+        if (moreToggle) {
+          // Copy, Part 23.7: "+{N} more facts on file" closed, "Show
+          // fewer" open — the closed label is saved once, up front, so
+          // toggling back and forth never has to reconstruct it.
+          const closedLabel = moreToggle.textContent;
+          moreToggle.addEventListener("click", () => {
+            const moreOpen = moreToggle.getAttribute("aria-expanded") === "true";
+            const moreList = panel.querySelector(".receipt-more-list");
+            moreList.hidden = moreOpen;
+            moreToggle.setAttribute("aria-expanded", String(!moreOpen));
+            moreToggle.textContent = moreOpen ? closedLabel : "Show fewer";
+          });
+        }
+      }
+      panel.hidden = open;
+      btn.setAttribute("aria-expanded", String(!open));
+      btn.textContent = open ? "evidence" : "hide";
+    });
+  });
   return details;
 }
 

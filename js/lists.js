@@ -247,14 +247,28 @@ function personaCoverage(rows) {
 function personaCoverageLine(store, persona, rows) {
   const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
   const kind = personaCoverageKind(store, persona);
+  // Part 23.4 item 1: the short per-row "(general)" marker's own full
+  // meaning, stated once here rather than repeated on every row it marks.
+  // Written to append to whichever branch below actually returns, not
+  // just the "criterion" branch — checked live, not assumed: today every
+  // one of the 8 named personas resolves to coverage kind "verdict"
+  // (store.verdictsByPersona now covers all eight), so the "criterion"
+  // branch is unreachable in practice and a fixed sentence living only
+  // there would never actually explain a marker a reader can see. The
+  // marker's real firing condition is row.personaAdjusted === false,
+  // independent of coverage kind — this checks that condition directly.
+  const anyFallback = rows.some((r) => r.personaAdjusted === false);
+  const fallbackExplainer = anyFallback
+    ? ` Rows marked (general) still show the general figure — ${displayName}'s own re-score hasn't reached that place yet.`
+    : "";
   if (kind === "verdict") {
     const { checked, total } = personaCoverage(rows);
-    return `${displayName}'s own verdict is checked for ${checked} of ${total} researched places — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet, ranked inside each group by whatever you've picked above. Each row shows its own reasoning directly, not just a colored chip.`;
+    return `${displayName}'s own verdict is checked for ${checked} of ${total} researched places — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet, ranked inside each group by whatever you've picked above. Each row shows its own reasoning directly, not just a colored chip.${fallbackExplainer}`;
   }
   if (kind === "criterion") {
     const checked = rows.filter((r) => r.personaAdjusted === true).length;
     const total = rows.length;
-    return `${displayName}'s own criterion scores are refined for ${checked} of ${total} researched places — used in the ranking above. ${displayName}'s specific visa/residency verdict isn't checked yet anywhere, so every place below sits in Not checked yet until that lands.`;
+    return `${displayName}'s own criterion scores are refined for ${checked} of ${total} researched places — used in the ranking above. ${displayName}'s specific visa/residency verdict isn't checked yet anywhere, so every place below sits in Not checked yet until that lands.${fallbackExplainer}`;
   }
   return `No persona-specific read exists yet for ${displayName} — every place below uses the general figures.`;
 }
@@ -354,12 +368,21 @@ function render(store, persona) {
 
   // §1.5 coverage line, recomputed every render (not just once in main())
   // so a country filter narrows the claim correctly.
+  // Part 23.4 item 3: the "visiting is a separate, easier question"
+  // framing used to repeat as link text on every row (38 times, identical
+  // wording). Relocated here, page chrome, stated once, present whenever a
+  // persona is active regardless of which persona or country filter — the
+  // per-row affordance below keeps its own navigation (each row's own
+  // #sec-visa anchor), just not the repeated sentence.
+  const visitContextLine = persona
+    ? " Just visiting instead? Every place below also has its own short-stay and tourist-visa rules — open any location's page and look under Visa & residency."
+    : "";
   document.getElementById("persona-context").textContent =
-    persona === "custom"
+    (persona === "custom"
       ? `Ranked by your own priorities — the same facts, weighted the way you told us matters (${CUSTOM_ESTIMATE_SUFFIX}).`
       : persona
       ? personaCoverageLine(store, persona, rows)
-      : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.";
+      : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.") + visitContextLine;
 
   const tbody = document.getElementById("rank-tbody");
   tbody.innerHTML = "";
@@ -443,8 +466,15 @@ function renderBanded(store, persona, rows, tbody) {
 // the flat (no persona) and banded (persona locked) paths share it.
 function renderRow(store, row, persona, tbody) {
   const tr = document.createElement("tr");
+  // Part 23.4 item 1: this genuinely varies row by row (whether THIS
+  // location has a persona rescore is computed per location, independent
+  // of which band the row sorts into), so the caveat-scope principle's own
+  // boundary condition applies here — compress the repeated words, don't
+  // relocate the fact itself to a table-scope header (that would assert a
+  // uniformity the data doesn't have). Full meaning stated once, in
+  // personaCoverageLine()'s own per-page sentence, below.
   const fallbackTag = row.personaAdjusted === false && !STATE.purposeCriterion
-    ? ` <span class="scope-tag">(no rescore for this persona yet — general figure shown)</span>`
+    ? ` <span class="scope-tag" title="General figure — ${escapeHtml(persona.charAt(0).toUpperCase() + persona.slice(1))} hasn't been individually re-scored here yet.">(general)</span>`
     : "";
   // 21.6 item 2: the disclosure suffix rides wherever the custom-weighted
   // number itself renders — here, not on the purpose-criterion view (that
@@ -510,8 +540,13 @@ function renderRow(store, row, persona, tbody) {
   // v7 no-JS fallback: link to the prerendered l/<id>.html page, not
   // location.html?loc=<id> — real static content exists there for
   // crawlers/no-JS visitors (tools/prerender-locations.mjs).
+  // Part 23.4 item 3: same href/destination as before, no repeated
+  // sentence — the explanatory framing now lives once, in page chrome
+  // (render(), above). A compact, real Unicode glyph (not an image asset,
+  // not emoji) with a full accessible label, so a screen-reader user gets
+  // the whole meaning even though the visible glyph is minimal.
   const visitLink = persona
-    ? `<a class="visit-link" href="${withPersona(siteUrl(`l/${row.loc.location_id}.html`))}#sec-visa">Just visiting instead?</a>`
+    ? `<a class="visit-icon-link" href="${withPersona(siteUrl(`l/${row.loc.location_id}.html`))}#sec-visa" aria-label="Short-stay and visitor rules for ${escapeHtml(row.loc.display_name)}" title="Short-stay and visitor rules">&#9432;</a>`
     : "";
 
   tr.innerHTML = `

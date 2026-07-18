@@ -1,38 +1,38 @@
-{"location_id":"AR-buenosaires","country_id":"AR","display_name":"Buenos Aires (Palermo focus)","status":"Rescored","lat":-34.5895,"lon":-58.4173}
-{"location_id":"BZ-corozal","country_id":"BZ","display_name":"Corozal","status":"Rescored","lat":18.4000,"lon":-88.4000}
-{"location_id":"CO-medellin","country_id":"CO","display_name":"Medellín","status":"Rescored","lat":6.2442,"lon":-75.5812}
-{"location_id":"CO-santamarta","country_id":"CO","display_name":"Santa Marta","status":"Rescored","lat":11.2408,"lon":-74.1990}
-{"location_id":"CR-chania","country_id":"CR","display_name":"Chania","status":"Rescored","lat":35.5138,"lon":24.0180}
-{"location_id":"CR-heraklion","country_id":"CR","display_name":"Heraklion","status":"Rescored","lat":35.3387,"lon":25.1442}
-{"location_id":"GT-antigua","country_id":"GT","display_name":"Antigua","status":"Rescored","lat":14.5586,"lon":-90.7295}
-{"location_id":"GT-atitlan","country_id":"GT","display_name":"Atitlán (San Pedro focus)","status":"Rescored","lat":14.6951,"lon":-91.2723}
-{"location_id":"MA-marrakech","country_id":"MA","display_name":"Marrakech","status":"Rescored","lat":31.6295,"lon":-7.9811}
-{"location_id":"MA-taghazout","country_id":"MA","display_name":"Taghazout","status":"Rescored","lat":30.5459,"lon":-9.7107}
-{"location_id":"MX-cdmx","country_id":"MX","display_name":"CDMX","status":"Rescored","lat":19.4326,"lon":-99.1332}
-{"location_id":"MX-merida","country_id":"MX","display_name":"Mérida","status":"Rescored","lat":20.9674,"lon":-89.5926}
-{"location_id":"MX-oaxaca","country_id":"MX","display_name":"Oaxaca","status":"Rescored","lat":17.0732,"lon":-96.7266}
-{"location_id":"MX-playadelcarmen","country_id":"MX","display_name":"Playa del Carmen","status":"Rescored","lat":20.6296,"lon":-87.0739}
-{"location_id":"MX-puertovallarta","country_id":"MX","display_name":"Puerto Vallarta","status":"Rescored","lat":20.6534,"lon":-105.2253}
-{"location_id":"PT-lagos","country_id":"PT","display_name":"Lagos (Algarve)","status":"Rescored","lat":37.1020,"lon":-8.6742}
-{"location_id":"PT-lisbon","country_id":"PT","display_name":"Lisbon","status":"Rescored","lat":38.7223,"lon":-9.1393}
-{"location_id":"PT-porto","country_id":"PT","display_name":"Porto","status":"Rescored","lat":41.1579,"lon":-8.6291}
-{"location_id":"TH-bangkok","country_id":"TH","display_name":"Bangkok","status":"Rescored","lat":13.7563,"lon":100.5018}
-{"location_id":"TH-chiangmai","country_id":"TH","display_name":"Chiang Mai","status":"Rescored","lat":18.7883,"lon":98.9853}
-{"location_id":"TH-phuket","country_id":"TH","display_name":"Phuket","status":"Rescored","lat":7.8804,"lon":98.3923}
-{"location_id":"US-asheville","country_id":"US","display_name":"Asheville, NC","status":"Rescored","lat":35.5951,"lon":-82.5515}
-{"location_id":"US-chattanooga","country_id":"US","display_name":"Chattanooga, TN","status":"Rescored","lat":35.0456,"lon":-85.3097}
-{"location_id":"US-rincon","country_id":"US","display_name":"Rincón, Puerto Rico","status":"Rescored","lat":18.3400,"lon":-67.2500}
-{"location_id":"AL-sarande","country_id":"AL","display_name":"Sarandë","status":"Rescored","lat":39.8756,"lon":20.0053}
-{"location_id":"AL-tirana","country_id":"AL","display_name":"Tirana","status":"Rescored","lat":41.3275,"lon":19.8187}
-{"location_id":"BG-bansko","country_id":"BG","display_name":"Bansko","status":"Rescored","lat":41.8375,"lon":23.4886}
-{"location_id":"BG-velikotarnovo","country_id":"BG","display_name":"Veliko Tarnovo","status":"Rescored","lat":43.0757,"lon":25.6172}
-{"location_id":"EC-cuenca","country_id":"EC","display_name":"Cuenca","status":"Rescored","lat":-2.9006,"lon":-79.0045}
-{"location_id":"EG-dahab","country_id":"EG","display_name":"Dahab","status":"Rescored","lat":28.5091,"lon":34.5136}
-{"location_id":"ES-barcelona","country_id":"ES","display_name":"Barcelona","status":"Rescored","lat":41.3874,"lon":2.1686}
-{"location_id":"ES-valencia","country_id":"ES","display_name":"Valencia","status":"Rescored","lat":39.4699,"lon":-0.3763}
-{"location_id":"ID-bali","country_id":"ID","display_name":"Bali (Canggu/Seminyak focus)","status":"Rescored","lat":-8.6478,"lon":115.1385}
-{"location_id":"IN-goa","country_id":"IN","display_name":"Goa (Anjuna-Assagao focus)","status":"Rescored","lat":15.5806,"lon":73.7593}
-{"location_id":"MY-penang","country_id":"MY","display_name":"Penang (George Town focus)","status":"Rescored","lat":5.4141,"lon":100.3288}
-{"location_id":"PY-asuncion","country_id":"PY","display_name":"Asunción","status":"Rescored","lat":-25.2637,"lon":-57.5759}
-{"location_id":"VN-danang","country_id":"VN","display_name":"Da Nang (An Thuong focus)","status":"Rescored","lat":16.0544,"lon":108.2022}
-{"location_id":"ZA-capetown","country_id":"ZA","display_name":"Cape Town","status":"Rescored","lat":-33.9249,"lon":18.4241}
+{"location_id": "AL-sarande", "country_id": "AL", "display_name": "Sarandë", "status": "Rescored", "lat": 39.8756, "lon": 20.0053}
+{"location_id": "AL-tirana", "country_id": "AL", "display_name": "Tirana", "status": "Rescored", "lat": 41.3275, "lon": 19.8187}
+{"location_id": "AR-buenosaires", "country_id": "AR", "display_name": "Buenos Aires (Palermo focus)", "status": "Rescored", "lat": -34.5895, "lon": -58.4173}
+{"location_id": "BG-bansko", "country_id": "BG", "display_name": "Bansko", "status": "Rescored", "lat": 41.8375, "lon": 23.4886}
+{"location_id": "BG-velikotarnovo", "country_id": "BG", "display_name": "Veliko Tarnovo", "status": "Rescored", "lat": 43.0757, "lon": 25.6172}
+{"location_id": "BZ-corozal", "country_id": "BZ", "display_name": "Corozal", "status": "Rescored", "lat": 18.4, "lon": -88.4}
+{"location_id": "CO-medellin", "country_id": "CO", "display_name": "Medellín", "status": "Rescored", "lat": 6.2442, "lon": -75.5812}
+{"location_id": "CO-santamarta", "country_id": "CO", "display_name": "Santa Marta", "status": "Rescored", "lat": 11.2408, "lon": -74.199}
+{"location_id": "CR-chania", "country_id": "CR", "display_name": "Chania", "status": "Rescored", "lat": 35.5138, "lon": 24.018}
+{"location_id": "CR-heraklion", "country_id": "CR", "display_name": "Heraklion", "status": "Rescored", "lat": 35.3387, "lon": 25.1442}
+{"location_id": "EC-cuenca", "country_id": "EC", "display_name": "Cuenca", "status": "Rescored", "lat": -2.9006, "lon": -79.0045}
+{"location_id": "EG-dahab", "country_id": "EG", "display_name": "Dahab", "status": "Rescored", "lat": 28.5091, "lon": 34.5136}
+{"location_id": "ES-barcelona", "country_id": "ES", "display_name": "Barcelona", "status": "Rescored", "lat": 41.3874, "lon": 2.1686}
+{"location_id": "ES-valencia", "country_id": "ES", "display_name": "Valencia", "status": "Rescored", "lat": 39.4699, "lon": -0.3763}
+{"location_id": "GT-antigua", "country_id": "GT", "display_name": "Antigua", "status": "Rescored", "lat": 14.5586, "lon": -90.7295}
+{"location_id": "GT-atitlan", "country_id": "GT", "display_name": "Atitlán (San Pedro focus)", "status": "Rescored", "lat": 14.6951, "lon": -91.2723}
+{"location_id": "ID-bali", "country_id": "ID", "display_name": "Bali (Canggu/Seminyak focus)", "status": "Rescored", "lat": -8.6478, "lon": 115.1385}
+{"location_id": "IN-goa", "country_id": "IN", "display_name": "Goa (Anjuna-Assagao focus)", "status": "Rescored", "lat": 15.5806, "lon": 73.7593}
+{"location_id": "MA-marrakech", "country_id": "MA", "display_name": "Marrakech", "status": "Rescored", "lat": 31.6295, "lon": -7.9811}
+{"location_id": "MA-taghazout", "country_id": "MA", "display_name": "Taghazout", "status": "Rescored", "lat": 30.5459, "lon": -9.7107}
+{"location_id": "MX-cdmx", "country_id": "MX", "display_name": "CDMX", "status": "Rescored", "lat": 19.4326, "lon": -99.1332}
+{"location_id": "MX-merida", "country_id": "MX", "display_name": "Mérida", "status": "Rescored", "lat": 20.9674, "lon": -89.5926}
+{"location_id": "MX-oaxaca", "country_id": "MX", "display_name": "Oaxaca", "status": "Rescored", "lat": 17.0732, "lon": -96.7266}
+{"location_id": "MX-playadelcarmen", "country_id": "MX", "display_name": "Playa del Carmen", "status": "Rescored", "lat": 20.6296, "lon": -87.0739}
+{"location_id": "MX-puertovallarta", "country_id": "MX", "display_name": "Puerto Vallarta", "status": "Rescored", "lat": 20.6534, "lon": -105.2253}
+{"location_id": "MY-penang", "country_id": "MY", "display_name": "Penang (George Town focus)", "status": "Rescored", "lat": 5.4141, "lon": 100.3288}
+{"location_id": "PT-lagos", "country_id": "PT", "display_name": "Lagos (Algarve)", "status": "Rescored", "lat": 37.102, "lon": -8.6742}
+{"location_id": "PT-lisbon", "country_id": "PT", "display_name": "Lisbon", "status": "Rescored", "lat": 38.7223, "lon": -9.1393}
+{"location_id": "PT-porto", "country_id": "PT", "display_name": "Porto", "status": "Rescored", "lat": 41.1579, "lon": -8.6291}
+{"location_id": "PY-asuncion", "country_id": "PY", "display_name": "Asunción", "status": "Rescored", "lat": -25.2637, "lon": -57.5759}
+{"location_id": "TH-bangkok", "country_id": "TH", "display_name": "Bangkok", "status": "Rescored", "lat": 13.7563, "lon": 100.5018}
+{"location_id": "TH-chiangmai", "country_id": "TH", "display_name": "Chiang Mai", "status": "Rescored", "lat": 18.7883, "lon": 98.9853}
+{"location_id": "TH-phuket", "country_id": "TH", "display_name": "Phuket", "status": "Rescored", "lat": 7.8804, "lon": 98.3923}
+{"location_id": "US-asheville", "country_id": "US", "display_name": "Asheville, NC", "status": "Rescored", "lat": 35.5951, "lon": -82.5515}
+{"location_id": "US-chattanooga", "country_id": "US", "display_name": "Chattanooga, TN", "status": "Rescored", "lat": 35.0456, "lon": -85.3097}
+{"location_id": "US-rincon", "country_id": "US", "display_name": "Rincón, Puerto Rico", "status": "Rescored", "lat": 18.34, "lon": -67.25}
+{"location_id": "VN-danang", "country_id": "VN", "display_name": "Da Nang (An Thuong focus)", "status": "Rescored", "lat": 16.0544, "lon": 108.2022}
+{"location_id": "ZA-capetown", "country_id": "ZA", "display_name": "Cape Town", "status": "Rescored", "lat": -33.9249, "lon": 18.4241}

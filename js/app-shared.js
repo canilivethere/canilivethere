@@ -713,6 +713,37 @@ function usdApprox(amount, fxCode) {
   return rounded.toLocaleString("en-US");
 }
 
+// Part 23.6: the feel-clever law's per-instance safety net. An existing
+// upstream check already enforces "generic term leads, acronym follows in
+// parens" at each field's mechanical FIRST occurrence — this
+// covers every occurrence, on every reader-facing surface, including a
+// deep-linked or screenshotted single row that never shows that field's
+// first occurrence at all. Wraps every whole-word match of a glossary term
+// with a real expansion in a native `<abbr title="…">` — screen readers can
+// announce the title on request, sighted readers get a dotted-underline
+// hover, zero new interaction to learn. `text` is raw (unescaped) input;
+// this both escapes it AND inserts the wrap in one pass, so a caller never
+// needs to call escapeHtml() separately on text going through this.
+// A single combined regex (not one replace() per term) so a term can never
+// accidentally get double-wrapped by matching inside a previous term's own
+// freshly-inserted title attribute.
+export function glossaryWrap(text, store) {
+  if (text == null) return "";
+  const escaped = escapeHtml(String(text));
+  const terms = store && store.glossaryByTerm;
+  if (!terms || !terms.size) return escaped;
+  const alternation = [...terms.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  if (!alternation) return escaped;
+  const re = new RegExp(`\\b(${alternation})\\b`, "g");
+  return escaped.replace(re, (m) => {
+    const entry = terms.get(m);
+    return entry ? `<abbr title="${escapeHtml(entry.expansion)}">${m}</abbr>` : m;
+  });
+}
+
 export function formatValue(fact) {
   if (fact.value_raw === "[GAP]") return "Not yet researched";
   const raw = formatNumbersInText(String(fact.value_raw));

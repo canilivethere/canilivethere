@@ -918,6 +918,11 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .fact-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.78rem; color: var(--muted); }
 .fact-notes { font-size: 0.85rem; color: var(--muted); }
 .scope-tag { font-size: 0.72rem; color: var(--muted); font-style: italic; }
+/* Part 23.6: the glossary-registry abbr wrap (glossaryWrap(), app-shared.js)
+   -- native <abbr title> everywhere a registered term renders, not just at
+   a field's mechanical first occurrence, so a reader landing on any single
+   isolated row still has the expansion one hover/tap away. */
+abbr[title] { text-decoration: underline dotted; cursor: help; }
 .criterion-scorebar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.75rem 0; }
 .criterion-chip { border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.82rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
 /* v9 Part 5.1: "every stat is a door" -- styled to *read* as a button

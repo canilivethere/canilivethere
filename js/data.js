@@ -80,7 +80,7 @@ async function fetchJson(path) {
 }
 
 async function buildStore(basePath) {
-  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, meta] =
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, glossary, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
@@ -102,6 +102,11 @@ async function buildStore(basePath) {
       // today) is not fetched here — nothing on this site renders it
       // directly yet; see the location-page build notes.
       fetchJsonl(basePath + "visa-routes.jsonl"),
+      // Part 23.6: the acronym/glossary registry (term -> expansion ->
+      // first_use_rule) — most rows still carry a null expansion (an
+      // in-progress registry, not a finished dictionary); glossaryWrap()
+      // in app-shared.js only ever acts on rows with a real expansion.
+      fetchJsonl(basePath + "glossary.jsonl"),
       fetchJson(basePath + "meta.json"),
     ]);
 
@@ -165,6 +170,14 @@ async function buildStore(basePath) {
 
   const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));
 
+  // glossaryByTerm: TERM -> registry row, expansion-having rows only —
+  // glossaryWrap() (app-shared.js) is the one consumer, filters again
+  // itself defensively, but building the map with only usable rows keeps
+  // the wrap function's own hot loop shorter.
+  const glossaryByTerm = new Map(
+    glossary.filter((g) => g.expansion).map((g) => [g.term, g])
+  );
+
   // visaRoutesByCountry: country_id -> [route rows] — the general,
   // non-persona "visa routes on file" list. Grouping only,
   // no filtering or reshaping — every row transports as exported.
@@ -217,6 +230,7 @@ async function buildStore(basePath) {
     verdictsByPersona,
     visaRoutesByCountry,
     profilesById,
+    glossaryByTerm,
     meta,
   };
 

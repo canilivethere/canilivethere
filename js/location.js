@@ -7,7 +7,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
   STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
-  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX,
+  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -261,7 +261,7 @@ function buildVerdictBlock(store, loc, country, persona) {
         : "";
       div.innerHTML = `
         <p class="verdict-headline"><span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span></p>
-        <p class="verdict-prose">${displayName}: ${escapeHtml(verdict.expected)}</p>
+        <p class="verdict-prose">${displayName}: ${glossaryWrap(verdict.expected, store)}</p>
         ${redFlagBadge}
         ${insteadLine}
         ${breakdownLink}

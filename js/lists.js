@@ -5,7 +5,7 @@ import {
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
-  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX,
+  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -476,7 +476,7 @@ function renderRow(store, row, persona, tbody) {
     // authored — the exact string verdictHeadline() already splits out,
     // shown in full instead of truncated.
     verdictHtml = `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span>
-      <div class="verdict-prose">${escapeHtml(row.verdict.expected)}</div>`;
+      <div class="verdict-prose">${glossaryWrap(row.verdict.expected, store)}</div>`;
   } else if (row.engineVerdict) {
     // Third application of the same map.js/location.js engine fallback
     // (Part 15.2/15.3). There's no fixture-shaped prose for this claim, so
@@ -576,7 +576,7 @@ function buildBreakdown(store, row, persona) {
   if (row.verdict) {
     const item = document.createElement("div");
     item.className = "breakdown-item";
-    item.innerHTML = `<strong>${displayName}'s visa/elimination read</strong><br>${escapeHtml(row.verdict.expected)}`;
+    item.innerHTML = `<strong>${displayName}'s visa/elimination read</strong><br>${glossaryWrap(row.verdict.expected, store)}`;
     wrap.appendChild(item);
   }
   return wrap;

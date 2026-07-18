@@ -306,17 +306,48 @@ for (const loc of locations) {
     return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}</details>`;
   }).join("");
 
+  // Part 23.2 (F3), same fix and same copy as the JS-hydrated page's
+  // buildSourcesSection() (js/location.js) — kept in sync by hand, same
+  // duplication class this file's own header comment already names for
+  // generalIndex()/sectionForFact(). Linked sources stay fully itemized;
+  // unlinked sources collapse to one honest, count-stated line.
   const sourcedFacts = facts.filter((f) => f.value_raw !== "[GAP]" && (f.source_url || f.source_ref));
-  const seen = new Map();
+  const linkedSeen = new Map();
+  const unlinkedSeen = new Map();
   for (const f of sourcedFacts) {
-    const key = f.source_url || `onfile:${f.source_ref || f.fact_label}`;
-    if (!seen.has(key)) seen.set(key, f);
+    if (f.source_url) {
+      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, f);
+    } else {
+      // Same dedup key as the old single-list code (source_ref/
+      // fact_label) — a "source" is a distinct citation, not one row per
+      // fact; several facts commonly cite the same unlinked source.
+      const key = `onfile:${f.source_ref || f.fact_label}`;
+      if (!unlinkedSeen.has(key)) unlinkedSeen.set(key, f);
+    }
   }
-  const sourceRows = [...seen.values()];
-  const sourcesHtml = `<details class="chapter" open id="sec-sources"><summary>Sources</summary>` + (sourceRows.length
-    ? `<ul class="fact-list">${sourceRows.map((f) => `<li class="fact-item"><div class="fact-value">${
-        f.source_url ? `<a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a>` : `<span class="source-onfile">Source noted — no link available yet</span>`
-      } <span class="scope-tag">${escapeHtml(f.date || "")}</span></div></li>`).join("")}</ul>`
+  const linkedRows = [...linkedSeen.values()];
+  const unlinkedFacts = [...unlinkedSeen.values()];
+  const linkedSourceHtml = linkedRows.map((f) => `<li class="fact-item"><div class="fact-value"><a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a> <span class="scope-tag">${escapeHtml(f.date || "")}</span></div></li>`).join("");
+  let mostRecentUnlinkedDate = null;
+  for (const f of unlinkedFacts) {
+    if (f.date && (!mostRecentUnlinkedDate || f.date > mostRecentUnlinkedDate)) mostRecentUnlinkedDate = f.date;
+  }
+  const unlinkedDateText = escapeHtml(mostRecentUnlinkedDate || "an unstated date");
+  let unlinkedSourceHtml = "";
+  if (unlinkedFacts.length > 0) {
+    let sentence;
+    if (linkedRows.length === 0) {
+      sentence = `${unlinkedFacts.length} sources are on file here, none with a public link yet — the most recent dates from ${unlinkedDateText}.`;
+    } else if (unlinkedFacts.length === 1) {
+      sentence = `One more source is on file here without a public link yet — it dates from ${unlinkedDateText}.`;
+    } else {
+      sentence = `${unlinkedFacts.length} more sources are on file here without a public link yet — the most recent dates from ${unlinkedDateText}.`;
+    }
+    unlinkedSourceHtml = `<li class="fact-item"><p class="fact-notes">${sentence}</p></li>`;
+  }
+  const sourceRowsHtml = linkedSourceHtml + unlinkedSourceHtml;
+  const sourcesHtml = `<details class="chapter" open id="sec-sources"><summary>Sources</summary>` + (sourceRowsHtml
+    ? `<ul class="fact-list">${sourceRowsHtml}</ul>`
     : `<p class="fact-notes">No sources on file yet.</p>`) + `</details>`;
 
   const candidates = locations

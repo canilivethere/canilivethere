@@ -875,21 +875,71 @@ function buildSection(key, facts, extraHtml = "") {
   return details;
 }
 
+// Part 23.2 (F3): a location with N facts noted-but-unlinked used to
+// render N identical "Source noted — no link available yet" rows, once per
+// fact, differing only by date — a section saying nothing, N times. Split
+// by whether a fact has a real, clickable link: linked sources are real,
+// distinguishing information (a URL) and stay fully itemized, one <li>
+// each, dedup'd by URL exactly as before; unlinked sources collapse to
+// ONE honest, count-stated line — never suppressed outright, since "on
+// file but unlinked" is still real evidence.
 function buildSourcesSection(sourcedFacts) {
   const details = document.createElement("details");
   details.className = "chapter";
   details.id = "sec-sources";
-  const seen = new Map();
+
+  const linkedSeen = new Map();
+  const unlinkedSeen = new Map();
   for (const f of sourcedFacts) {
-    const key = f.source_url || `onfile:${f.source_ref || f.fact_label}`;
-    if (!seen.has(key)) seen.set(key, f);
+    if (f.source_url) {
+      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, f);
+    } else {
+      // Dedup by the same key the old single-list code used
+      // (source_ref/fact_label) — a "source" here is a distinct citation,
+      // not one row per fact; several facts commonly cite the same
+      // unlinked source (e.g. the same research file backing a dozen
+      // facts), and counting raw facts instead of distinct sources would
+      // badly overstate N.
+      const key = `onfile:${f.source_ref || f.fact_label}`;
+      if (!unlinkedSeen.has(key)) unlinkedSeen.set(key, f);
+    }
   }
-  const rows = [...seen.values()];
-  details.innerHTML = `<summary>Sources</summary>` + (rows.length
-    ? `<ul class="fact-list">` + rows.map((f) => `
+  const linked = [...linkedSeen.values()];
+  const unlinked = [...unlinkedSeen.values()];
+
+  const linkedHtml = linked.map((f) => `
         <li class="fact-item">
           <div class="fact-value">${sourceLine(f)} ${confidenceBadge(f, { interactive: false })} <span class="scope-tag">${escapeHtml(f.date || "")}</span></div>
-        </li>`).join("") + `</ul>`
+        </li>`).join("");
+
+  // Most recent of the unlinked sources' own dates — already-available
+  // data, no new field. Plain string comparison: every date on file uses
+  // the same YYYY-MM-DD-leading shape, so lexical order is date order.
+  let mostRecentDate = null;
+  for (const f of unlinked) {
+    if (f.date && (!mostRecentDate || f.date > mostRecentDate)) mostRecentDate = f.date;
+  }
+  const dateText = escapeHtml(mostRecentDate || "an unstated date");
+  let unlinkedHtml = "";
+  if (unlinked.length > 0) {
+    let sentence;
+    if (linked.length === 0) {
+      // This variant's own source copy is written generically for "N > 0,
+      // linked = 0" without a singular sub-form — a real, small copy gap
+      // at N=1 ("1 sources"), flagged rather than silently patched here
+      // (not this seat's copy to write). See the build report.
+      sentence = `${unlinked.length} sources are on file here, none with a public link yet — the most recent dates from ${dateText}.`;
+    } else if (unlinked.length === 1) {
+      sentence = `One more source is on file here without a public link yet — it dates from ${dateText}.`;
+    } else {
+      sentence = `${unlinked.length} more sources are on file here without a public link yet — the most recent dates from ${dateText}.`;
+    }
+    unlinkedHtml = `<li class="fact-item"><p class="fact-notes">${sentence}</p></li>`;
+  }
+
+  const rowsHtml = linkedHtml + unlinkedHtml;
+  details.innerHTML = `<summary>Sources</summary>` + (rowsHtml
+    ? `<ul class="fact-list">${rowsHtml}</ul>`
     : `<p class="fact-notes">No sources on file yet.</p>`);
   return details;
 }

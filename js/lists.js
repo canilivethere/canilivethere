@@ -6,6 +6,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
+  personaDisplayLabel,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -454,7 +455,16 @@ function renderBanded(store, persona, rows, tbody) {
     headerTr.className = "band-header-row";
     const headerTd = document.createElement("td");
     headerTd.colSpan = 5;
-    headerTd.innerHTML = `<strong>${escapeHtml(BAND_LABEL[band])} (${groupRows.length})</strong>`;
+    // Part 23.8 (F12/perspective-disclosure law): a scrolled viewport can
+    // lose which persona's lens produced these groupings above it —
+    // "Clears (0)" alone, mid-scroll, doesn't say for whom. renderBanded()
+    // only ever runs with a real, non-custom persona locked (see its call
+    // site in render()), so the "for {name}" clause always applies here —
+    // the unlocked/no-persona state renders through the flat path below,
+    // never reaching this function, and stays correctly un-qualified there
+    // (the law's own "no-lens state is itself a perspective and says so"
+    // clause, already true by omission).
+    headerTd.innerHTML = `<strong>${escapeHtml(BAND_LABEL[band])} for ${escapeHtml(personaDisplayLabel(persona))} (${groupRows.length})</strong>`;
     headerTr.appendChild(headerTd);
     tbody.appendChild(headerTr);
 

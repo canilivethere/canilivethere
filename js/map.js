@@ -1,4 +1,4 @@
-import { loadStore, verdictHeadline, sectionForFact } from "./data.js";
+import { loadStore, verdictHeadline, sectionForFact, resolveVerdict } from "./data.js";
 import { scoreToColor, indexToColor, calibrateIndexBands, indexBandDisclosure, getScaleLegend, verdictVisual, bandVisual, clearsColor, eliminatedColor, isGapValue, CONDITIONAL_COLOR, pendingColor, DOG_LENS_COLOR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
@@ -821,7 +821,7 @@ function renderMap(store, lenses) {
         faded = false;
         tooltip = baseTooltip;
       } else {
-        const engineVerdict = store.verdictsByPersona.get("waldo")?.get(loc.location_id);
+        const engineVerdict = resolveVerdict(store, "waldo", loc);
         if (engineVerdict) {
           faded = false;
           const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
@@ -854,7 +854,7 @@ function renderMap(store, lenses) {
       // answers this location — same precedence as location.js's
       // buildVerdictBlock (15.2), same engine the five-persona branch below
       // already uses.
-      const engineVerdict = !verdict ? store.verdictsByPersona.get(persona)?.get(loc.location_id) : null;
+      const engineVerdict = !verdict ? resolveVerdict(store, persona, loc) : null;
       const hasRealRead = !!verdict || hasCriterionFixtures || !!engineVerdict;
       fill = indexToColor(underlyingValue);
       gap = isGapValue(underlyingValue);
@@ -921,7 +921,7 @@ function renderMap(store, lenses) {
       // claim ("the engine looked and the facts don't reach an answer"),
       // gets its own color below, not the fade treatment.
       const displayName = persona.charAt(0).toUpperCase() + persona.slice(1);
-      const verdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
+      const verdict = resolveVerdict(store, persona, loc);
       const general = store.generalIndex(loc.location_id);
       const generalValue = general ? general.value : null;
       if (verdict) {

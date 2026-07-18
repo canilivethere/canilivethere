@@ -174,15 +174,26 @@ async function buildStore(basePath) {
     visaRoutesByCountry.get(r.country_id).push(r);
   }
 
-  // verdictsByPersona: persona_id -> location_id -> verdict row (v9 Part
-  // 6/7 — the five no-fixture personas' only source of a real, rule-derived
-  // read; `routes_detail` stays a JSON-string-of-a-list on the row exactly
-  // as exported, unparsed here, since Tier 1 (this build) never reads it —
-  // a future Tier 2 build parses it at its own point of use).
+  // verdictsByPersona: persona_id -> { byLocation: Map(location_id->row),
+  // byCountry: Map(country_id->row) } (v9 Part 6/7, re-shaped v12 Part 23.5
+  // for the export's own §8Q-ruled `scope` field). A `scope:
+  // "country"` row carries `location_id: null` and is the ONE physical row
+  // for every location in that country under this persona (today: all 168
+  // rows are scope="country" — confirmed live, zero scope="location" rows
+  // exist yet). Indexing straight on `location_id` the old way would
+  // collapse every country-scope row for a persona onto a single `null`
+  // key; splitting into two maps and resolving through resolveVerdict()
+  // below is the actual fix `8Q.5`'s "join by scope + join key, never
+  // string-matching prose" describes. `routes_detail` stays a
+  // JSON-string-of-a-list on the row exactly as exported, unparsed here.
   const verdictsByPersona = new Map();
   for (const v of verdicts) {
-    if (!verdictsByPersona.has(v.persona_id)) verdictsByPersona.set(v.persona_id, new Map());
-    verdictsByPersona.get(v.persona_id).set(v.location_id, v);
+    if (!verdictsByPersona.has(v.persona_id)) {
+      verdictsByPersona.set(v.persona_id, { byLocation: new Map(), byCountry: new Map() });
+    }
+    const perPersona = verdictsByPersona.get(v.persona_id);
+    if (v.scope === "location" && v.location_id) perPersona.byLocation.set(v.location_id, v);
+    else if (v.country_id) perPersona.byCountry.set(v.country_id, v);
   }
 
   const store = {
@@ -391,6 +402,22 @@ export function topBottomCriteria(store, personaId, locationId) {
     if (e.val < bottom.val) bottom = e;
   }
   return { top, bottom };
+}
+
+// The one place a verdict is looked up for a given persona + location
+// (§8Q.5/§8Q.6, Part 23.5): tries a location-scope row first (the forward
+// path — a route or fact that genuinely varies by location, none live
+// today), falls back to that location's own country's country-scope row.
+// Every call site that used to do
+// `store.verdictsByPersona.get(persona)?.get(loc.location_id)` reads
+// through this instead, so a deep-linked/screenshotted single location
+// still resolves its persona's full verdict even though the row now
+// canonically lives at country grain (§8Q.6's own caution).
+export function resolveVerdict(store, personaId, loc) {
+  if (!loc) return null;
+  const perPersona = store.verdictsByPersona.get(personaId);
+  if (!perPersona) return null;
+  return perPersona.byLocation.get(loc.location_id) || perPersona.byCountry.get(loc.country_id) || null;
 }
 
 // Verdict fixtures (Wenda/Carmen) are freeform prose, e.g.

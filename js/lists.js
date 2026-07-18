@@ -1,4 +1,4 @@
-import { loadStore, verdictHeadline } from "./data.js";
+import { loadStore, verdictHeadline, resolveVerdict } from "./data.js";
 import { scoreToColor, indexToColor, calibrateIndexBands, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
@@ -302,7 +302,7 @@ function buildRows(store, persona) {
         }
         verdict = perLoc?.verdict || null;
         if (!verdict) {
-          engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id) || null;
+          engineVerdict = resolveVerdict(store, persona, loc);
         }
       }
       // Purpose-list score (§3): a straight read of scores.jsonl for the

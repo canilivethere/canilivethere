@@ -1,4 +1,4 @@
-import { loadStore, sectionForFact, verdictHeadline } from "./data.js";
+import { loadStore, sectionForFact, verdictHeadline, resolveVerdict } from "./data.js";
 import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
@@ -273,7 +273,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       // through to this box's own always-fires "not checked yet"
       // confession below — Part 6's map-pin fix, a second render home for
       // the identical claim (mirrors map.js's own persona branch exactly).
-      const engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
+      const engineVerdict = resolveVerdict(store, persona, loc);
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
@@ -292,8 +292,18 @@ function buildVerdictBlock(store, loc, country, persona) {
         // judge," so a tier badge there would wrongly imply a tier exists.
         const tierBadge = engineVerdict.overall_band === "data_gap"
           ? "" : verdictConfidenceBadge(engineVerdict.confidence_tier);
+        // Part 23.5 / §8Q item 4: never render the raw word "scope" —
+        // disclose the effect instead. Every verdict on file today is
+        // computed once per country, not per location (confirmed live:
+        // 168/168 rows), so a single-location page showing it needs to say
+        // so, not let the reader assume it was checked at this exact place.
+        // PLACEHOLDER WORDING, not final copy — needs a register pass
+        // before shipping; flagged in the build report.
+        const scopeNote = engineVerdict.scope === "country"
+          ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
+          : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}</p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}${scopeNote}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}
@@ -366,7 +376,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       // the five no-fixture personas, one level down the same precedence
       // chain this box already enforces (hand fixture always wins when
       // present, checked first, unchanged above this Part).
-      const engineVerdict = store.verdictsByPersona.get(persona)?.get(loc.location_id);
+      const engineVerdict = resolveVerdict(store, persona, loc);
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
@@ -379,8 +389,13 @@ function buildVerdictBlock(store, loc, country, persona) {
         // above — skip on a data-gap band for the identical reason.
         const tierBadge = engineVerdict.overall_band === "data_gap"
           ? "" : verdictConfidenceBadge(engineVerdict.confidence_tier);
+        // Same scope disclosure as the no-fixture branch above — see its
+        // comment. PLACEHOLDER WORDING, not final — see above.
+        const scopeNote = engineVerdict.scope === "country"
+          ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
+          : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}</p>
+          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}${scopeNote}</p>
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
           ${insteadLine}

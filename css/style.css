@@ -818,6 +818,11 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .verdict-prose { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; max-width: 32em; }
 /* v4 addendum R1 §1.2/1.3: persona verdict-first band group headers. */
 .band-header-row td { background: var(--panel); font-size: 0.95rem; font-weight: 600; padding-top: 0.75rem; }
+/* Part 23.5: the country subheader is a real sub-level of the band header
+   above it -- same shape (a full-width panel row), one step down in
+   weight/indent, never confused with the band header itself. */
+.country-subheader-row td { font-size: 0.85rem; font-weight: 400; padding-top: 0.5rem; padding-left: 1.25rem; }
+.country-subheader-label { font-weight: 600; }
 /* Part 23.4 item 3: replaces the old .visit-link text repeated on every
    row — same destination, a compact icon-style affordance instead of a
    repeated sentence (the sentence itself moved to page chrome). */

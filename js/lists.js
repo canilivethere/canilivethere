@@ -458,13 +458,109 @@ function renderBanded(store, persona, rows, tbody) {
     headerTr.appendChild(headerTd);
     tbody.appendChild(headerTr);
 
-    for (const row of groupRows) renderRow(store, row, persona, tbody);
+    // Part 23.5 (F13, §8Q): group by (persona_id, country_id) when the
+    // row's own engineVerdict is scope="country" — never by string-
+    // matching prose (the spec's own hard constraint). A hand fixture
+    // (row.verdict) is a genuinely per-location claim and is never
+    // grouped; a forward scope="location" row (none live today) also
+    // renders inline, unchanged — mixed scope within one band is the
+    // expected shape, not special-cased away (§8Q item 4). Country
+    // clusters render in the same relative position their first row would
+    // have held under the existing sort, one subheader per country, not
+    // re-sorted to the top/bottom of the band.
+    const countryRowsSeen = new Map(); // country_id -> rows[]
+    for (const row of groupRows) {
+      if (!row.verdict && row.engineVerdict && row.engineVerdict.scope === "country") {
+        const cid = row.country.country_id;
+        if (!countryRowsSeen.has(cid)) countryRowsSeen.set(cid, []);
+        countryRowsSeen.get(cid).push(row);
+      }
+    }
+    const emittedCountries = new Set();
+    for (const row of groupRows) {
+      if (!row.verdict && row.engineVerdict && row.engineVerdict.scope === "country") {
+        const cid = row.country.country_id;
+        if (emittedCountries.has(cid)) continue;
+        emittedCountries.add(cid);
+        const countryRows = countryRowsSeen.get(cid);
+        renderCountrySubheader(store, countryRows[0], countryRows.length, tbody);
+        for (const r of countryRows) renderRow(store, r, persona, tbody, { suppressVerdict: true });
+      } else {
+        renderRow(store, row, persona, tbody);
+      }
+    }
   }
+}
+
+// Part 23.5: the verdict chip + prose, extracted out of renderRow() so the
+// new country-subheader row (below) can render the identical markup once,
+// at country grain, instead of each location row re-deriving its own copy
+// of an identical string. Zero behavior change for the row-level callers —
+// same branches, same strings, same order.
+function buildVerdictHtml(store, row) {
+  if (row.verdict) {
+    const headline = verdictHeadline(row.verdict.expected);
+    const v = verdictVisual(headline);
+    // Sell-the-no framing (§1.4): the verdict's full prose, always visible
+    // under the chip, not gated behind the breakdown toggle. Zero new text
+    // authored — the exact string verdictHeadline() already splits out,
+    // shown in full instead of truncated.
+    return `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span>
+      <div class="verdict-prose">${glossaryWrap(row.verdict.expected, store)}</div>`;
+  }
+  if (row.engineVerdict) {
+    // Third application of the same map.js/location.js engine fallback
+    // (Part 15.2/15.3). There's no fixture-shaped prose for this claim, so
+    // (per this dispatch's own instruction) the chip carries the same
+    // STATE_HEADLINE sentence location.js's own verdict block already uses
+    // for the identical claim — zero new copy authored, and no separate
+    // verdict-prose line, since STATE_HEADLINE already states the finer
+    // read in full (the same "color answers roughly what kind, text
+    // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
+    // comment cites).
+    const visual = bandVisual(row.engineVerdict.overall_band);
+    const stateText = STATE_HEADLINE[row.engineVerdict.overall_state] || row.engineVerdict.overall_state;
+    // Sourcing-confidence tier badge, same skip-on-data-gap rule as
+    // location.js's own verdict block (a data-gap band already says "not
+    // enough to judge" — a tier badge there would wrongly imply one exists).
+    const tierBadge = row.engineVerdict.overall_band === "data_gap"
+      ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
+    return `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}`;
+  }
+  return "";
+}
+
+// Part 23.5 (F13, §8Q): a country-scope verdict is now stored ONCE per
+// (persona, country) — every location under that country shares the exact
+// same engineVerdict row (confirmed live: today, every engineVerdict row is
+// scope="country"). Renders that shared verdict once, at a new subheader
+// row directly under the band header — parallel structure (same
+// `.band-header-row` shape, one level narrower via a modifier class),
+// never string-matching prose to detect the duplication (the spec's own
+// hard constraint) — this groups by the data's own scope+join key instead.
+function renderCountrySubheader(store, sourceRow, count, tbody) {
+  const tr = document.createElement("tr");
+  tr.className = "band-header-row country-subheader-row";
+  const td = document.createElement("td");
+  td.colSpan = 5;
+  // Copy, Part 23.5: "one verdict, applying to every location below"
+  // states the scope explicitly rather than leaving it to indentation
+  // alone — the perspective-disclosure law's own point (a grouping is
+  // itself a claim about what the number covers).
+  td.innerHTML = `<span class="country-subheader-label">${escapeHtml(sourceRow.country.name)} — one verdict, applying to every location below.</span> ${buildVerdictHtml(store, sourceRow)}`;
+  tr.appendChild(td);
+  tbody.appendChild(tr);
 }
 
 // One row (+ its expand-row sibling) — factored out of render() so both
 // the flat (no persona) and banded (persona locked) paths share it.
-function renderRow(store, row, persona, tbody) {
+// `suppressVerdict` (23.5): true when this row's own verdict is already
+// shown once at a country-subheader row directly above it — the cell that
+// used to carry the duplicated prose renders empty/dash instead, per
+// F10/F13's own "never render a claim twice to the same eye" fix. The
+// visit-link icon is NOT suppressed — its own destination is per-location
+// and unrelated to the verdict-scope question.
+function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {}) {
   const tr = document.createElement("tr");
   // Part 23.4 item 1: this genuinely varies row by row (whether THIS
   // location has a persona rescore is computed per location, independent
@@ -497,40 +593,20 @@ function renderRow(store, row, persona, tbody) {
     ? `<span class="fit-swatch" style="background:${colorFor(displayValue)}"></span> ${displayValue.toFixed(1)}/5${fallbackTag}${customTag}`
     : `<span class="fit-swatch" style="background:${colorFor(displayValue)}"></span> not scored`;
 
+  // Part 23.5: verdict already shown once at this row's own country
+  // subheader — this cell carries no repeated prose, an em dash instead
+  // (same "cell says nothing new, don't repeat the claim" convention 23.3
+  // already established for a different collision). A trailing <br> stays
+  // on the non-suppressed engine branch (unchanged from before) so the
+  // visit-link icon lands on its own line rather than squeezed against the
+  // chip — caught live, by screenshot, not assumed, in the original build.
   let verdictHtml = "";
-  if (row.verdict) {
-    const headline = verdictHeadline(row.verdict.expected);
-    const v = verdictVisual(headline);
-    // Sell-the-no framing (§1.4): the verdict's full prose, always visible
-    // under the chip, not gated behind the breakdown toggle. Zero new text
-    // authored — the exact string verdictHeadline() already splits out,
-    // shown in full instead of truncated.
-    verdictHtml = `<span class="verdict-chip" style="background:${v.color}">${escapeHtml(v.label)}</span>
-      <div class="verdict-prose">${glossaryWrap(row.verdict.expected, store)}</div>`;
+  if (suppressVerdict) {
+    verdictHtml = `<span class="scope-tag">—</span><br>`;
+  } else if (row.verdict) {
+    verdictHtml = buildVerdictHtml(store, row);
   } else if (row.engineVerdict) {
-    // Third application of the same map.js/location.js engine fallback
-    // (Part 15.2/15.3). There's no fixture-shaped prose for this claim, so
-    // (per this dispatch's own instruction) the chip carries the same
-    // STATE_HEADLINE sentence location.js's own verdict block already uses
-    // for the identical claim — zero new copy authored, and no separate
-    // verdict-prose line, since STATE_HEADLINE already states the finer
-    // read in full (the same "color answers roughly what kind, text
-    // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
-    // comment cites).
-    // A trailing <br> (same idiom this file already uses in buildBreakdown()
-    // below) stands in for the block-level <div class="verdict-prose"> the
-    // fixture branch above relies on to push visitLink onto its own line —
-    // without it, two adjacent `display: inline-block` elements (chip, then
-    // the visit-link anchor) would render on the same line, squeezed
-    // together with no separation. Caught live, by screenshot, not assumed.
-    const visual = bandVisual(row.engineVerdict.overall_band);
-    const stateText = STATE_HEADLINE[row.engineVerdict.overall_state] || row.engineVerdict.overall_state;
-    // Sourcing-confidence tier badge, same skip-on-data-gap rule as
-    // location.js's own verdict block (a data-gap band already says "not
-    // enough to judge" — a tier badge there would wrongly imply one exists).
-    const tierBadge = row.engineVerdict.overall_band === "data_gap"
-      ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
-    verdictHtml = `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span>${tierBadge}<br>`;
+    verdictHtml = buildVerdictHtml(store, row) + "<br>";
   }
 
   // Visit-layer affordance (§1.6): the honest interim pointer to the one

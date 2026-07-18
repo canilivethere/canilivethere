@@ -158,14 +158,43 @@ async function buildStore(basePath) {
   }
 
   // fixturesByPersona: persona_id -> location_id -> { criteria: Map(critId->row), verdict: row|null }
+  // A `:verdict` fixture row is now country-scoped (location_id: null,
+  // country_id set instead) — the same schema shift §8Q made for
+  // verdicts.jsonl, applied here too (§8Q item 7's own flagged
+  // consequence, confirmed live this session: every wenda/carmen
+  // `:verdict` fixture in the current export carries a null location_id).
+  // Indexing straight on `f.location_id` the old way collapsed every
+  // persona's entire verdict-fixture set onto one shared `null` key — real
+  // bug, found live (a hand-checked pin that should carry a ring rendered
+  // with none; traced to this, not assumed from the schema note alone).
+  // Two passes: location-keyed fixtures first (criteria rows, and any
+  // future genuinely location-scoped verdict row), then country-scoped
+  // verdict rows resolved onto every location under that country — same
+  // join shape as resolveVerdict() below, applied to this second source.
   const fixturesByPersona = new Map();
+  const countryVerdictFixtures = new Map(); // persona_id -> country_id -> row
   for (const f of fixtures) {
     if (!fixturesByPersona.has(f.persona_id)) fixturesByPersona.set(f.persona_id, new Map());
     const perLoc = fixturesByPersona.get(f.persona_id);
-    if (!perLoc.has(f.location_id)) perLoc.set(f.location_id, { criteria: new Map(), verdict: null });
-    const entry = perLoc.get(f.location_id);
-    if (f.criterion_id) entry.criteria.set(f.criterion_id, f);
-    else entry.verdict = f;
+    if (f.location_id) {
+      if (!perLoc.has(f.location_id)) perLoc.set(f.location_id, { criteria: new Map(), verdict: null });
+      const entry = perLoc.get(f.location_id);
+      if (f.criterion_id) entry.criteria.set(f.criterion_id, f);
+      else entry.verdict = f;
+    } else if (f.country_id) {
+      if (!countryVerdictFixtures.has(f.persona_id)) countryVerdictFixtures.set(f.persona_id, new Map());
+      countryVerdictFixtures.get(f.persona_id).set(f.country_id, f);
+    }
+  }
+  for (const loc of locations) {
+    for (const [personaId, byCountry] of countryVerdictFixtures) {
+      const countryVerdict = byCountry.get(loc.country_id);
+      if (!countryVerdict) continue;
+      const perLoc = fixturesByPersona.get(personaId);
+      if (!perLoc.has(loc.location_id)) perLoc.set(loc.location_id, { criteria: new Map(), verdict: null });
+      const entry = perLoc.get(loc.location_id);
+      if (!entry.verdict) entry.verdict = countryVerdict;
+    }
   }
 
   const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));

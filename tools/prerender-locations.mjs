@@ -316,7 +316,12 @@ for (const loc of locations) {
   const unlinkedSeen = new Map();
   for (const f of sourcedFacts) {
     if (f.source_url) {
-      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, f);
+      // Same fix as js/location.js's buildSourcesSection(): one row per
+      // distinct URL, but every fact this URL backs gets named, not just
+      // the first one kept for its link/date — a bare "source" link gave
+      // a reader no way to tell which claim it documented.
+      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, { fact: f, labels: [] });
+      linkedSeen.get(f.source_url).labels.push(f.fact_label);
     } else {
       // Same dedup key as the old single-list code (source_ref/
       // fact_label) — a "source" is a distinct citation, not one row per
@@ -327,7 +332,7 @@ for (const loc of locations) {
   }
   const linkedRows = [...linkedSeen.values()];
   const unlinkedFacts = [...unlinkedSeen.values()];
-  const linkedSourceHtml = linkedRows.map((f) => `<li class="fact-item"><div class="fact-value"><a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a> <span class="scope-tag">${escapeHtml(f.date || "")}</span></div></li>`).join("");
+  const linkedSourceHtml = linkedRows.map(({ fact: f, labels }) => `<li class="fact-item"><div class="fact-label">${escapeHtml(labels.join(", "))}</div><div class="fact-value"><a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a> <span class="scope-tag">${escapeHtml(f.date || "")}</span></div></li>`).join("");
   let mostRecentUnlinkedDate = null;
   for (const f of unlinkedFacts) {
     if (f.date && (!mostRecentUnlinkedDate || f.date > mostRecentUnlinkedDate)) mostRecentUnlinkedDate = f.date;

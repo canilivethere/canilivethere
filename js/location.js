@@ -990,7 +990,17 @@ function buildSourcesSection(sourcedFacts) {
   const unlinkedSeen = new Map();
   for (const f of sourcedFacts) {
     if (f.source_url) {
-      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, f);
+      // Kept as one row per distinct URL (a "source" is a citation, not a
+      // fact), but every fact this same URL backs gets named in that row —
+      // the row previously kept only the first fact it met and rendered no
+      // label at all, so a reader with several linked sources on one page
+      // had no way to tell which claim any given link actually documents.
+      // `labels` collects every fact_label sharing this URL; `fact` (kept
+      // as the first match, unchanged from before) still supplies the
+      // link/date/confidence — those don't vary meaningfully by which of
+      // the shared facts you'd pick.
+      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, { fact: f, labels: [] });
+      linkedSeen.get(f.source_url).labels.push(f.fact_label);
     } else {
       // Dedup by the same key the old single-list code used
       // (source_ref/fact_label) — a "source" here is a distinct citation,
@@ -1005,8 +1015,9 @@ function buildSourcesSection(sourcedFacts) {
   const linked = [...linkedSeen.values()];
   const unlinked = [...unlinkedSeen.values()];
 
-  const linkedHtml = linked.map((f) => `
+  const linkedHtml = linked.map(({ fact: f, labels }) => `
         <li class="fact-item">
+          <div class="fact-label">${escapeHtml(labels.join(", "))}</div>
           <div class="fact-value">${sourceLine(f)} ${confidenceBadge(f, { interactive: false })} <span class="scope-tag">${escapeHtml(f.date || "")}</span></div>
         </li>`).join("");
 

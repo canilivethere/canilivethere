@@ -8,6 +8,7 @@ import {
   STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
+  verdictChipMarkup, renewalLifeExplainerLine,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -283,7 +284,14 @@ function buildVerdictBlock(store, loc, country, persona) {
         // fixture-specific content, so it transports verbatim — gated on
         // bandVisual()'s own `eliminated` flag, the engine's equivalent of
         // verdictVisual()'s `kind === "eliminated"` above.
-        const insteadLine = visual.eliminated
+        // Part 24.3: widened per §13.9's own reasoning — a composed case
+        // whose deciding group is the visit layer (overall_band
+        // "uncertain_or_conditional", not "hard_fail") has the identical
+        // practical need as a true hard-fail reader ("nowhere to convert
+        // to residency"), so `visual.eliminated` alone would silently skip
+        // this reader. Zero new content — same two anchors, only the gate
+        // condition widens.
+        const insteadLine = (visual.eliminated || !!engineVerdict.companion_disclosure)
           ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
           : "";
         // Sourcing-confidence tier for this verdict, same three-value
@@ -302,10 +310,22 @@ function buildVerdictBlock(store, loc, country, persona) {
         const scopeNote = engineVerdict.scope === "country"
           ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
           : "";
+        // Part 24.3: §13.9's mandatory companion disclosure, when it
+        // fires, as its OWN paragraph directly under the headline and
+        // BEFORE the generic verdictDisclosureSentence paragraph below —
+        // the specific, load-bearing finding reads before the general
+        // methodology boilerplate. Verbatim from the engine's own
+        // `companion_disclosure` field (the ratified §13.9 item 2
+        // sentence), not reworded here.
+        const companionParagraph = engineVerdict.companion_disclosure
+          ? `<p class="verdict-prose">${escapeHtml(engineVerdict.companion_disclosure)}</p>`
+          : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
+          <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
+          ${companionParagraph}
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
+          ${renewalLifeExplainerLine()}
           ${insteadLine}
           ${breakdownLink}
         `;
@@ -380,9 +400,10 @@ function buildVerdictBlock(store, loc, country, persona) {
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
-        // Same instead-line extension as the branch
-        // above (Waldo/Wenda/Carmen's own no-fixture-at-this-location case).
-        const insteadLine = visual.eliminated
+        // Same instead-line extension as the branch above (Waldo/Wenda/
+        // Carmen's own no-fixture-at-this-location case), same Part 24.3
+        // widening — see that branch's own comment for the reasoning.
+        const insteadLine = (visual.eliminated || !!engineVerdict.companion_disclosure)
           ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
           : "";
         // Same sourcing-confidence tier badge as the no-fixture branch
@@ -394,10 +415,16 @@ function buildVerdictBlock(store, loc, country, persona) {
         const scopeNote = engineVerdict.scope === "country"
           ? `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`
           : "";
+        // Same Part 24.3 companion-disclosure paragraph as the branch above.
+        const companionParagraph = engineVerdict.companion_disclosure
+          ? `<p class="verdict-prose">${escapeHtml(engineVerdict.companion_disclosure)}</p>`
+          : "";
         div.innerHTML = `
-          <p class="verdict-headline"><span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
+          <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
+          ${companionParagraph}
           <p class="verdict-prose">${escapeHtml(verdictDisclosureSentence(displayName))}</p>
           ${redFlagBadge}
+          ${renewalLifeExplainerLine()}
           ${insteadLine}
           ${breakdownLink}
         `;

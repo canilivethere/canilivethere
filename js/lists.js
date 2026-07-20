@@ -6,7 +6,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
-  personaDisplayLabel, verdictProvenanceBadge,
+  personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -547,7 +547,14 @@ function buildVerdictHtml(store, row, persona) {
       ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
     // Provenance label, same fix as above: this is the rule-derived
     // branch — the majority case, 5 of 8 personas at every location.
-    return `<span class="verdict-chip" style="background:${visual.color}">${escapeHtml(stateText)}</span> ${verdictProvenanceBadge(false, displayName)}${tierBadge}`;
+    // Part 24.3 (Lists table): split pill only, no added prose paragraph
+    // — preserves this branch's own "no separate verdict-prose line"
+    // economy argued in the comment above (STATE_HEADLINE already states
+    // the finer read in full; the split pill's own segment 2 text now
+    // carries that finer read for this specific case). verdictChipMarkup()
+    // renders the plain single chip, byte-for-byte unchanged, when
+    // companion_disclosure is null.
+    return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}`;
   }
   return "";
 }

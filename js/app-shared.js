@@ -4,6 +4,7 @@
 
 import { topBottomCriteria } from "./data.js";
 import { siteUrl } from "./site-root.js";
+import { eliminatedColor } from "./colors.js";
 
 export function escapeHtml(str) {
   if (str == null) return "";
@@ -924,6 +925,75 @@ export function verdictProvenanceBadge(isHandChecked, displayName) {
   return isHandChecked
     ? `<span class="badge badge-neutral" title="We reviewed ${escapeHtml(displayName)}'s own case here directly, not just the general rule.">Hand-checked for ${escapeHtml(displayName)}</span>`
     : `<span class="badge badge-neutral" title="Computed from this site's own documented rules against ${escapeHtml(displayName)}'s stated profile — not individually reviewed by us.">Rule-derived read</span>`;
+}
+
+// ---------------------------------------------------------------------
+// Part 24: the split-pill treatment for a visit-layer headline that is
+// the ONLY thing standing between a reader and "every residency route
+// here hard-fails" — §13.9's mandatory disclosure, made visible at the
+// chip itself, not just in a caption. Ground truth for both new engine
+// fields: `derived/verdicts.jsonl`'s `deciding_group_kind` ("route"/
+// "visit") and `companion_disclosure` (the ratified §13.9 item 2
+// sentence when the trigger fires, else null) — confirmed against live
+// exported rows this session. The render spec sketched an illustrative
+// separate boolean trigger flag alongside `deciding_group_kind`; the
+// engine's actual build instead folds trigger-and-text into the one
+// `companion_disclosure` field (null when the trigger doesn't fire) —
+// this code reads that field directly as both the truthy trigger check
+// AND the rendered text, rather than hardcoding a second copy of the
+// same ratified sentence here. That adaptation is this build's own
+// call, flagged in its own report, not a re-derivation of §13.9's
+// semantics (no rank/hard-fail comparison happens client-side anywhere
+// below — the engine's own pre-computed field is trusted as-is, per the
+// spec's own single-source instruction).
+// ---------------------------------------------------------------------
+
+// 24.2's own always-visible second-segment label — five words, no
+// internal vocabulary (checked against the feel-clever law and the
+// publication-boundary sweep, same as every other committed UI string
+// in this file).
+export const NO_RESIDENCY_ROUTE_CLEARS_LABEL = "No residency route clears";
+
+// One shared builder for the three call sites this Part touches
+// (location.js's two engine-verdict branches, lists.js's
+// buildVerdictHtml() engine branch) — so the split-pill markup lives in
+// exactly one place, not copy-pasted three times. `companionDisclosure`
+// is `engineVerdict.companion_disclosure` verbatim: null renders the
+// existing single chip, byte-for-byte unchanged from before this Part;
+// a real string renders the two-segment split pill (24.2) instead.
+// Segment 1 reuses the caller's own color/label exactly as it already
+// rendered (zero new copy — the visit layer's own true state, unchanged
+// per §13.9's own ruling that the composition stands). Segment 2 is the
+// fixed label above, filled with eliminatedColor() — the same token
+// every hard-fail chip on this site already uses, zero new hex. Wrapped
+// in `role="group"` with one combined `aria-label` (24.2's own
+// accessibility requirement) built mechanically from the two segments'
+// own real visible text, not fabricated new prose.
+export function verdictChipMarkup(color, label, companionDisclosure) {
+  if (!companionDisclosure) {
+    return `<span class="verdict-chip" style="background:${color}">${escapeHtml(label)}</span>`;
+  }
+  const ariaLabel = `${label} ${NO_RESIDENCY_ROUTE_CLEARS_LABEL}.`;
+  return (
+    `<span class="verdict-chip-split" role="group" aria-label="${escapeHtml(ariaLabel)}">` +
+    `<span class="verdict-chip-split-seg" style="background:${color}">${escapeHtml(label)}</span>` +
+    `<span class="verdict-chip-split-seg" style="background:${eliminatedColor()}">${escapeHtml(NO_RESIDENCY_ROUTE_CLEARS_LABEL)}</span>` +
+    `</span>`
+  );
+}
+
+// 24.5: a named, deliberately dormant slot for a future renewal-life
+// explainer (a fresh, separate product ask — explicitly NOT this
+// dispatch's own build; the render spec reserves only the slot,
+// immediately after the companion-disclosure paragraph and before
+// insteadLine on the location page). Same hard-placeholder convention
+// location.js's own buildPortrait()
+// already uses for a location with no portrait on file: returns "" now
+// and authors zero copy — the real link (href + text, once that content
+// exists) lands inside this one function with zero other call-site
+// changes needed.
+export function renewalLifeExplainerLine() {
+  return "";
 }
 
 // The expand content for the confidence-badge pull affordance above —

@@ -820,6 +820,27 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .btn-chip { border: 1px solid var(--line); cursor: pointer; }
 .expand-toggle { background: none; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
 .verdict-chip { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; color: #fff; }
+/* Part 24.2 (§13.9's mandatory disclosure): the
+   two-segment split pill for a composed verdict where a visit-layer
+   headline is the ONLY thing standing between a reader and "every
+   residency route here hard-fails." A single shell (rounded, clipped)
+   holding two equal-height, equal-font-size, equal-weight segments — the
+   shape itself, not just a color, carries the "two things" signal (a
+   non-color geometry cue that survives grayscale/blur/CVD, same pairing
+   doctrine as Part 23.9's stroke-only ring). Segment 1 keeps whatever
+   color/text the caller already rendered (unchanged, zero new copy);
+   segment 2 always fills with eliminatedColor() and the fixed "No
+   residency route clears" label — see app-shared.js's verdictChipMarkup().
+   Deliberately NOT two independently-rounded pills: overflow:hidden on
+   the shell clips both segments to the shell's own single border-radius,
+   so it reads as one pill with an internal divider, not two adjacent
+   ones. */
+.verdict-chip-split { display: inline-flex; align-items: stretch; border-radius: 10px; overflow: hidden; vertical-align: middle; }
+.verdict-chip-split-seg { display: inline-flex; align-items: center; padding: 0.1rem 0.5rem; font-size: 0.75rem; color: #fff; white-space: nowrap; }
+/* The divider itself: geometry, not meaning — a fixed white-based line
+   (not a themed token) since it has to read against whichever two
+   saturated fill colors land on either side of it, in either theme. */
+.verdict-chip-split-seg:first-child { border-right: 2px solid rgba(255, 255, 255, 0.6); }
 /* v4 addendum R1 §1.4: the verdict's full prose, always visible under the
    chip, not gated behind the breakdown toggle ("sell the no" framing). */
 .verdict-prose { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; max-width: 32em; }
@@ -865,6 +886,7 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
    this block's own rules are typography/layout only. */
 .verdict-headline { font-family: "Fraunces", serif; font-weight: 700; font-size: 1.1rem; margin: 0 0 0.4rem; }
 .verdict-block .verdict-chip { font-size: 0.85rem; padding: 0.15rem 0.65rem; }
+.verdict-block .verdict-chip-split-seg { font-size: 0.85rem; padding: 0.15rem 0.65rem; }
 .verdict-block .verdict-prose { font-size: 0.95rem; color: var(--ink); max-width: 40em; margin: 0.4rem 0; }
 .redflag-pointer { display: inline-block; margin-top: 0.4rem; font-weight: 600; }
 .fit-link-line { font-size: 0.82rem; margin-top: 0.5rem; }
@@ -989,6 +1011,15 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 @media (max-width: 700px) {
   .site-topbar { flex-direction: column; align-items: flex-start; }
   #theme-toggle { margin-left: 0; }
+  /* Part 24.2's split pill: found by live-render check, not assumed --
+     the row layout (two segments side by side) overflows a narrow
+     viewport (measured 437px pill inside a 335px block at 375px). Stacks
+     to a column below this breakpoint instead of shrinking text (which
+     the perspective-disclosure/accessibility rules above don't allow
+     compromising) -- still one shell, one border-radius, one divider,
+     just oriented vertically; the divider moves with it. */
+  .verdict-chip-split { flex-direction: column; align-items: flex-start; }
+  .verdict-chip-split-seg:first-child { border-right: none; border-bottom: 2px solid rgba(255, 255, 255, 0.6); }
 }
 
 /* ==========================================================================

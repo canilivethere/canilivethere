@@ -80,6 +80,28 @@ export function hasCustomProfile() {
   return !!(profile && profile.weights);
 }
 
+// Merge-write discipline (§8AA.1, mandatory, found live before it ever
+// shipped): the envelope now holds more than one
+// sub-object (custom_profile, nationality, saved_perspective — see the
+// door/passport-lens build), so a writer that rebuilds the whole payload
+// from scratch erases every sibling key it doesn't know about. This is the
+// one write path every sub-object writer in this file goes through from
+// here on: reads whatever is already stored, updates ONLY the named key,
+// writes every other key back verbatim. `existing` already fails closed to
+// `null` (a corrupt blob or a schema_version mismatch) via
+// readReaderPreferences() above — spread of `null` is safely `{}`, so a
+// first-ever write behaves exactly as it did before this fix.
+function writeReaderPreferenceKey(key, value) {
+  try {
+    const existing = readReaderPreferences();
+    const payload = { ...(existing || {}), schema_version: READER_PREFS_SCHEMA_VERSION, [key]: value };
+    localStorage.setItem(READER_PREFS_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // weights: the 13-key criterion_id -> 0-3 vector (8P.1). answers: the raw
 // per-question answer trail (8P.3's own forward-compatibility field, for a
 // future "revisit your answers" affordance) — stored alongside the
@@ -89,19 +111,10 @@ export function hasCustomProfile() {
 // updated_at always reflects this write. Returns true/false rather than
 // throwing, matching this module's fail-open discipline throughout.
 export function saveCustomProfile(weights, answers) {
-  try {
-    const now = new Date().toISOString();
-    const existing = readReaderPreferences();
-    const createdAt = existing?.custom_profile?.created_at || now;
-    const payload = {
-      schema_version: READER_PREFS_SCHEMA_VERSION,
-      custom_profile: { weights, answers, created_at: createdAt, updated_at: now },
-    };
-    localStorage.setItem(READER_PREFS_KEY, JSON.stringify(payload));
-    return true;
-  } catch (e) {
-    return false;
-  }
+  const now = new Date().toISOString();
+  const existing = readReaderPreferences();
+  const createdAt = existing?.custom_profile?.created_at || now;
+  return writeReaderPreferenceKey("custom_profile", { weights, answers, created_at: createdAt, updated_at: now });
 }
 
 // Attaches store.customWeights (or null) onto an already-built store —

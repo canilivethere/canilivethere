@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What this site does with your browser — CanILiveThere</title>
+<meta name="description" content="What leaves your browser, what stays in it, and why the pages are this light — plain description, not legal boilerplate.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
+</head>
+<body>
+<main>
+  <h1>What this site does with your browser</h1>
+  <p id="privacy-intro"></p>
+  <h2>What leaves your browser</h2>
+  <div id="privacy-leaves"></div>
+  <h2>What stays on your device</h2>
+  <p id="privacy-stays"></p>
+  <h2>Why the pages are light</h2>
+  <div id="privacy-light"></div>
+  <h2>If you don't believe us</h2>
+  <div id="privacy-checkable"></div>
+</main>
+<script type="module" src="js/privacy.js"></script>
+</body>
+</html>

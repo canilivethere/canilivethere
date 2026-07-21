@@ -405,7 +405,7 @@ ${THEME_SCRIPT}
     ${nextBestHtml}
   </div>
 </main>
-<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p></footer>
+<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p><p>Want something researched, or found something wrong? <a href="../contact.html">Write to us.</a></p></footer>
 <script type="module" src="../js/location.js"></script>
 </body>
 </html>

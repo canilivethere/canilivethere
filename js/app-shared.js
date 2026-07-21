@@ -776,6 +776,8 @@ export function renderFooter(store) {
     </p>
     <p><a href="${withPersona(siteUrl("corrections.html"))}">Corrections &amp; changes</a> — every dated update, including what we got wrong.</p>
     <p><a href="${withPersona(siteUrl("principles.html"))}">How we work</a> — the rules we hold ourselves to, and how to check us on them.</p>
+    <p><a href="${withPersona(siteUrl("privacy.html"))}">What this site does with your browser</a> — what leaves it, what stays, and why the pages are this light.</p>
+    <p>Want something researched, or found something wrong? <a href="${withPersona(siteUrl("contact.html"))}">Write to us.</a></p>
     <p>Anonymous, cookieless visit counts by Cloudflare help us see what's useful.</p>
   `;
   document.body.appendChild(footer);

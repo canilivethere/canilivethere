@@ -269,6 +269,14 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
   white-space: nowrap;
 }
 .persona-blurb { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); min-height: 1.1em; }
+/* Part 25.4/25.6: the two conditional switcher lines — §8AA.2's
+   set-aside-not-deleted disclosure and §15/§8Z's passport-lens line.
+   Both toggle via the `hidden` attribute in app-shared.js (not left as
+   empty text), so neither ever leaves a ghost gap when it has nothing to
+   say. Same weight as .persona-blurb — this is the same class of
+   perspective-disclosure text, not a lesser aside. */
+.explicit-general-line, .passport-lens-line { margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--muted); }
+.explicit-general-line { font-style: italic; }
 
 /* ---------- disclosure "recede" mechanism (v2/v1 §2.2): a <details>
    pattern, closed by default, worded summary line — never hidden, never
@@ -791,6 +799,85 @@ h3 { font-size: 1.05rem; }
   font-family: inherit;
 }
 .door-escape:hover, .door-escape:focus { border-color: var(--accent); }
+
+/* ---------- perspective door, Part 25: the resume band, the two wing
+   cards, and the passport box (js/perspective-door.js's own rework) ---------- */
+
+/* The resume band (25.2) — sits above the wings, returning readers only.
+   A quieter card than the wings below it (no border, just breathing
+   room), since its own job is a single obvious primary action, not a
+   choice among several. */
+.door-resume { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.door-resume-line { font-size: 0.9rem; color: var(--muted); margin: 0 0 0.6rem; }
+/* Filled with the accent color (unlike the neutral .door-escape base
+   class it also carries) — the one visually PRIMARY action on this
+   screen, matching "keyboard focus starts here" with a look that says
+   so, per 25.2's own "one Enter/tap continues" framing. */
+.door-resume-continue { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.door-resume-continue:hover, .door-resume-continue:focus { background: var(--accent); border-color: var(--ink); }
+.door-resume-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.6rem; }
+/* Same quiet-link treatment as .door-back — "Switch or start over" and
+   the forget control are real but deliberately lower-weight than the
+   continue button beside them. */
+.door-link-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.door-link-btn:hover, .door-link-btn:focus { color: var(--ink); }
+
+/* The two wing cards (25.3) — side by side, card-styled (unlike the
+   circular-avatar tiles below them), since these are the door's own
+   primary entries now, not a worked-example reference row. */
+.door-wings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.door-wing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1.25rem 1rem;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+.door-wing:hover, .door-wing:focus { border-color: var(--accent); }
+.door-wing .door-portrait { width: 48px; height: 48px; }
+.door-wing-label { font-family: "Fraunces", serif; font-weight: 700; font-size: 1.05rem; }
+.door-wing-subline { font-size: 0.85rem; color: var(--muted); max-width: 26em; }
+
+/* The persona reference row (25.3) — same tiles, same size, as before;
+   only the heading above them and their position (below the wings, not
+   the primary grid) changed. */
+.door-persona-row-heading { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.75rem; }
+
+/* Wing 1 interior — the passport box (25.5). */
+.door-passport-box { display: flex; flex-direction: column; gap: 0.5rem; max-width: 32em; }
+.door-passport-heading { font-family: "Fraunces", serif; font-weight: 600; font-size: 1.1rem; margin: 0; }
+.door-passport-scope { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.4rem; }
+.door-passport-box label { font-size: 0.85rem; font-weight: 600; }
+.door-passport-box select { font-size: 0.95rem; padding: 0.35rem 0.5rem; width: 100%; }
+.door-dual-citizen-line { font-size: 0.82rem; color: var(--muted); font-style: italic; margin: 0.2rem 0 0.5rem; }
+.door-passport-save[disabled] { opacity: 0.5; cursor: not-allowed; }
+.door-passport-more { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0; }
+.door-passport-footer { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.5rem; }
+
+@media (max-width: 500px) {
+  .door-wings { grid-template-columns: 1fr; }
+}
 
 /* ---------- lists ---------- */
 .fit-def { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--muted); padding: 0 0 0.4rem; }

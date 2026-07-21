@@ -5,6 +5,7 @@
 import { topBottomCriteria } from "./data.js";
 import { siteUrl } from "./site-root.js";
 import { eliminatedColor } from "./colors.js";
+import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
 export function escapeHtml(str) {
   if (str == null) return "";
@@ -117,6 +118,124 @@ export function saveCustomProfile(weights, answers) {
   return writeReaderPreferenceKey("custom_profile", { weights, answers, created_at: createdAt, updated_at: now });
 }
 
+// ---------------------------------------------------------------------
+// The passport lens (nationality) and the door's own memory
+// (saved_perspective) — §8AA.1's two new envelope siblings, both real
+// as of the door rework. Same fail-open,
+// merge-write discipline as custom_profile above.
+// ---------------------------------------------------------------------
+
+// { code, created_at, updated_at } | null. `code` is one uppercase ISO
+// 3166-1 alpha-2 string (§15.5's ratified vocabulary) — single-select by
+// contract (§15.4).
+export function loadNationality() {
+  const prefs = readReaderPreferences();
+  return prefs && prefs.nationality ? prefs.nationality : null;
+}
+
+export function saveNationality(code) {
+  const now = new Date().toISOString();
+  const existing = readReaderPreferences();
+  const createdAt = existing?.nationality?.created_at || now;
+  return writeReaderPreferenceKey("nationality", { code, created_at: createdAt, updated_at: now });
+}
+
+// { kind: "persona"|"custom"|"none", persona_id, chosen_at } | null — the
+// door's own memory of the reader's last explicit choice there. Per
+// §8AA.1: this is the door's memory, never a render lens on its own —
+// getActivePersona() below never reads it directly; only the door itself
+// (perspective-door.js) reads it, to pre-offer the resume band.
+export function loadSavedPerspective() {
+  const prefs = readReaderPreferences();
+  return prefs && prefs.saved_perspective ? prefs.saved_perspective : null;
+}
+
+// kind: "persona" | "custom" | "none". personaId: required iff
+// kind==="persona", else null.
+export function saveSavedPerspective(kind, personaId) {
+  return writeReaderPreferenceKey("saved_perspective", {
+    kind,
+    persona_id: kind === "persona" ? personaId : null,
+    chosen_at: new Date().toISOString(),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Explicit-general session view state (§8AA.2) — td12's real fix:
+// viewing plainly and forgetting permanently are two different acts.
+// sessionStorage (not the envelope): lives exactly as long as "this
+// visit" (per-tab, survives in-site navigation, gone when the tab
+// closes) — no expiry bookkeeping, nothing to go stale, nothing this
+// forgets on its own that a reader would need to explicitly undo later.
+// ---------------------------------------------------------------------
+const EXPLICIT_GENERAL_KEY = "clt-explicit-general";
+
+export function isExplicitGeneral() {
+  try {
+    return sessionStorage.getItem(EXPLICIT_GENERAL_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+export function setExplicitGeneral() {
+  try {
+    sessionStorage.setItem(EXPLICIT_GENERAL_KEY, "1");
+  } catch (e) {}
+}
+
+// Choosing any lens IS leaving the general view (§8AA.2) — every call
+// site that activates a persona, a custom profile, or the passport lens
+// clears this alongside doing so.
+export function clearExplicitGeneral() {
+  try {
+    sessionStorage.removeItem(EXPLICIT_GENERAL_KEY);
+  } catch (e) {}
+}
+
+// True whenever the "Forget what I've saved here" control (§8AA.3) has
+// anything real to offer forgetting — gates whether that control renders
+// at all, at either of its two surfaces (the door's resume band, the
+// switcher block), so it's never a dead affordance for a reader with
+// nothing stored.
+export function hasAnySavedReaderState() {
+  return !!(hasCustomProfile() || loadNationality() || loadSavedPerspective());
+}
+
+// §8AA.3: forget = remove the envelope key, whole — never field surgery.
+// Also clears the explicit-general session flag and any lingering
+// door-seen remnant (§8AA.4's own retirement, belt-and-suspenders here
+// too). `theme` lives under its own key and is untouched by construction
+// — no carve-out needed. After this runs, the reader is a fresh visitor
+// by construction; the caller decides whether/how to reflect that
+// (every current call site reloads the page).
+export function forgetReaderPreferences() {
+  try { localStorage.removeItem(READER_PREFS_KEY); } catch (e) {}
+  try { sessionStorage.removeItem(EXPLICIT_GENERAL_KEY); } catch (e) {}
+  try { localStorage.removeItem("door-seen"); } catch (e) {}
+}
+
+// The forget affordance's own two-state confirm mechanics (§8AA.3 / C10),
+// one implementation shared by both surfaces it renders at (the switcher
+// block above, the door's resume band in perspective-door.js) — no modal
+// stack, a single button whose own label carries the confirm step. The
+// button's starting label ("Forget what I've saved here") is read from
+// the DOM rather than hardcoded here, so each call site's own markup
+// stays the single source of that first-state string.
+export function wireForgetControl(btn, { onDone } = {}) {
+  if (!btn) return;
+  let confirming = false;
+  btn.addEventListener("click", () => {
+    if (!confirming) {
+      confirming = true;
+      btn.textContent = "Sure? This clears your answers and passport on this device.";
+      return;
+    }
+    forgetReaderPreferences();
+    if (onDone) onDone();
+  });
+}
+
 // Attaches store.customWeights (or null) onto an already-built store —
 // runtime-layered, same category as fixturesByPersona/verdictsByPersona,
 // never a derived/ fetch (data.js's own header comment names this
@@ -128,17 +247,26 @@ export function applyStoredCustomWeights(store) {
   store.customWeights = profile ? profile.weights : null;
 }
 
-// The one place precedence between an explicit URL persona and a stored
-// custom weight vector gets decided (8P.2's own ruling) — deliberately
-// NOT folded into getPersona() itself, since "custom" is deliberately kept
-// out of VALID_PERSONAS (see that export's own comment). URL persona
-// always wins (same "explicit signal beats stored state" precedent
-// perspective-door.js's own shouldShowDoor() already uses for ?persona=
-// vs. door-seen); falls back to "custom" only when no URL persona is set
-// AND a stored vector exists; falls back to null (general) otherwise.
+// The one place precedence between an explicit URL persona, the
+// explicit-general session flag, and a stored custom weight vector gets
+// decided (8P.2's original ruling, extended by §8AA.2 for the new middle
+// tier) — deliberately NOT folded into getPersona() itself, since
+// "custom" is deliberately kept out of VALID_PERSONAS (see that export's
+// own comment). URL persona always wins (same "explicit signal beats
+// stored state" precedent perspective-door.js's own shouldShowDoor()
+// already uses for ?persona= vs. its old door-seen check); an active
+// explicit-general flag returns null (genuinely unfiltered) even with a
+// stored profile still present — this is td12's actual fix, the whole
+// reason the flag exists; falls back to "custom" only when neither of
+// those applies AND a stored vector exists; falls back to null (general)
+// otherwise. A stored PERSONA choice (saved_perspective) never enters
+// this precedence at all — §8AA.1's own hard boundary, "the door's
+// memory, never a render lens": only the door itself reads
+// saved_perspective, to pre-offer it, never to silently apply it.
 export function getActivePersona() {
   const urlPersona = getPersona();
   if (urlPersona) return urlPersona;
+  if (isExplicitGeneral()) return null;
   return hasCustomProfile() ? "custom" : null;
 }
 
@@ -445,6 +573,13 @@ function personaSlotInnerHtml() {
   const editControl = hasCustomProfile()
     ? `<button type="button" class="btn-chip" id="edit-priorities-btn">Edit your answers</button>`
     : "";
+  // 25.4 item 3 / C10: the permanent forget affordance, at the switcher's
+  // own copy of the two surfaces the ruling names (the door's own resume
+  // band carries the other). Gated on hasAnySavedReaderState() so it's
+  // never a dead control for a reader with nothing stored.
+  const forgetControl = hasAnySavedReaderState()
+    ? `<button type="button" class="btn-chip" id="forget-saved-btn">Forget what I've saved here</button>`
+    : "";
   return `
     <div class="persona-block">
       <label for="persona-select">Pick the point of view closest to your own:</label>
@@ -454,7 +589,10 @@ function personaSlotInnerHtml() {
         ${customOption}
       </select>
       <p class="persona-blurb" id="persona-blurb"></p>
+      <p class="explicit-general-line" id="explicit-general-line"></p>
+      <p class="passport-lens-line" id="passport-lens-line"></p>
       ${editControl}
+      ${forgetControl}
     </div>
     <details class="recede">
       <summary>Information, not advice — read what this site is and isn't</summary>
@@ -497,20 +635,49 @@ function wirePersonaSlot(container, persona) {
     blurb.textContent =
       "Every score below is shown as-is — pick a name above to see it adjusted for someone in their situation instead.";
   }
+  // §8AA.2's mandatory middle-state disclosure (C11): renders whenever the
+  // explicit-general flag is up AND a saved build actually exists to be
+  // set aside — the copy names "your saved priorities" specifically, so
+  // this gates on hasCustomProfile() literally, not on any other saved
+  // dimension (nationality/a saved persona choice don't fit this string's
+  // own wording — a narrower reading than "any saved state," flagged in
+  // the build report as a real, if small, interpretive call).
+  const generalLine = container.querySelector("#explicit-general-line");
+  const showGeneralLine = isExplicitGeneral() && hasCustomProfile();
+  generalLine.textContent = showGeneralLine
+    ? "Shown unfiltered — your saved priorities are set aside for now, not deleted."
+    : "";
+  generalLine.hidden = !showGeneralLine;
+  // §15/§8Z's passport-lens strip line, applied here per 25.6's own
+  // instruction: the switcher block names the saved passport on EVERY
+  // page, independent of persona/general state — a passport isn't a
+  // render lens the way a persona is (§8AA.1), so this renders regardless
+  // of what `persona` resolved to above.
+  const passportLine = container.querySelector("#passport-lens-line");
+  const savedNationality = loadNationality();
+  const nationalityName = savedNationality ? ISO_COUNTRY_NAMES[savedNationality.code] : null;
+  passportLine.textContent = nationalityName ? `Passport lens: ${nationalityName}` : "";
+  passportLine.hidden = !nationalityName;
   select.addEventListener("change", () => {
     const params = new URLSearchParams(location.search);
     // "custom" is never a URL value (8P.2's own ruling keeps it out of
     // VALID_PERSONAS/getPersona() entirely) — selecting it just clears any
-    // ?persona= override, same action as selecting "General." A named
-    // simplification, not silently made: once a custom weight vector is
-    // stored, getActivePersona()'s own ruled precedence means BOTH options
-    // resolve to the custom read from here on — there is no v1 switcher
-    // path back to genuinely blank general figures short of clearing the
-    // browser's own stored preferences. Flagged in the build record, not
-    // fixed here (no escape hatch was specced, and inventing new URL
-    // semantics to build one is outside this change's own scope).
-    if (select.value && select.value !== "custom") params.set("persona", select.value);
-    else params.delete("persona");
+    // ?persona= override, same action as selecting "General."
+    if (select.value && select.value !== "custom") {
+      // §8AA.2: activating any persona IS leaving the general view.
+      clearExplicitGeneral();
+      params.set("persona", select.value);
+    } else if (select.value === "custom") {
+      clearExplicitGeneral();
+      params.delete("persona");
+    } else {
+      // General selected. td12's actual fix: only meaningful (and only
+      // set) when a stored custom profile exists to override — otherwise
+      // there's nothing for getActivePersona()'s precedence to set aside,
+      // and setting the flag anyway would be a no-op write for no reason.
+      if (hasCustomProfile()) setExplicitGeneral();
+      params.delete("persona");
+    }
     const qs = params.toString();
     location.search = qs ? `?${qs}` : "";
   });
@@ -522,6 +689,12 @@ function wirePersonaSlot(container, persona) {
       // js/map.js), so this always navigates there regardless of which
       // page the switcher is on today.
       location.href = `${siteUrl("index.html")}?edit-priorities=1`;
+    });
+  }
+  const forgetBtn = container.querySelector("#forget-saved-btn");
+  if (forgetBtn) {
+    wireForgetControl(forgetBtn, {
+      onDone: () => { location.href = location.pathname + location.hash; },
     });
   }
 }

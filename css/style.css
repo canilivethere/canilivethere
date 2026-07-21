@@ -220,6 +220,21 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
   flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   padding: 0.75rem 1.25rem;
+  /* §8AA.6 bounce fix (2026-07-21): the perspective door
+     (#perspective-door, position:fixed/z-index:500) is appended to
+     <body> after this bar and, being a positioned element, paints above
+     any non-positioned sibling regardless of DOM order or z-index alone
+     — this bar was catching zero clicks with the door open even though
+     it remained faintly visible through the door's translucent backdrop.
+     A real position + a higher z-index puts it back on top of the door
+     for both paint and hit-testing; an explicit opaque background (this
+     bar had none of its own, relying on <body>'s) keeps it fully legible
+     rather than reading as a dimmed strip. Navigating away while the
+     door is open is a legitimate exit, not one this bar should ever
+     block. */
+  position: relative;
+  z-index: 501;
+  background: var(--paper);
 }
 .brand {
   font-weight: 700;

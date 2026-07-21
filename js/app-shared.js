@@ -193,6 +193,35 @@ export function clearExplicitGeneral() {
   } catch (e) {}
 }
 
+// ---------------------------------------------------------------------
+// Door-answered session flag (§8AA.6, ruled 2026-07-21). The
+// always-meet-the-door rework
+// (§8AA.2/25.2) dropped the old door-seen permanent gate but never
+// replaced it with any visit-scoped "already answered" concept — every
+// completion path (persona pick, passport save, priorities save,
+// explicit-general/Escape) ended in a plain reload that met
+// shouldShowDoor()'s bare "no ?persona= present" check and re-summoned
+// the door over whatever had just been correctly set. sessionStorage
+// (not the envelope): sticks for this tab's session only, so a genuinely
+// new visit still meets the door fresh — Cap's ratified always-meet
+// sentence is per-visit, not per-answer.
+// ---------------------------------------------------------------------
+const DOOR_ANSWERED_KEY = "clt-door-answered";
+
+export function isDoorAnswered() {
+  try {
+    return sessionStorage.getItem(DOOR_ANSWERED_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+
+export function markDoorAnswered() {
+  try {
+    sessionStorage.setItem(DOOR_ANSWERED_KEY, "1");
+  } catch (e) {}
+}
+
 // True whenever the "Forget what I've saved here" control (§8AA.3) has
 // anything real to offer forgetting — gates whether that control renders
 // at all, at either of its two surfaces (the door's resume band, the

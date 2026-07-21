@@ -42,6 +42,7 @@ import {
   loadNationality, saveNationality, loadSavedPerspective, saveSavedPerspective,
   isExplicitGeneral, setExplicitGeneral, clearExplicitGeneral,
   hasAnySavedReaderState, wireForgetControl,
+  isDoorAnswered, markDoorAnswered,
 } from "./app-shared.js";
 import { loadStore, defaultWeightForCriterion } from "./data.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
@@ -118,12 +119,24 @@ const PASSPORT_TILE_ICON = `
 `;
 
 // 25.2: ?persona= deep links still bypass the door — unchanged, an
-// explicit signal beats the ritual. Nothing else suppresses it anymore —
-// door-seen is retired (below), and a saved perspective changes what the
-// door LEADS WITH, not whether it shows.
+// explicit signal beats the ritual. door-seen is retired (below), and a
+// saved perspective changes what the door LEADS WITH, not whether it
+// shows.
+//
+// §8AA.6 fix (2026-07-21): the always-meet rework above
+// left every non-?persona= completion path (Continue, passport save,
+// priorities save, Escape/explicit-general) ending in a plain reload
+// that met this same check and re-summoned the door over the view that
+// reload had just correctly rendered. clt-door-answered (sessionStorage,
+// set by every one of those completion paths below) is the visit-scoped
+// "already met the door this visit" state that was missing — checked
+// here alongside the existing ?persona= bypass. A genuinely new visit
+// (fresh session) carries no sessionStorage at all, so it still meets
+// the door fresh — Cap's ratified sentence stays per-visit, unchanged.
 function shouldShowDoor() {
   const params = new URLSearchParams(location.search);
-  return !params.has("persona");
+  if (params.has("persona")) return false;
+  return !isDoorAnswered();
 }
 
 // §8AA.1/25.4: builds the one compound phrase the resume band names in
@@ -294,6 +307,11 @@ export function initPerspectiveDoor() {
     const priorSaved = loadSavedPerspective();
     const hadLensToSetAside = hasCustomProfile()
       || (priorSaved && priorSaved.kind === "persona" && VALID_PERSONAS.includes(priorSaved.persona_id));
+    // §8AA.6: both branches are a real door completion (Escape/explicit-
+    // general) — mark answered either way, so a within-session return to
+    // index.html doesn't re-summon the door over a reader who already
+    // dismissed it, whether or not there was a lens to set aside.
+    markDoorAnswered();
     if (hadLensToSetAside) {
       saveSavedPerspective("none", null);
       setExplicitGeneral();
@@ -353,6 +371,11 @@ export function initPerspectiveDoor() {
         const persona = btn.dataset.persona;
         saveSavedPerspective("persona", persona);
         clearExplicitGeneral();
+        // §8AA.6: the ?persona= param already bypasses shouldShowDoor() on
+        // its own, but marking answered too keeps every completion path
+        // consistent — a later within-session visit to plain index.html
+        // (no ?persona=) shouldn't re-summon the door either.
+        markDoorAnswered();
         location.href = withPersona(location.pathname + location.hash, { persona });
       };
       btn.addEventListener("click", choose);
@@ -382,6 +405,9 @@ export function initPerspectiveDoor() {
         // lens IS leaving the general view (§8AA.2) — clear the flag
         // either way, even if it wasn't set, harmless.
         clearExplicitGeneral();
+        // §8AA.6: Continue is a real door completion — mark it before
+        // either reload branch, same as every other completion path.
+        markDoorAnswered();
         const savedPersp = loadSavedPerspective();
         if (savedPersp && savedPersp.kind === "persona" && VALID_PERSONAS.includes(savedPersp.persona_id)) {
           location.href = withPersona(location.pathname + location.hash, { persona: savedPersp.persona_id });
@@ -461,6 +487,8 @@ export function initPerspectiveDoor() {
       saveNationality(select.value);
       // §8AA.2: choosing the passport lens IS leaving the general view.
       clearExplicitGeneral();
+      // §8AA.6: a real door completion — mark answered before the reload.
+      markDoorAnswered();
       location.href = location.pathname + location.hash;
     });
     select.focus();
@@ -531,6 +559,10 @@ export function initPerspectiveDoor() {
       // the door's own memory, same as choosing a named persona does.
       saveSavedPerspective("custom", null);
       clearExplicitGeneral();
+      // §8AA.6: "See my priorities" is a real door completion — mark
+      // answered before the reload, so the door doesn't re-summon over
+      // the rendered priorities view this reload is about to produce.
+      markDoorAnswered();
       // Full reload rather than an in-place re-render — the same idiom
       // the eight named tiles already use (choose() above) — so every
       // page-level index computation picks up store.customWeights fresh,

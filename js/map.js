@@ -5,7 +5,7 @@ import {
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
-  CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX,
+  CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX, initLocationSearch,
 } from "./app-shared.js";
 
 // Plain-text equivalent of app-shared.js's verdictConfidenceBadge(), for
@@ -490,6 +490,50 @@ async function main() {
   renderPurposeSelector(store, lenses);
   renderMap(store, lenses);
   wireMapInteractions(store, lenses);
+  const searchSlot = document.getElementById("location-search-slot");
+  if (searchSlot) {
+    initLocationSearch(searchSlot, store, {
+      onSelectLocation: (loc) => selectSearchLocation(store, lenses, loc),
+      onSelectCountry: (country) => selectSearchCountry(store, lenses, country),
+    });
+  }
+}
+
+// Part 26.5, map surface: zoom to the one location, then open its
+// teaser — the map's own established preview idiom, reusing the exact
+// mechanism zoomToCluster() already uses for the zoom itself. The
+// teaser needs an entry-shaped object; rather than re-deriving the whole
+// persona-dependent color/tooltip computation renderMap() already ran,
+// this reads the tooltip straight off the just-rendered visual pin's own
+// dataset (set by makeVisualPin(), unchanged) and recomputes redFlagCount
+// with the exact same one-line filter renderMap() itself uses just above
+// — cheap, deterministic, not a second copy of any real logic.
+function selectSearchLocation(store, lenses, loc) {
+  STATE.viewBox = parseViewBox(computeViewBoxForLocations([loc]));
+  renderMap(store, lenses);
+  const wrap = document.querySelector("#map-root .map-wrap");
+  const hit = wrap ? wrap.querySelector(`.pin-hit-area[data-loc="${CSS.escape(loc.location_id)}"]`) : null;
+  if (wrap && hit) {
+    const visualPin = wrap.querySelector(`.location-pin[data-loc="${CSS.escape(loc.location_id)}"]`);
+    const country = store.countriesById.get(loc.country_id);
+    const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
+      .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
+    showTeaser(wrap, hit, { loc, country, tooltip: visualPin ? visualPin.dataset.tooltip : "", redFlagCount });
+  } else {
+    // 26.5's knot fallback: this location's resolving zoom still leaves
+    // it inside a knot (near-coincident pins can stay merged at
+    // MAX_SCALE) — no solo pin to open a teaser on, so the direct page
+    // is the honest fallback, not a degraded one.
+    location.href = withPersona(siteUrl(`l/${loc.location_id}.html`));
+  }
+}
+
+// Part 26.5, map surface, country result: the zoomed frame with its
+// labeled pins IS the answer — no teaser (a country isn't a pin).
+function selectSearchCountry(store, lenses, country) {
+  const locs = store.locations.filter((l) => l.country_id === country.country_id);
+  STATE.viewBox = parseViewBox(computeViewBoxForLocations(locs));
+  renderMap(store, lenses);
 }
 
 function renderPurposeSelector(store, lenses) {
@@ -1193,6 +1237,11 @@ function renderMap(store, lenses) {
       hit.setAttribute("role", "link");
       hit.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
       hit.setAttribute("aria-expanded", "false");
+      // Part 26.5: the location search's own post-select lookup needs a
+      // solo pin's hit-area findable by location_id — the visible circle
+      // already carries this (makeVisualPin(), above); the hit-area alone
+      // didn't until this Part touched it.
+      hit.dataset.loc = entry.loc.location_id;
       const go = () => { location.href = withPersona(siteUrl(`l/${entry.loc.location_id}.html`)); };
       // v9 Part 1.1: solo pins only (knots, below, are unaffected -- 1.6).
       // First activation opens the teaser (showTeaser, above); a second

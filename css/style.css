@@ -973,6 +973,89 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .purpose-more { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
 .purpose-explainer { font-size: 0.82rem; color: var(--muted); margin: 0.35rem 0 0.75rem; }
 
+/* Part 26: the location search — one shared component, two homes (map,
+   lists). Normal-flow results (never an absolutely-positioned overlay,
+   per the spec's own no-z-index/no-focus-trap requirement) — the list
+   simply pushes content below it down when it renders. Existing tokens
+   only (--paper, --ink, --line, --accent, the .btn-chip family) — zero
+   new hex anywhere in this block. */
+.location-search { margin: 0.75rem 0; max-width: 26em; }
+.location-search label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.location-search-input {
+  width: 100%;
+  font-size: 0.95rem;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.location-search-results {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.location-search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.location-search-result:last-child { border-bottom: none; }
+.location-search-result.highlighted,
+.location-search-result:hover,
+.location-search-result:focus {
+  background: var(--chip-active-bg);
+  color: #fff;
+  outline: none;
+}
+.location-search-overflow { padding: 0.4rem 0.6rem; font-size: 0.82rem; color: var(--muted); font-style: italic; }
+.location-search-message { font-size: 0.85rem; color: var(--muted); margin: 0.25rem 0 0; }
+.location-search-message a { font-weight: 600; }
+/* .filters (lists.html) is a flex row; the search component is its own
+   compact block within it, not stretched to the row's full width. */
+.filters .location-search { margin: 0; }
+
+/* 26.6: the Lists-row selection highlight — a focus aid, not a meaning-
+   bearing mark (the moved keyboard focus ring is the non-color signal;
+   this is decoration on top of it), so a plain color pulse is fine here.
+   --accent "at low alpha," per the spec's own instruction — color-mix()
+   keeps that literal (no new hex authored), not a hand-picked rgba. */
+@keyframes location-search-row-flash {
+  from { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+  to { background-color: transparent; }
+}
+.location-search-row-highlight { animation: location-search-row-flash 2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .location-search-row-highlight { animation: none; }
+}
+
+/* Screen-reader-only text (Part 26.4's aria-live match-count region) —
+   this codebase's first use; a standard clip-based utility, not a themed
+   token, since it never paints. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- location page ---------- */
 .loc-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
 /* v4 addendum R4 §4.3: renderPersonaBlock() inserts #persona-slot as the

@@ -6,7 +6,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
-  personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup,
+  personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
@@ -90,6 +90,37 @@ async function main() {
 
   renderPurposeSelector(store, persona);
   render(store, persona);
+
+  const searchSlot = document.getElementById("location-search-slot");
+  if (searchSlot) {
+    initLocationSearch(searchSlot, store, {
+      // Part 26.6, lists surface, a location: if the active country
+      // filter would exclude it, clear it first — visibly, through the
+      // existing #country-filter control's own state, so the reader
+      // sees what changed and can undo it in place.
+      onSelectLocation: (loc) => {
+        if (STATE.country && STATE.country !== loc.country_id) {
+          STATE.country = "";
+          countrySelect.value = "";
+        }
+        render(store, persona);
+        const row = document.querySelector(`tr[data-loc="${CSS.escape(loc.location_id)}"]`);
+        if (!row) return; // defensive only — every searchable location has a row
+        row.scrollIntoView({ block: "center" });
+        const link = row.querySelector("a");
+        if (link) link.focus();
+        row.classList.add("location-search-row-highlight");
+        setTimeout(() => row.classList.remove("location-search-row-highlight"), 2000);
+      },
+      // Part 26.6, a country: the surface's own established idiom for
+      // "show me this country," reader-undoable through the same control.
+      onSelectCountry: (country) => {
+        STATE.country = country.country_id;
+        countrySelect.value = country.country_id;
+        render(store, persona);
+      },
+    });
+  }
 }
 
 function renderPurposeSelector(store, persona) {
@@ -591,6 +622,9 @@ function renderCountrySubheader(store, sourceRow, count, tbody, persona) {
 // and unrelated to the verdict-scope question.
 function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {}) {
   const tr = document.createElement("tr");
+  // Part 26.6: the location search's own post-select lookup needs a row
+  // findable by location_id, on either the flat or banded render path.
+  tr.dataset.loc = row.loc.location_id;
   // Part 23.4 item 1: this genuinely varies row by row (whether THIS
   // location has a persona rescore is computed per location, independent
   // of which band the row sorts into), so the caveat-scope principle's own

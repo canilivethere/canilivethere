@@ -1271,3 +1271,251 @@ export function divergenceBadge(fact) {
   const [cls, label] = map[fact.divergence_flag] || ["div-unchecked", fact.divergence_flag];
   return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
+
+// ---------------------------------------------------------------------
+// Part 26: the location search — a jump-to-place component over
+// data.js's own 38 locations / 21 covered countries. One shared
+// component (this function), rendered on both the map and lists
+// surfaces; the only per-surface difference is the on-select handler,
+// passed in by the caller (map.js and lists.js each own the mechanics of
+// what "go there" means on their own surface — zoom+teaser vs.
+// scroll+highlight). Zero storage keys, zero network calls: every name/
+// count rendered here is computed from `store` at call time, never
+// persisted and never hardcoded (26.8).
+// ---------------------------------------------------------------------
+
+// Unicode NFD normalize + strip combining marks — case-insensitive,
+// diacritic-folded matching (26.3): "atitlan" finds Atitlán, "merida"
+// finds Mérida.
+function foldForSearch(str) {
+  return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// container: an empty element already in the DOM (a static placeholder
+// slot, same idiom as renderPersonaSlot's own #persona-slot). handlers:
+// { onSelectLocation(loc), onSelectCountry(country) } — the caller's own
+// surface-specific "go there" behavior (26.5/26.6); this function never
+// navigates or re-renders anything outside the box it just built.
+export function initLocationSearch(container, store, handlers = {}) {
+  const { onSelectLocation, onSelectCountry } = handlers;
+
+  const countryLocationCounts = new Map();
+  for (const loc of store.locations) {
+    countryLocationCounts.set(loc.country_id, (countryLocationCounts.get(loc.country_id) || 0) + 1);
+  }
+  const candidates = [
+    ...store.locations.map((loc) => ({
+      kind: "location",
+      loc,
+      country: store.countriesById.get(loc.country_id),
+      name: loc.display_name,
+      norm: foldForSearch(loc.display_name),
+    })),
+    ...store.countries.map((country) => ({
+      kind: "country",
+      country,
+      name: country.name,
+      norm: foldForSearch(country.name),
+      count: countryLocationCounts.get(country.country_id) || 0,
+    })),
+  ];
+  const totalLocations = store.locations.length;
+  const totalCountries = store.countries.length;
+
+  container.innerHTML = `
+    <div class="location-search">
+      <label for="location-search-input">Find a place or country:</label>
+      <input type="text" id="location-search-input" class="location-search-input"
+        role="combobox" aria-expanded="false" aria-controls="location-search-results"
+        aria-autocomplete="list" autocomplete="off" spellcheck="false">
+      <p class="location-search-message" id="location-search-message" hidden></p>
+      <ul class="location-search-results" id="location-search-results" role="listbox" hidden></ul>
+      <p class="visually-hidden" id="location-search-live" aria-live="polite"></p>
+    </div>
+  `;
+  const input = container.querySelector("#location-search-input");
+  const messageEl = container.querySelector("#location-search-message");
+  const resultsEl = container.querySelector("#location-search-results");
+  const liveEl = container.querySelector("#location-search-live");
+
+  let currentMatches = [];
+  let highlightedIndex = -1;
+  // Escape's two-stage behavior (26.4): first press hides whatever's
+  // showing without touching the typed text; a second press (already
+  // collapsed) clears the text itself. Reset to false by any input event,
+  // so typing again always reopens.
+  let collapsed = false;
+
+  function matchesFor(query) {
+    const q = foldForSearch(query);
+    if (!q) return [];
+    const found = candidates.filter((c) => c.norm.includes(q));
+    // 26.3: prefix matches before mid-string matches; locations before
+    // countries within each of those groups; alphabetical within that.
+    found.sort((a, b) => {
+      const aPrefix = a.norm.startsWith(q) ? 0 : 1;
+      const bPrefix = b.norm.startsWith(q) ? 0 : 1;
+      if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+      const aKind = a.kind === "location" ? 0 : 1;
+      const bKind = b.kind === "location" ? 0 : 1;
+      if (aKind !== bKind) return aKind - bKind;
+      return a.name.localeCompare(b.name);
+    });
+    return found;
+  }
+
+  function displayLabel(c) {
+    return c.kind === "location"
+      ? `${c.name} — ${c.country ? c.country.name : ""}`
+      : `${c.name} — ${c.count} place${c.count === 1 ? "" : "s"}`;
+  }
+
+  function updateHighlight() {
+    const items = [...resultsEl.querySelectorAll(".location-search-result")];
+    items.forEach((li, i) => {
+      const isHigh = i === highlightedIndex;
+      li.classList.toggle("highlighted", isHigh);
+      li.setAttribute("aria-selected", isHigh ? "true" : "false");
+    });
+    if (highlightedIndex >= 0 && items[highlightedIndex]) {
+      input.setAttribute("aria-activedescendant", items[highlightedIndex].id);
+    } else {
+      input.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function activate(c) {
+    input.value = "";
+    currentMatches = [];
+    highlightedIndex = -1;
+    collapsed = true;
+    render();
+    if (c.kind === "location" && onSelectLocation) onSelectLocation(c.loc);
+    else if (c.kind === "country" && onSelectCountry) onSelectCountry(c.country);
+  }
+
+  function render() {
+    resultsEl.innerHTML = "";
+    resultsEl.hidden = true;
+    messageEl.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+
+    if (collapsed) return;
+
+    const q = input.value.trim();
+    if (!q) {
+      // S2: a quiet hint, only while the input actually has focus — a
+      // blurred empty box shows nothing (26.7).
+      if (document.activeElement === input) {
+        messageEl.hidden = false;
+        messageEl.textContent = `${totalLocations} places in ${totalCountries} countries on file — type a name.`;
+      }
+      return;
+    }
+
+    currentMatches = matchesFor(q);
+    if (currentMatches.length === 0) {
+      messageEl.hidden = false;
+      // S3 + S4 (26.7): S4 links contact.html, which exists as of the
+      // same build chain this Part ships in.
+      messageEl.innerHTML =
+        `Nothing on file matches '${escapeHtml(q)}'. This site covers ${totalLocations} places in ${totalCountries} countries. ` +
+        `<a href="${withPersona(siteUrl("contact.html"))}">Want somewhere researched? Ask us.</a>`;
+      liveEl.textContent = "no matches";
+      return;
+    }
+
+    const shown = currentMatches.slice(0, 8);
+    resultsEl.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    shown.forEach((c, i) => {
+      const li = document.createElement("li");
+      li.id = `location-search-option-${i}`;
+      li.setAttribute("role", "option");
+      li.className = "location-search-result" + (i === highlightedIndex ? " highlighted" : "");
+      li.setAttribute("aria-selected", i === highlightedIndex ? "true" : "false");
+      // Real, individually focusable elements (not just a roving
+      // aria-activedescendant target) — 26.4's own requirement, so
+      // Tab-through works without the arrow-key pattern too.
+      li.tabIndex = 0;
+      li.textContent = displayLabel(c);
+      // stopPropagation is load-bearing here, found live not assumed: a
+      // result click bubbles to `document` same as any click, and the
+      // map's own pre-existing "click outside a pin closes the teaser"
+      // listener (map.js's wireMapInteractions()) would otherwise see
+      // this exact click one tick after activate() -> onSelectLocation()
+      // just opened a teaser, and immediately close it again in the same
+      // event dispatch. Confined to this one click, not a general
+      // document-click suppression.
+      li.addEventListener("click", (e) => { e.stopPropagation(); activate(c); });
+      li.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); activate(c); } });
+      li.addEventListener("mouseenter", () => { highlightedIndex = i; updateHighlight(); });
+      resultsEl.appendChild(li);
+    });
+    // S5 (26.3): a computed overflow line, never copy that can go stale.
+    if (currentMatches.length > 8) {
+      const li = document.createElement("li");
+      li.className = "location-search-overflow";
+      li.setAttribute("aria-hidden", "true");
+      li.textContent = `${currentMatches.length - 8} more match — keep typing.`;
+      resultsEl.appendChild(li);
+    }
+    if (highlightedIndex >= 0 && highlightedIndex < shown.length) {
+      input.setAttribute("aria-activedescendant", `location-search-option-${highlightedIndex}`);
+    }
+    // 26.4: the visually-hidden live region, announced on every change.
+    liveEl.textContent = `${currentMatches.length} match${currentMatches.length === 1 ? "" : "es"}`;
+  }
+
+  input.addEventListener("input", () => {
+    collapsed = false;
+    highlightedIndex = -1;
+    render();
+  });
+  input.addEventListener("focus", () => {
+    collapsed = false;
+    render();
+  });
+  input.addEventListener("keydown", (e) => {
+    const optionCount = Math.min(currentMatches.length, 8);
+    if (e.key === "ArrowDown") {
+      if (!optionCount) return;
+      e.preventDefault();
+      highlightedIndex = highlightedIndex < optionCount - 1 ? highlightedIndex + 1 : 0;
+      updateHighlight();
+    } else if (e.key === "ArrowUp") {
+      if (!optionCount) return;
+      e.preventDefault();
+      highlightedIndex = highlightedIndex > 0 ? highlightedIndex - 1 : optionCount - 1;
+      updateHighlight();
+    } else if (e.key === "Enter") {
+      // Enter activates the highlighted result, or the FIRST result when
+      // none is highlighted (26.4's own fast path); zero results does
+      // nothing — the no-match line already on screen says why.
+      if (!optionCount) return;
+      e.preventDefault();
+      const idx = highlightedIndex >= 0 ? highlightedIndex : 0;
+      activate(currentMatches[idx]);
+    } else if (e.key === "Escape") {
+      if (!collapsed) {
+        collapsed = true;
+        render();
+      } else if (input.value) {
+        input.value = "";
+        highlightedIndex = -1;
+        render();
+      }
+    }
+  });
+  // 26.2: Escape here never reaches the door — the door isn't in the DOM
+  // at all while search is reachable (it only ever renders as an
+  // overlay, closed before this component's own container exists in the
+  // flow), so no explicit stopPropagation is needed for that guarantee.
+  container.addEventListener("focusout", (e) => {
+    if (!container.contains(e.relatedTarget)) {
+      collapsed = true;
+      render();
+    }
+  });
+}

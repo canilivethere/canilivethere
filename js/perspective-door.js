@@ -46,6 +46,7 @@ import {
 } from "./app-shared.js";
 import { loadStore, defaultWeightForCriterion } from "./data.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
+import { siteUrl } from "./site-root.js";
 
 // §8AA.4: retired 2026-07-21 as a show/don't-show gate (Cap's
 // always-meet-the-door direction ends the once-per-browser semantic this
@@ -79,6 +80,15 @@ const PASSPORT_BOX_SCOPE = "One real thing about you, and the entry rules on thi
 // sentence renders sentence-cased once it becomes its own standalone
 // reader paragraph — words unchanged from the source).
 const DUAL_CITIZEN_LINE = "Holding more than one passport? Check each — the better answer wins.";
+// This line is a lane draft executing Cap's verified-only re-rule (list
+// only what the data covers, not the full ISO set) — a register pass on
+// the exact wording is owed to the copy owner, not a precondition for
+// tonight's build. "Not yet verified," never "unsupported" (25.6's own
+// ratified register) still holds: this line narrates the site's own
+// unfinished coverage, never the reader's passport as a problem.
+const PASSPORT_ABSENCE_BEFORE = "Don't see your passport? We haven't verified its rules yet — tell us at ";
+const PASSPORT_ABSENCE_LINK_TEXT = "our contact page";
+const PASSPORT_ABSENCE_AFTER = " and we'll research it.";
 const PASSPORT_MORE_LINE = "That's the whole form — one passport, nothing else about you.";
 const PASSPORT_SCOPE_FOOTER = "This checks entry rules only — nothing here compares your income or savings to any threshold.";
 const PASSPORT_SAVE_LABEL = "See it through your passport";
@@ -396,7 +406,16 @@ export function initPerspectiveDoor() {
     });
 
     const passportWing = panel.querySelector('.door-wing[data-wing="passport"]');
-    const openPassport = () => renderPassportBox();
+    // The picker's own option set now needs the tiers table (Cap's
+    // re-rule) — loadStore()'s promise is already in flight by the time
+    // a reader reaches this screen (kicked off at page load, same
+    // precedent as the priorities submit button below), so this await is
+    // normally already-resolved, not a real wait; the door's own first
+    // paint above never depended on it either way.
+    const openPassport = async () => {
+      const store = await loadStore();
+      renderPassportBox(store);
+    };
     passportWing.addEventListener("click", openPassport);
     passportWing.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); openPassport(); } });
 
@@ -452,20 +471,38 @@ export function initPerspectiveDoor() {
     (continueBtn || panel.querySelector(".door-wing"))?.focus();
   }
 
-  // Wing 1 interior (25.5) — one screen, no multi-step wizard. Native
-  // <select>, full ISO list, deliberately: ~250 options is exactly what
-  // OS-level pickers already handle with built-in type-ahead, especially
-  // on mobile (the device class that surfaced the original build-your-
-  // own dead end this whole door rework fixes) — a custom combobox is a
-  // real accessibility project this v1 doesn't need.
-  function renderPassportBox() {
-    const codes = Object.keys(ISO_COUNTRY_NAMES).sort(
-      (a, b) => ISO_COUNTRY_NAMES[a].localeCompare(ISO_COUNTRY_NAMES[b])
-    );
+  // Wing 1 interior (25.5, picker rebuilt per Cap's re-rule, 2026-07-21):
+  // one screen, no multi-step wizard. The picker used to be a native
+  // <select> over the full ~250-entry ISO list (OS-level type-ahead, no
+  // custom combobox needed) — that reasoning about the WIDGET still
+  // holds, but the OPTION SET is now data-driven instead of exhaustive:
+  // only nationalities the tiers table (store.nationalityCodes, a plain
+  // dedupe in data.js) actually carries a verified row for anywhere. The
+  // list grows the moment new rows land, with no picker edit ever again.
+  // Display names still resolve through the vendored ISO list — that
+  // file is the name authority, never the option source.
+  function renderPassportBox(store) {
+    const tierCodes = new Set(store.nationalityCodes);
+    // A code the tiers table names but the vendored ISO list doesn't
+    // recognize would be a data problem upstream, not a blank option
+    // rendered here — filtered out rather than shown nameless.
+    const codes = store.nationalityCodes
+      .filter((code) => ISO_COUNTRY_NAMES[code])
+      .sort((a, b) => ISO_COUNTRY_NAMES[a].localeCompare(ISO_COUNTRY_NAMES[b]));
     const optionsHtml = codes
       .map((code) => `<option value="${code}">${escapeHtml(ISO_COUNTRY_NAMES[code])}</option>`)
       .join("");
     const existing = loadNationality();
+    // The saved-nationality edge case: a reader's saved passport could in
+    // principle no longer be in this table (a real retraction, not
+    // expected today but never ruled out) — never preselect a code the
+    // current list doesn't offer, and never touch the reader's own saved
+    // value either. The degrade already exists one layer up: the
+    // location-page passport strip's own not-yet-verified disclosure
+    // fires the same way for "nationality never in the table" as for
+    // "nationality in the table, just not for this country" — one render
+    // condition, no special case needed here.
+    const existingOffered = Boolean(existing) && tierCodes.has(existing.code);
 
     panel.innerHTML = `
       <button type="button" class="door-back" id="door-back">&lsaquo; Back</button>
@@ -474,9 +511,10 @@ export function initPerspectiveDoor() {
         <p class="door-passport-scope">${escapeHtml(PASSPORT_BOX_SCOPE)}</p>
         <label for="door-nationality-select">Your nationality</label>
         <select id="door-nationality-select">
-          <option value="" disabled${existing ? "" : " selected"}>${escapeHtml(PASSPORT_PLACEHOLDER_OPTION)}</option>
+          <option value="" disabled${existingOffered ? "" : " selected"}>${escapeHtml(PASSPORT_PLACEHOLDER_OPTION)}</option>
           ${optionsHtml}
         </select>
+        <p class="door-passport-absence">${escapeHtml(PASSPORT_ABSENCE_BEFORE)}<a href="${withPersona(siteUrl("contact.html"))}">${escapeHtml(PASSPORT_ABSENCE_LINK_TEXT)}</a>${escapeHtml(PASSPORT_ABSENCE_AFTER)}</p>
         <p class="door-dual-citizen-line">${escapeHtml(DUAL_CITIZEN_LINE)}</p>
         <button type="button" class="door-escape door-passport-save" id="door-passport-save" disabled>${escapeHtml(PASSPORT_SAVE_LABEL)}</button>
         <p class="door-passport-more">${escapeHtml(PASSPORT_MORE_LINE)}</p>
@@ -484,7 +522,7 @@ export function initPerspectiveDoor() {
       </div>
     `;
     const select = panel.querySelector("#door-nationality-select");
-    if (existing && ISO_COUNTRY_NAMES[existing.code]) select.value = existing.code;
+    if (existingOffered) select.value = existing.code;
     const saveBtn = panel.querySelector("#door-passport-save");
     const syncSave = () => { saveBtn.disabled = !select.value; };
     select.addEventListener("change", syncSave);

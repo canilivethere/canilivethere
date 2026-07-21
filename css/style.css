@@ -885,6 +885,7 @@ h3 { font-size: 1.05rem; }
 .door-passport-scope { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.4rem; }
 .door-passport-box label { font-size: 0.85rem; font-weight: 600; }
 .door-passport-box select { font-size: 0.95rem; padding: 0.35rem 0.5rem; width: 100%; }
+.door-passport-absence { font-size: 0.82rem; color: var(--muted); margin: 0.3rem 0 0; }
 .door-dual-citizen-line { font-size: 0.82rem; color: var(--muted); font-style: italic; margin: 0.2rem 0 0.5rem; }
 .door-passport-save[disabled] { opacity: 0.5; cursor: not-allowed; }
 .door-passport-more { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0; }

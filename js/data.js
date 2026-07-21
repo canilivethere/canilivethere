@@ -255,6 +255,16 @@ async function buildStore(basePath) {
     nationalityTiers.map((r) => [`${r.nationality}:${r.country_id}`, r])
   );
 
+  // nationalityCodes: the distinct `nationality` values this table actually
+  // covers, in no particular order — a mechanical dedupe, nothing computed
+  // or judged. This is the passport picker's data-driven option source
+  // (Cap's re-rule, 2026-07-21): the picker lists exactly these codes, so
+  // it grows automatically as new rows land and never needs a hand edit.
+  // Display names and sort order are the presentation layer's job (see
+  // js/perspective-door.js), not this module's — this array is just the
+  // set of codes the library has verified anything about.
+  const nationalityCodes = [...new Set(nationalityTiers.map((r) => r.nationality))];
+
   const store = {
     countries,
     locations,
@@ -278,6 +288,7 @@ async function buildStore(basePath) {
     profilesById,
     glossaryByTerm,
     nationalityTiersByKey,
+    nationalityCodes,
     meta,
   };
 

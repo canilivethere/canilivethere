@@ -80,7 +80,7 @@ async function fetchJson(path) {
 }
 
 async function buildStore(basePath) {
-  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, glossary, meta] =
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
@@ -107,6 +107,12 @@ async function buildStore(basePath) {
       // in-progress registry, not a finished dictionary); glossaryWrap()
       // in app-shared.js only ever acts on rows with a real expansion.
       fetchJsonl(basePath + "glossary.jsonl"),
+      // Part 25.6/§8Z: the passport-lens v1 table — one row per
+      // (nationality x country) the library has actually verified.
+      // Absence of a row is a defined semantic (not-yet-verified), never
+      // an error — see resolveNationalityTier() below, which is the only
+      // place this array gets read.
+      fetchJsonl(basePath + "nationality-tiers-public.jsonl"),
       fetchJson(basePath + "meta.json"),
     ]);
 
@@ -238,6 +244,17 @@ async function buildStore(basePath) {
     else if (v.country_id) perPersona.byCountry.set(v.country_id, v);
   }
 
+  // nationalityTiersByKey: "{nationality}:{country_id}" -> row (25.6/§8Z —
+  // grain is one row per nationality x country, mechanical, no
+  // interpretation). Absence of a key is not-yet-verified, a defined
+  // semantic the render layer must disclose (§13.2's never-silence rule)
+  // — resolveNationalityTier() below is the one place this gets read, so
+  // that disclosure duty has exactly one gate to pass through, not one
+  // per call site.
+  const nationalityTiersByKey = new Map(
+    nationalityTiers.map((r) => [`${r.nationality}:${r.country_id}`, r])
+  );
+
   const store = {
     countries,
     locations,
@@ -260,6 +277,7 @@ async function buildStore(basePath) {
     visaRoutesByCountry,
     profilesById,
     glossaryByTerm,
+    nationalityTiersByKey,
     meta,
   };
 
@@ -461,6 +479,19 @@ export function resolveVerdict(store, personaId, loc) {
   const perPersona = store.verdictsByPersona.get(personaId);
   if (!perPersona) return null;
   return perPersona.byLocation.get(loc.location_id) || perPersona.byCountry.get(loc.country_id) || null;
+}
+
+// The one place a passport-lens row is looked up (25.6/§8Z): a plain,
+// mechanical key lookup, nothing computed. Returns null for both "no
+// nationality selected" and "a nationality is selected but this table has
+// no row for it" — the CALLER is responsible for §8Z item 2's own
+// never-silence rule (the render condition is the reader's own state,
+// nationality selected, never the table's — this function can't know
+// which case it's in from a bare null, by design; see location.js's
+// passport-strip builder for where that distinction actually renders).
+export function resolveNationalityTier(store, nationalityCode, countryId) {
+  if (!nationalityCode || !countryId) return null;
+  return store.nationalityTiersByKey.get(`${nationalityCode}:${countryId}`) || null;
 }
 
 // Verdict fixtures (Wenda/Carmen) are freeform prose, e.g.

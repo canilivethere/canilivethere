@@ -1002,6 +1002,18 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .chapter[open] > summary::before { content: "▾ "; }
 .chapter > summary:hover { color: var(--accent); }
 .chapter .chapter-intro { font-size: 0.88rem; color: var(--muted); margin: 0.5rem 0 0.75rem; }
+
+/* Part 25.6: the passport strip — words-first, no color-coded badge
+   cluster (the standing severity-never-by-color-alone rule); a
+   <section> with its own heading, sitting above "Visa routes at a
+   glance" inside the same chapter. Inline styles carry the
+   suspended/ineligible color tokens (eliminatedColor(), theme-aware at
+   render time); the rules here are structure/spacing only. */
+.passport-strip { border: 1px solid var(--line); border-radius: 3px; padding: 0.75rem 0.9rem; margin-bottom: 1rem; background: var(--panel); }
+.passport-strip-heading { font-family: "Fraunces", serif; font-weight: 600; font-size: 0.95rem; margin: 0 0 0.4rem; }
+.passport-strip-line { margin: 0.3rem 0; font-size: 0.9rem; }
+.passport-strip-note { color: var(--muted); font-size: 0.85rem; }
+.passport-gate-line { margin-top: 0.3rem; }
 /* Red Flags keeps its stronger heading treatment even while collapsed —
    the <summary> itself carries the weight now that nothing stays open by
    default (v1 §2.1.1's left-border-accent + tint, moved onto the

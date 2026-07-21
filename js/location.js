@@ -1,5 +1,5 @@
-import { loadStore, sectionForFact, verdictHeadline, resolveVerdict } from "./data.js";
-import { scoreToColor, verdictVisual, bandVisual } from "./colors.js";
+import { loadStore, sectionForFact, verdictHeadline, resolveVerdict, resolveNationalityTier } from "./data.js";
+import { scoreToColor, verdictVisual, bandVisual, eliminatedColor } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar, renderPersonaBlock,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
@@ -8,10 +8,11 @@ import {
   STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
-  verdictChipMarkup, renewalLifeExplainerLine,
+  verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
+import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
 applyStoredTheme();
 renderTopBar("location");
@@ -91,8 +92,21 @@ async function main() {
     bySection.get(s).push(f);
   }
 
+  // Part 25.6: the passport lens re-renders the ENTRY LAYER only, inside
+  // this one section — nothing else on the page changes under it (25.9's
+  // own scope line). `nationalityRow` is null both for "no nationality
+  // saved" and "nationality saved, no row for this country" — the two
+  // cases render differently (buildPassportStripHtml reads
+  // loadNationality() itself to tell them apart), but buildVisaRoutesHtml
+  // only needs the resolved row (or null) to know which route cards, if
+  // any, carry a gate line.
+  const nationality = loadNationality();
+  const nationalityRow = nationality ? resolveNationalityTier(store, nationality.code, country.country_id) : null;
+
   for (const sectionKey of SECTION_ORDER) {
-    const extraHtml = sectionKey === "visa" ? buildVisaRoutesHtml(store, country) : "";
+    const extraHtml = sectionKey === "visa"
+      ? buildPassportStripHtml(store, nationality, nationalityRow, country) + buildVisaRoutesHtml(store, country, nationalityRow)
+      : "";
     root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || [], extraHtml));
   }
 
@@ -828,7 +842,115 @@ function routeCategoryLabel(routeKey) {
     .join(" – ");
 }
 
-function buildVisaRoutesHtml(store, country) {
+// Part 25.6: the entry-tier display phrases, all five ruled tokens
+// (§8Z's own `entry_tier_kind` enum). `suspended` is handled entirely
+// separately (buildPassportSuspendedHtml, 25.7) — it's a register
+// obligation, not a phrase variant, so it never reaches this function.
+function entryTierPhrase(row) {
+  const days = row.entry_max_days;
+  // "when null, no day count renders — never '0 days,' never a guessed
+  // number" — §8Z's own null-semantics, honored render-side.
+  const daysSuffix = days != null ? `, up to ${days} days` : "";
+  switch (row.entry_tier_kind) {
+    case "exempt": return `visa-free entry${daysSuffix}`;
+    case "visa-on-arrival": return `visa on arrival${daysSuffix}`;
+    case "evisa": return `eVisa required before travel${days != null ? `, up to ${days} days granted` : ""}`;
+    case "visa-required": return "visa required before travel — apply at an embassy or consulate first";
+    default: return row.entry_tier_kind;
+  }
+}
+
+// Part 25.7: the `suspended` render — plain mechanism, scope, and date,
+// nothing else. Visual register: the existing hard-fail token
+// (eliminatedColor()), words-first, always-visible — never theatrical
+// (no icons, no exclamation marks, no sympathy-performance). No
+// editorializing about WHY a suspension exists — this renders exactly
+// what the fact row carries, verbatim-or-silent.
+function buildPassportSuspendedHtml(row, country) {
+  const sentence = `Entry through ${country.name}'s ordinary visa channels is currently suspended for your passport. Verified ${row.last_verified_date}.`;
+  let html = `<p class="passport-strip-line passport-strip-suspended" style="color:${eliminatedColor()};font-weight:600">${escapeHtml(sentence)}</p>`;
+  if (row.document_conditional_note) {
+    html += `<p class="passport-strip-line passport-strip-note">A documented exception may apply — ${escapeHtml(row.document_conditional_note)} — this site doesn't evaluate it for you yet.</p>`;
+  }
+  return html;
+}
+
+// Part 25.6: the passport strip — the governing render rule is that its
+// OWN render condition is the reader's state (a nationality is saved),
+// never the table's (a row exists for it). No nationality saved changes
+// NOTHING on this page (the existing general-foundation render is
+// already a disclosed no-lens state via the persona-block's own blurb
+// line) — this function returns "" in that case, not a phantom
+// "select a passport" nag.
+//
+// The "how we know" receipt affordance §8Z's own `fact_key` column is
+// meant to wire (the score-receipts idiom, one interaction away) is
+// deliberately NOT built here: a direct check this session found every
+// one of the 11 fact_key values on file in derived/nationality-tiers-
+// public.jsonl point at a fact that does not exist anywhere in this
+// repo's own derived/facts/*.jsonl — a real, systemic data-layer gap
+// (not something this seat authors a fix for), flagged to the owning
+// specialist rather than built as a dead click target. The mandatory
+// claim itself (the date) still renders as plain text either way,
+// satisfying §15.3's own literal requirement.
+function buildPassportStripHtml(store, nationality, nationalityRow, country) {
+  if (!nationality) return "";
+  const nationalityName = ISO_COUNTRY_NAMES[nationality.code] || nationality.code;
+  const lines = [`<section class="passport-strip"><h4 class="passport-strip-heading">Your passport (${escapeHtml(nationalityName)})</h4>`];
+
+  if (!nationalityRow) {
+    lines.push(`<p class="passport-strip-line">Entry rules aren't yet verified for your passport — what you see below is the general foreign-national picture.</p>`);
+  } else if (nationalityRow.entry_tier_kind === "suspended") {
+    lines.push(buildPassportSuspendedHtml(nationalityRow, country));
+  } else {
+    const tierPhrase = entryTierPhrase(nationalityRow);
+    lines.push(`<p class="passport-strip-line">Your passport: ${escapeHtml(tierPhrase)}. Verified ${escapeHtml(nationalityRow.last_verified_date)}.</p>`);
+    if (nationalityRow.document_conditional_note) {
+      lines.push(`<p class="passport-strip-line passport-strip-note">A documented exception may apply — ${escapeHtml(nationalityRow.document_conditional_note)} — this site doesn't evaluate it for you yet.</p>`);
+    }
+  }
+
+  // Item 5: the never-silence rule for route-gate absence, at strip
+  // level, once — not per card. Fires whenever a nationality is selected
+  // AND at least one documented route on this country's own list carries
+  // no gate line (true for every route on file today — route_gates is
+  // empty on every row currently exported, a real and expected state,
+  // not a bug this build introduces).
+  const routes = store.visaRoutesByCountry.get(country.country_id) || [];
+  if (routes.length) {
+    const gateKeys = new Set((nationalityRow?.route_gates || []).map((g) => g.group_key));
+    const routeKeys = new Set(routes.map((r) => r.route_key));
+    const hasGatelessRoute = [...routeKeys].some((k) => !gateKeys.has(k));
+    if (hasGatelessRoute) {
+      lines.push(`<p class="passport-strip-line passport-strip-note">Routes below that don't mention your passport haven't had their nationality rules checked for it yet.</p>`);
+    }
+  }
+
+  lines.push("</section>");
+  return lines.join("");
+}
+
+// Part 25.6 item 4: one route-eligibility line per card, where a
+// `route_gates` entry exists for that route's own key. `gate0_result`
+// membership semantics are the engine's own (§13.2's Gate 0, imported by
+// the export, never re-implemented) — this is a pure lookup-and-render,
+// no eligibility logic runs here. Both outcomes render at the SAME visual
+// weight (no muting on the ineligible line) — a red-flag-class finding
+// gets the same prominence discipline as a strength, per the spec's own
+// instruction.
+function passportGateLineHtml(nationalityRow, routeKey) {
+  if (!nationalityRow) return "";
+  const gate = (nationalityRow.route_gates || []).find((g) => g.group_key === routeKey);
+  if (!gate) return "";
+  const ineligible = gate.gate0_result === "confirmed-ineligible";
+  const label = ineligible
+    ? "Not open to your passport under this route's nationality rules."
+    : "Open to your passport under this route's nationality rules.";
+  const style = ineligible ? ` style="color:${eliminatedColor()};font-weight:600"` : ` style="font-weight:600"`;
+  return `<div class="fact-notes passport-gate-line"${style}>${escapeHtml(label)}</div>`;
+}
+
+function buildVisaRoutesHtml(store, country, nationalityRow = null) {
   const rows = store.visaRoutesByCountry.get(country.country_id) || [];
   if (!rows.length) return "";
   // Grouped by route_key so a route documented as several sub-thresholds
@@ -842,6 +964,7 @@ function buildVisaRoutesHtml(store, country) {
     byRoute.get(r.route_key).push(r);
   }
   const cards = [...byRoute.values()].map((group) => {
+    const routeKey = group[0].route_key;
     const rowsHtml = group.map((r) => {
       const asFact = routeAsFact(r);
       const notes = [];
@@ -891,7 +1014,7 @@ function buildVisaRoutesHtml(store, country) {
         ${notes.join("")}
       `;
     }).join("<hr>");
-    return `<div class="fact-item">${rowsHtml}</div>`;
+    return `<div class="fact-item">${rowsHtml}${passportGateLineHtml(nationalityRow, routeKey)}</div>`;
   }).join("");
   return `
     <h3>Visa routes at a glance</h3>

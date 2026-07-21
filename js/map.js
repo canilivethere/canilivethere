@@ -168,9 +168,15 @@ function dogImportFactsLens(store) {
 // this change (ported from lists.js's own FEATURED_CRITERIA) — it's
 // not one of Part 13's four named purpose lenses, but it's already a
 // working, criterion-backed lens with no reason to drop it. The dog-
-// import lens (v8 Part 6) is a fourth chip, appended last — reversible on
-// purpose (a confirmation of keeping this lens at all is still pending):
-// removing it again is one array entry, nothing else references it.
+// import lens (v8 Part 6) stays a fourth member of this SAME array
+// (Part 28.3, 2026-07-21: demoted from its own chip to the "More…"
+// dropdown, load-bearing build note) — it must stay registered here,
+// where resolveLens() finds it by id; removing it from this array
+// entirely would make resolveLens() fall through to its own
+// criterionLens() fallback against a nonexistent criterion, silently
+// rendering a broken "not scored" ramp instead of the real two-state
+// facts view. renderPurposeSelector() below is what actually moved —
+// it now renders this one entry as a dropdown option, not a chip.
 function buildFeaturedLenses(store) {
   return [
     criterionLens(store, "visa-legal-pathway-ease", "Easiest visa"),
@@ -542,16 +548,30 @@ function renderPurposeSelector(store, lenses) {
   // "All thirteen, always reachable": the remaining criteria beyond the
   // three featured chips, sorted by the schema's own display_order.
   const moreCriteria = store.criteria.filter((c) => !lensIds.has(c.criterion_id));
+  // Part 28.3: the dog-import facts lens no longer gets its own chip —
+  // its only positive state ("rules on file") colors essentially every
+  // pin the same blue via country inheritance now that all 21 countries
+  // carry a conforming row, a coverage indicator, not information. It
+  // stays in `lenses` (buildFeaturedLenses(), unchanged) so
+  // resolveLens() still finds it by id; only the render route changes,
+  // from a top-row chip to a dropdown option. Split by `kind` (Part 13's
+  // own lens-kind field), not a hardcoded id check, so this stays
+  // correct if a second facts lens is ever added.
+  const chipLenses = lenses.filter((l) => l.kind !== "facts");
+  const factsLenses = lenses.filter((l) => l.kind === "facts");
 
   const chipHtml = (id, label, active) =>
     `<button type="button" class="btn-chip purpose-chip${active ? " active" : ""}" data-purpose="${id || ""}">${escapeHtml(label)}</button>`;
+  const factsOptionHtml = (l) =>
+    `<option value="${l.id}"${STATE.lensId === l.id ? " selected" : ""}>${escapeHtml(l.label)}</option>`;
 
   el.innerHTML =
     chipHtml("", "Blended Fit index", !STATE.lensId) +
-    lenses.map((l) => chipHtml(l.id, l.label, STATE.lensId === l.id)).join("") +
+    chipLenses.map((l) => chipHtml(l.id, l.label, STATE.lensId === l.id)).join("") +
     `<select class="purpose-more" id="purpose-more">
       <option value="">More…</option>
       ${moreCriteria.map((c) => `<option value="${c.criterion_id}"${STATE.lensId === c.criterion_id ? " selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+      ${factsLenses.length ? `<optgroup label="Facts on file — not scored">${factsLenses.map(factsOptionHtml).join("")}</optgroup>` : ""}
     </select>`;
 
   const setLens = (value) => {

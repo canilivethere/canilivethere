@@ -54,23 +54,24 @@ import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 const DOOR_SEEN_KEY = "door-seen";
 
 // Already-reviewed public-bound copy, transported verbatim, not authored
-// in this file. NOT reframed for the new three-wing layout (25.3's own
-// instruction, C12 in the Part 25 copy table): the door's most-read line
-// deserves a real register pass, not a placeholder shipped by default —
-// this ships as-is until that pass lands.
+// in this file. Register pass landed 2026-07-21 (C12; the earlier
+// as-shipped-until-reviewed line this comment used to flag is now the
+// reviewed replacement below).
 const WELCOME_LINE =
-  "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Pick whoever below comes closest to you, and see what these same facts mean for someone like that.";
+  "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Start with your passport, your priorities, or one of eight worked examples — three ways to tell the site who's asking.";
 const ESCAPE_HATCH_LABEL = "See the facts as they are.";
 
-// Part 25 copy table, C1-C8 — every string here is DRAFTED (a design
-// register pass is a named follow-up, not this build's call), shipped
-// as-drafted per the dispatch's own instruction. Kept in one place, same
-// discipline the rest of this file already uses for its own committed
-// strings, so a future register pass is cheap.
+// Part 25 copy table, C1-C10 — most ship as originally drafted; four
+// (WING_PASSPORT_SUBLINE, WING_PRIORITIES_SUBLINE, PASSPORT_MORE_LINE,
+// PASSPORT_SCOPE_FOOTER) carry a 2026-07-21 register pass responding to
+// Cap's two live bounces plus the promise-surface direction (no forward
+// promises, no "soon"/"yet" attached to a capability the site doesn't
+// have). Kept in one place, same discipline the rest of this file already
+// uses for its own committed strings, so a future register pass is cheap.
 const WING_PASSPORT_LABEL = "Your passport";
-const WING_PASSPORT_SUBLINE = "Pick your nationality and see what entry actually looks like for you.";
+const WING_PASSPORT_SUBLINE = "Pick your nationality and see what entry actually looks like for you. Where we haven't checked your passport yet, the site says so plainly.";
 const WING_PRIORITIES_LABEL = "Your priorities";
-const WING_PRIORITIES_SUBLINE = "Seven quick questions, weighed your way.";
+const WING_PRIORITIES_SUBLINE = "Seven quick questions about what matters to you.";
 const PERSONA_ROW_HEADING = "Or compare against eight worked examples — fictional people, real rules.";
 const PASSPORT_BOX_HEADING = "Start from your passport";
 const PASSPORT_BOX_SCOPE = "One real thing about you, and the entry rules on this site re-read themselves around it.";
@@ -78,8 +79,8 @@ const PASSPORT_BOX_SCOPE = "One real thing about you, and the entry rules on thi
 // sentence renders sentence-cased once it becomes its own standalone
 // reader paragraph — words unchanged from the source).
 const DUAL_CITIZEN_LINE = "Holding more than one passport? Check each — the better answer wins.";
-const PASSPORT_MORE_LINE = "That's all it asks for now. Income, savings, family, pets — the rest of you gets a place here soon.";
-const PASSPORT_SCOPE_FOOTER = "This checks entry rules only — nothing here compares your income or savings to any threshold yet.";
+const PASSPORT_MORE_LINE = "That's the whole form — one passport, nothing else about you.";
+const PASSPORT_SCOPE_FOOTER = "This checks entry rules only — nothing here compares your income or savings to any threshold.";
 const PASSPORT_SAVE_LABEL = "See it through your passport";
 const PASSPORT_PLACEHOLDER_OPTION = "Choose a passport…";
 const FORGET_LABEL = "Forget what I've saved here";
@@ -216,12 +217,18 @@ function questionRowHtml(q, prefillAnswers) {
 // (2026-07-17): five questions reworded, two kept verbatim. Q6
 // deliberately names both short and long stays — a baked-in "long-term"
 // was dropped on purpose: shorter stays are in scope, not a lesser case
-// (a same-day product decision, not drift).
+// (a same-day product decision, not drift). The routine-sustainability
+// question (Q4) was rewritten a second time 2026-07-21 (per Part 28.2,
+// the primary over a frame-parallel alternate): Cap's second live bounce
+// ("they're both AI-Language") plus a direction ruling on the axis itself
+// (friction/reliability, not tempo) — "pace of life" is dropped from
+// every reader-facing surface; the display name still carrying it
+// (derived/criteria.jsonl) is a separate, routed fix, not this file's.
 const CUSTOM_QUESTIONS = [
   { criterion_id: "community-social-fabric", question: "How much does being part of a real community — neighbors who know you, a social life that comes easily — matter to you?" },
   { criterion_id: "nature-water-adjacency", question: "How much do mountains, water, or green space right outside your door matter to you?" },
   { criterion_id: "income-viability", question: "How much does being able to actually earn a living there matter to you?" },
-  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does the day-to-day pace of life — a rhythm you could settle into and keep — matter to you?" },
+  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does it matter to you that daily life there just works — simple errands, reliable services, a routine that doesn't fall apart with the seasons?" },
   { criterion_id: "cost-of-living-affordability", question: "How much does your money going further — rent, groceries, the ordinary bills — matter to you?" },
   { criterion_id: "visa-legal-pathway-ease", question: "How much does simple paperwork — a visa that's easy to get and easy to keep, whether for a season or for good — matter to you?" },
   { criterion_id: "room-for-others-group-viability", question: "How much does having room for friends or family to join you later matter to you?" },
@@ -229,13 +236,19 @@ const CUSTOM_QUESTIONS = [
 // Most-important option first, left to right (21.5's own ordering
 // instruction) — value is the exact 0-3 weight this choice sets (8P.1's
 // own tier vocabulary), not a separate code needing translation later.
+// Part 28.1: the literal spoken answers to the shared "how much does …
+// matter to you?" stem, replacing the old per-pill "Matters …"
+// restatement — the accessibility fallback (self-labeling pills) does
+// not apply, since every question renders as a <fieldset>/<legend> pair
+// (questionRowHtml, above), so a screen reader always announces the
+// question with the group.
 const TIER_CHOICES = [
-  { value: 3, label: "Matters a lot" },
-  { value: 2, label: "Matters some" },
-  { value: 1, label: "Not a big factor" },
+  { value: 3, label: "A lot" },
+  { value: 2, label: "Some" },
+  { value: 1, label: "Not much" },
   // No trailing period — matches the other three pills' punctuation
   // pattern (a review nit, fixed for uniformity across all four).
-  { value: 0, label: "Doesn't matter to me" },
+  { value: 0, label: "Not at all" },
 ];
 
 // 21.4 screen 1's three fixed parts, in order, plus the scope line.

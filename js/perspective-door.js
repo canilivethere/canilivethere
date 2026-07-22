@@ -96,6 +96,22 @@ const PASSPORT_PLACEHOLDER_OPTION = "Choose a passport…";
 const FORGET_LABEL = "Forget what I've saved here";
 const SWITCH_LABEL = "Switch or start over";
 
+// Part 29 copy table, C1-C10 (2026-07-23) — the resume band's own
+// headline fix: a saved nationality was reading as a site question
+// ("ARE YOU TURKISH?"), not reader state. C2-C6 (the five
+// state-sentence templates) and
+// C9/C10 (the wing sublines) are built at render time from the saved-
+// state parts, not stored as flat strings here — see
+// resumeStateParts()/passportWingSubline()/prioritiesWingSubline()
+// below. Only the two fixed strings (the kicker, the neutral button)
+// are plain consts.
+const RESUME_KICKER_LABEL = "Your saved view";
+const RESUME_CONTINUE_LABEL = "Continue where you left off";
+// C3/C10: one true sentence, reused for both the resume band's
+// priorities-only state and the priorities wing's own saved-state
+// subline — not two separate claims about the same fact (29.5).
+const PRIORITIES_SAVED_LINE = "Your own priorities are saved on this device.";
+
 function portraitSrc(id) {
   return `assets/portraits/${id}.png`;
 }
@@ -158,24 +174,95 @@ function shouldShowDoor() {
 // PERSONA choice is read here (the door's own memory, §8AA.1) but never
 // applied anywhere outside an explicit "Continue" click — this function
 // only describes it.
+// Part 29: the SHAPE of this function's return value changed (raw
+// parts, not a pre-joined phrase) so the resume band's kicker/state-
+// sentence/button/aria-label (29.2) and the wing sublines (29.3) can
+// each consume the same underlying facts differently — the
+// underlying lookups (VALID_PERSONAS, hasCustomProfile, the ISO name
+// lookup) are unchanged from the pre-29 version; only their assembly
+// into a string moved out of this function, into resumeStateParts()
+// below.
 function savedPerspectiveDescriptor() {
   const savedPersp = loadSavedPerspective();
   const nationality = loadNationality();
   const nationalityName = nationality ? ISO_COUNTRY_NAMES[nationality.code] : null;
 
-  let lensPart = null;
+  let lensKind = null;
+  let personaName = null;
   if (savedPersp && savedPersp.kind === "persona" && VALID_PERSONAS.includes(savedPersp.persona_id)) {
-    lensPart = `as ${personaDisplayName(savedPersp.persona_id)}`;
+    lensKind = "persona";
+    personaName = personaDisplayName(savedPersp.persona_id);
   } else if (hasCustomProfile()) {
-    lensPart = "with your priorities";
+    lensKind = "priorities";
   }
 
-  const passportPart = nationalityName
-    ? (lensPart ? `a ${nationalityName} passport` : `with a ${nationalityName} passport`)
-    : null;
+  if (!lensKind && !nationalityName) return null;
+  return { lensKind, personaName, nationalityName };
+}
 
-  const parts = [lensPart, passportPart].filter(Boolean);
-  return parts.length ? parts.join(" + ") : null;
+// 29.2B/29.2D: the shared fragment+verb pair every resume-band string
+// is built from — one branch per saved combination, matching the five
+// spec templates exactly. Callers should already have checked
+// savedPerspectiveDescriptor() truthy.
+function resumeStateParts(descriptor) {
+  const { lensKind, personaName, nationalityName } = descriptor;
+  if (lensKind === "persona" && nationalityName) {
+    return { fragment: `${personaName}'s example and a ${nationalityName} passport`, verb: "are" };
+  }
+  if (lensKind === "priorities" && nationalityName) {
+    return { fragment: `Your own priorities and a ${nationalityName} passport`, verb: "are" };
+  }
+  if (lensKind === "persona") {
+    return { fragment: `${personaName}'s example`, verb: "is" };
+  }
+  if (lensKind === "priorities") {
+    return { fragment: "Your own priorities", verb: "are" };
+  }
+  if (nationalityName) {
+    return { fragment: `A ${nationalityName} passport`, verb: "is" };
+  }
+  return null;
+}
+
+// 29.2B, C2-C6: the resume band's own state sentence — a fact ABOUT
+// the reader, never phrased as an instruction FROM the site (the
+// mechanism Cap's own "ARE YOU TURKISH?" bounce named — "continue X"
+// reads as the site issuing a command, not reflecting a stored fact).
+function buildResumeStateSentence(descriptor) {
+  const parts = resumeStateParts(descriptor);
+  return parts ? `${parts.fragment} ${parts.verb} saved on this device.` : null;
+}
+
+// 29.2D, C8: the same content, minus the trailing "on this device"
+// clause — voiced only inside the button's own aria-label, where it's
+// inaudible/invisible to a sighted reader (who already read the
+// kicker + state line above) and load-bearing for assistive tech, so
+// the accessible name doesn't regress just because the visible label
+// went neutral.
+function buildResumeAriaFragment(descriptor) {
+  const parts = resumeStateParts(descriptor);
+  return parts ? parts.fragment : null;
+}
+
+// 29.3: the passport wing's own invitation text, state-aware. Doesn't
+// gate on whether the saved code is still in the CURRENT tiers table
+// (a different question, already handled inside renderPassportBox()'s
+// own existingOffered check) — this only answers "is anything on
+// file," same as the resume band's own facts.
+function passportWingSubline() {
+  const nationality = loadNationality();
+  const name = nationality ? ISO_COUNTRY_NAMES[nationality.code] : null;
+  return name
+    ? `Saved: a ${name} passport. Open it to change your answer.`
+    : WING_PASSPORT_SUBLINE;
+}
+
+// 29.3: deliberately NOT "open to review or change them" — that
+// promise isn't true yet (the priorities wing's own click path
+// restarts the questionnaire blank even with a saved profile, 29.1).
+// States the fact and stops.
+function prioritiesWingSubline() {
+  return hasCustomProfile() ? PRIORITIES_SAVED_LINE : WING_PRIORITIES_SUBLINE;
 }
 
 function markSeenLegacyKeyRemoved() {
@@ -347,11 +434,19 @@ export function initPerspectiveDoor() {
 
   function renderMainScreen() {
     const descriptor = savedPerspectiveDescriptor();
+    // 29.2: a quiet kicker names the band as reader-state before any
+    // content renders; the state line is a fact ABOUT the reader, never
+    // an instruction FROM the site; the button is state-neutral for
+    // every saved combination, its full state carried in aria-label
+    // instead (29.2D) so the accessible name doesn't regress.
+    const stateSentence = descriptor ? buildResumeStateSentence(descriptor) : null;
+    const ariaFragment = descriptor ? buildResumeAriaFragment(descriptor) : null;
     const resumeHtml = descriptor
       ? `
         <div class="door-resume">
-          <p class="door-resume-line">Welcome back — continue ${escapeHtml(descriptor)}.</p>
-          <button type="button" class="door-escape door-resume-continue" id="door-continue">Continue ${escapeHtml(descriptor)}</button>
+          <p class="door-resume-kicker">${escapeHtml(RESUME_KICKER_LABEL)}</p>
+          <p class="door-resume-line">${escapeHtml(stateSentence)}</p>
+          <button type="button" class="door-escape door-resume-continue" id="door-continue" aria-label="${escapeHtml(`${RESUME_CONTINUE_LABEL} — ${ariaFragment}`)}">${escapeHtml(RESUME_CONTINUE_LABEL)}</button>
           <div class="door-resume-controls">
             <button type="button" class="door-link-btn" id="door-switch">${escapeHtml(SWITCH_LABEL)}</button>
             ${hasAnySavedReaderState() ? `<button type="button" class="door-link-btn" id="door-forget-resume">${escapeHtml(FORGET_LABEL)}</button>` : ""}
@@ -367,12 +462,12 @@ export function initPerspectiveDoor() {
         <button type="button" class="door-wing" data-wing="passport">
           <span class="door-portrait door-portrait-icon">${PASSPORT_TILE_ICON}</span>
           <span class="door-wing-label">${escapeHtml(WING_PASSPORT_LABEL)}</span>
-          <span class="door-wing-subline">${escapeHtml(WING_PASSPORT_SUBLINE)}</span>
+          <span class="door-wing-subline">${escapeHtml(passportWingSubline())}</span>
         </button>
         <button type="button" class="door-wing" data-wing="priorities">
           <span class="door-portrait door-portrait-icon">${CUSTOM_TILE_ICON}</span>
           <span class="door-wing-label">${escapeHtml(WING_PRIORITIES_LABEL)}</span>
-          <span class="door-wing-subline">${escapeHtml(WING_PRIORITIES_SUBLINE)}</span>
+          <span class="door-wing-subline">${escapeHtml(prioritiesWingSubline())}</span>
         </button>
       </div>
       <div class="door-persona-row">

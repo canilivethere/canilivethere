@@ -823,6 +823,20 @@ h3 { font-size: 1.05rem; }
    room), since its own job is a single obvious primary action, not a
    choice among several. */
 .door-resume { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+/* Part 29.2A: a quiet meta-label naming the band as reader-state
+   before any content renders — the site's first uppercase/letter-
+   spaced device anywhere. text-transform re-cases the PAINT only; the
+   markup itself stays sentence-case ("Your saved view") so a screen
+   reader never spells it out letter-by-letter as an acronym. Set below
+   every other type on this panel (29.4's ordering) so it can never
+   itself become the loud thing. */
+.door-resume-kicker { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.35rem; }
+/* Part 29.2B: a fact ABOUT the reader ("A Türkiye passport is saved on
+   this device"), never an instruction FROM the site ("continue with a
+   Türkiye passport") — same class/size as before this Part, content
+   only changed. This is also the type-scale CEILING (29.4): no nation
+   name renders anywhere on this panel above this line, in this weight,
+   in this color, ever. */
 .door-resume-line { font-size: 0.9rem; color: var(--muted); margin: 0 0 0.6rem; }
 /* Filled with the accent color (unlike the neutral .door-escape base
    class it also carries) — the one visually PRIMARY action on this

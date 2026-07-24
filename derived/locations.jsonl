@@ -18,7 +18,7 @@
 {"location_id": "IN-goa", "country_id": "IN", "display_name": "Goa (Anjuna-Assagao focus)", "status": "Rescored", "lat": 15.5806, "lon": 73.7593}
 {"location_id": "MA-marrakech", "country_id": "MA", "display_name": "Marrakech", "status": "Rescored", "lat": 31.6295, "lon": -7.9811}
 {"location_id": "MA-taghazout", "country_id": "MA", "display_name": "Taghazout", "status": "Rescored", "lat": 30.5459, "lon": -9.7107}
-{"location_id": "MX-cdmx", "country_id": "MX", "display_name": "CDMX", "status": "Rescored", "lat": 19.4326, "lon": -99.1332}
+{"location_id": "MX-cdmx", "country_id": "MX", "display_name": "Mexico City", "status": "Rescored", "lat": 19.4326, "lon": -99.1332}
 {"location_id": "MX-merida", "country_id": "MX", "display_name": "Mérida", "status": "Rescored", "lat": 20.9674, "lon": -89.5926}
 {"location_id": "MX-oaxaca", "country_id": "MX", "display_name": "Oaxaca", "status": "Rescored", "lat": 17.0732, "lon": -96.7266}
 {"location_id": "MX-playadelcarmen", "country_id": "MX", "display_name": "Playa del Carmen", "status": "Rescored", "lat": 20.6296, "lon": -87.0739}

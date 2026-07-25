@@ -226,7 +226,7 @@ function resumeStateParts(descriptor) {
 
 // 29.2B, C2-C6: the resume band's own state sentence — a fact ABOUT
 // the reader, never phrased as an instruction FROM the site (the
-// mechanism Cap's own "ARE YOU TURKISH?" bounce named — "continue X"
+// mechanism a review bounce named — "continue X"
 // reads as the site issuing a command, not reflecting a stored fact).
 function buildResumeStateSentence(descriptor) {
   const parts = resumeStateParts(descriptor);

@@ -676,22 +676,43 @@ h3 { font-size: 1.05rem; }
   inset: 0;
   z-index: 500;
   display: flex;
-  align-items: center;
+  /* Part 31: top-anchored, never blind-centered. This element is the ONE
+     scroll container for the whole door — the panel below no longer caps
+     or scrolls its own height. Scroll starts at 0 on open, so the panel's
+     top (the welcome line) is always the first thing painted; content can
+     only extend below the fold (reachable by scrolling), never above it. */
+  align-items: flex-start;
   justify-content: center;
-  padding: 1.5rem;
+  /* Part 31: horizontal padding only — vertical breathing room rides the
+     panel's own margin instead, because a scroll container's bottom
+     padding is unreliably included in scroll overflow, while a child's
+     margin always is. Total vertical gap stays 1.5rem, same as before. */
+  padding: 0 1.5rem;
   background: rgba(27, 27, 27, 0.4);
   overflow-y: auto;
 }
 .door-panel {
   background: var(--panel);
-  border: 1px solid var(--line);
+  /* Part 31: 2px, a felt card boundary, not just a technical line. Light
+     theme keeps the shared line token (measures 3.03:1 against the panel
+     fill, clears the WCAG 1.4.11 3:1 non-text floor); dark theme needs its
+     own border-color override (the shared token measures 1.29:1 there,
+     effectively invisible) — see the dark-theme block. */
+  border: 2px solid var(--line);
   border-radius: 4px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   padding: 1.5rem;
   max-width: 920px;
   width: 100%;
-  max-height: calc(100vh - 3rem);
-  overflow-y: auto;
+  /* Part 31: no own max-height/overflow — the outer container scrolls. */
+  margin: 1.5rem auto;
+}
+/* Part 33: at short viewports the panel's vertical margin compresses so
+   the resume band's continue button fits above the fold even with the
+   longest saved-state sentence wrapping an extra line. Nothing changes
+   at heights above 400px. */
+@media (max-height: 400px) {
+  .door-panel { margin: 0.75rem auto; }
 }
 .door-welcome {
   font-family: "Fraunces", serif;
@@ -1311,3 +1332,14 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 [data-theme="dark"] .sev-1 { border-left-color: #256b9b; }
 
 [data-theme="dark"] .breakdown-item { background: var(--panel); }
+
+/* Part 31: the shared line token measures 1.29:1 against the panel fill in
+   this theme — effectively invisible as a card boundary. A lighter tan in
+   the same warm-neutral family measures 3.75:1, clearing the WCAG 1.4.11
+   3:1 non-text floor. Scoped to the door only, not the shared token itself
+   (changing the token would ripple across every bordered element). The
+   resume band's interior divider rides the same token pair, so it gets the
+   same color fix (width stays 1px — the 2px bump is the card boundary's
+   own felt fix, not the divider's). */
+[data-theme="dark"] .door-panel { border-color: #8a7c60; }
+[data-theme="dark"] .door-resume { border-bottom-color: #8a7c60; }

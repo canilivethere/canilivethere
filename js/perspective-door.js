@@ -563,7 +563,12 @@ export function initPerspectiveDoor() {
     // 25.2: keyboard focus starts on the resume band's own continue
     // button when one renders; a fresh visitor (no band) starts on the
     // first wing instead. Never an empty/missing focus target either way.
-    (continueBtn || panel.querySelector(".door-wing"))?.focus();
+    // Part 31: preventScroll, so native focus-scroll can't move the
+    // door's scroll position away from 0 on open — the welcome line at
+    // the panel's top must be the first thing painted, never carried
+    // out of view above the fold by the browser scrolling to the
+    // focused element on short viewports.
+    (continueBtn || panel.querySelector(".door-wing"))?.focus({ preventScroll: true });
   }
 
   // Wing 1 interior (25.5, picker rebuilt per Cap's re-rule, 2026-07-21):

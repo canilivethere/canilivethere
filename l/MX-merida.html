@@ -41,152 +41,217 @@
       <li class="fact-item">
         <div class="fact-label">Public health-insurance enrollment (IMSS) — public-system backstop</div>
         <div class="fact-value">500-700/year; excludes cancer, chronic degenerative disease, HIV, addictions, mental illness $/year</div>
-        <div class="fact-notes">Common expat pattern: private out-of-pocket for routine care plus the public system (IMSS) or private insurance as catastrophic backstop, not one system exclusively</div>
+        <div class="fact-notes">Common expat pattern: private out-of-pocket for routine care plus the public system (IMSS) or private insurance as catastrophic backstop, not one system exclusively. Source-link backfill 2026-07-19 ([specialist]): direct match, sources.md's own dedicated IMSS URL</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Pet import (cat) — species-specific requirement verification</div>
-        <div class="fact-value">Not yet researched</div>
-        <div class="fact-notes">Whether cat rabies-titer timing or quarantine requirements differ from the dog findings above has not been checked</div>
+        <div class="fact-value">No rabies-titer test or quarantine required (same core rules as dogs); cats do NOT need a SENASICA import permit, unlike dogs</div>
+        <div class="fact-notes">Corrected 2026-07-19 ([specialist]) during this pass's source-link backfill: this row was stale, still reading value_raw='[GAP]' and source_ref='[GAP — Mexico's own research is dog-specific only]' despite the underlying research already existing in overview.md and sources.md since 2026-07-09 (closing [specialist] original species-specific-verification ask). A real extraction gap, not a research gap — the markdown was correct, the derived row simply never got updated to match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Pet import (dog) — rabies titer / quarantine requirement</div>
         <div class="fact-value">No rabies titer required; no quarantine if compliant</div>
-        <div class="fact-notes">Current rabies vaccination, parasite treatment within 6 months, tick treatment shortly before entry, ISO microchip (recommended) — a materially easier process than many destinations in this project</div>
+        <div class="fact-notes">Current rabies vaccination, parasite treatment within 6 months, tick treatment shortly before entry, ISO microchip (recommended) — a materially easier process than many destinations in this project. Source-link backfill 2026-07-19 ([specialist]): direct match, corroborated by cdc.gov also listed in sources.md</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Private health insurance — new-enrollment age ceiling</div>
         <div class="fact-value">~65 (some plans 60-65)</div>
-        <div class="fact-notes">Existing policyholders typically keep renewing past the ceiling; someone not already enrolled loses access to most standard plans past it; premiums rise sharply from the early 60s regardless; international (non-domestic) insurance is the named workaround. Archetype/age-neutral fact — a real compound gate for some readers, irrelevant to others</div>
+        <div class="fact-notes">Existing policyholders typically keep renewing past the ceiling; someone not already enrolled loses access to most standard plans past it; premiums rise sharply from the early 60s regardless; international (non-domestic) insurance is the named workaround. Archetype/age-neutral fact — a real compound gate for some readers, irrelevant to others. Source-link backfill 2026-07-19 ([specialist]): wired to Feather Insurance, one of the two named cross-corroborating sources</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Private health insurance cost (expat)</div>
         <div class="fact-value">520–1230 $/year</div>
-        <div class="fact-notes">Range driven by age; national, applies uniformly to all five scored locations</div>
+        <div class="fact-notes">Range driven by age; national, applies uniformly to all five scored locations. Source-link backfill 2026-07-19 ([specialist])</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Residency visa — mandatory health-insurance requirement</div>
         <div class="fact-value">No nationwide mandate from the immigration authority (INM); consulate-dependent, increasing for Europe/Canada/some US jurisdictions</div>
-        <div class="fact-notes">Checked directly this pass rather than assumed — a real but not uniform compound-gate risk on top of the age-enrollment-ceiling row above; the immigration authority (INM) can also request updated proof at renewal</div>
+        <div class="fact-notes">Checked directly this pass rather than assumed — a real but not uniform compound-gate risk on top of the age-enrollment-ceiling row above; the immigration authority (INM) can also request updated proof of insurance at renewal. Source-link backfill 2026-07-19 ([specialist]): direct match</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Minimum wage (2026)</div>
+        <div class="fact-value">315.04–440.87 MXN/day</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]), closing a zero-fact income-viability gap across all five Mexico locations (country-scope, applies to all). 315.04 MXN/day general zone, 440.87 MXN/day Northern Border Free Zone; 13% YoY increase (6.5% fixed adjustment + MXN 17.01 Independent Recovery Amount/MIR), CONASAMI 2026 DOF publication. Background economic-context fact, not a threshold gating a foreign passive-income arrival directly</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Gig/platform-worker social-security (IMSS) mandate, effective 2026</div>
+        <div class="fact-value">Yes</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Pilot program registering delivery/rideshare gig workers with the public health-insurance system (IMSS) concluded Dec 2025; mandatory enrollment nationwide from Jan 1, 2026. Net-income exclusion factors vary by vehicle type: up to 48% (cars), 32% (motorcycles), 3% (non-motorized). Relevant context if a small-group arrival considers local gig income as a supplement — now a real, registered, IMSS-linked system, not an informal cash economy</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Remote-employee wage-zone rule (Mexican-registered employer)</div>
+        <div class="fact-value">Applicable minimum-wage zone set by the employer's registered social-security (IMSS) location, not employee's physical residence</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Relevant only to someone employed by a Mexican-registered entity while working remotely from a different state — not applicable to a foreign-employer remote arrangement, which is the more common shape for this project's readers</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Nearshoring-linked FDI investment scale (2023-2025)</div>
+        <div class="fact-value">114 $ billion, cumulative nearshoring-linked investment announcements 2023-2025</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Associated with an estimated 235,000 skilled jobs. Over $40 billion in US FDI alone in Q1-Q3 2025. Same underlying trend as red-flags.md's USMCA section, viewed here from the labor-market/income-opportunity angle rather than currency/institutional — not a duplicate finding, a different question about the same trend</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Digital-nomad/remote-worker population scale</div>
+        <div class="fact-value">~1.6 million Americans resident in Mexico as of mid-2025; CDMX captured ~14% of global digital nomads 2020-2023</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Real evidence the remote/passive-income arrival path is extremely well-trodden here — worth reading alongside, not instead of, the gentrification-backlash finding in red-flags.md: the same scale that makes this path well-trodden is part of what's driving that backlash</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Remote work on tourist (FMM) status — legal gray area, not aggressively enforced</div>
+        <div class="fact-value">Legally ambiguous (not explicitly authorized under tourist status)</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Mexican law distinguishes tourism from 'lucrative activities'; remote work for a foreign employer isn't explicitly authorized under FMM tourist status but has historically not been aggressively enforced against — probably the single most common quiet remote-work-on-tourist-status arrangement of any country in this project. Real, current tightening trend: officer discretion increasingly limits granted stay length for suspected long-stayers (see visa-legal.md's FMM section), and the 2026 digital-record replacement of the paper FMM gives officers a cleaner repeat-entry trail. Divergence: paper distinguishes tourism from work; practice widely tolerates it, but the tolerance is narrowing, not stable</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Distance to emergency care</div>
         <div class="fact-value">Real, named hospitals — not just 'healthcare exists'</div>
-        <div class="fact-notes">Star Médica, Clínica de Mérida, Faro del Mayab all offer real emergency services; ambulance dispatch via 066. Distance to specialist (not general emergency) care wasn't checked this pass</div>
+        <div class="fact-notes">Star Médica, Clínica de Mérida, Faro del Mayab all offer real emergency services; ambulance dispatch via 066. Distance to specialist (not general emergency) care wasn't checked this pass. Source-link backfill 2026-07-19 ([specialist]): direct match, sources.md's own dedicated hospital-list URL</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Kidnapping/cartel-extortion risk specifically targeting foreigners</div>
         <div class="fact-value">Not yet researched</div>
         <div class="fact-notes">Not specifically searched for at Mérida — Yucatán's own Level-1 safety tier makes this less likely a priori, but &quot;not found&quot; isn't &quot;confirmed absent&quot;</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Nature/water adjacency — cenotes; Progreso beach 30-45 min away</div>
+        <div class="fact-value">~2,000 cenotes within 1.5 hours of Mérida; nearest beach (Progreso, Gulf of Mexico) ~30-45 min/48km north</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). No beach in the city itself, but a real day-trip distance, not a beach-town lifestyle; cenotes (Cenote Xlacah/Dzibilchaltún, El Corchito near Progreso) sit under an hour away — a distinctive regional nature feature CDMX/Oaxaca don't have. Beach-distance figure separately sourced: lifeinmerida.com, 'Mérida Mexico &amp; the Beach: Closer Than You Think' (in sources.md's new nature-water-adjacency section)</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Walkability / car-free living — first-hand account</div>
+        <div class="fact-value">Centro/Downtown Mérida described as walkable and cycling-friendly; a first-hand account describes years of car-free living, using Uber/buses as needed</div>
+        <div class="fact-notes">Added 2026-07-19 ([specialist]). Consistent with, not a repeat of, the existing 'stability/safety draw, not a top-tier nomad hotspot' finding already in community-network.md — same underlying slower rhythm, same first-hand source, different criterion</div>
       </li></ul></details><details class="chapter" open id="sec-visa"><summary>Visa & residency</summary><p class="chapter-intro">How you'd actually get to stay — the real routes, their income floors, and how long they realistically take, not the marketing version.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Diligence risk — ejido-land fraud rate (Quintana Roo specifically)</div>
         <div class="fact-value">15–20 % of foreign transactions</div>
-        <div class="fact-notes">Concentrated in Playa del Carmen/Tulum, confirmed clean at CDMX/Mérida/Oaxaca.</div>
+        <div class="fact-notes">Concentrated in Playa del Carmen/Tulum, confirmed clean at CDMX/Mérida/Oaxaca. Source-link backfill 2026-07-19 ([specialist]): wired to the piece whose own title names the exact risk this fact states</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Permanent Residency direct-from-abroad restricted to retirees/pensioners</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Mirror image of Guatemala's Rentista advantage — no direct-to-permanent shortcut for non-pension passive income</div>
+        <div class="fact-notes">Mirror image of Guatemala's Rentista advantage — no direct-to-permanent shortcut for non-pension passive income. Source-link backfill 2026-07-19 ([specialist]): direct topical match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Property tax (predial) rate</div>
         <div class="fact-value">0.05–0.3 % of assessed value/year</div>
-        <div class="fact-notes">Remarkably low by US/European standards — a real, durable structural advantage</div>
+        <div class="fact-notes">Remarkably low by US/European standards — a real, durable structural advantage. Source-link backfill 2026-07-19 ([specialist]): direct match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Restricted Zone (coastal/border)</div>
         <div class="fact-value">50km coast / 100km border</div>
-        <div class="fact-notes">Fideicomiso bank-trust workaround inside the zone; ~$500-3,000 setup, ~$500-1,000/yr ongoing, ~21,650 MXN foreign-affairs ministry (SRE) permit fee</div>
+        <div class="fact-notes">Fideicomiso bank-trust workaround inside the zone; ~$500-3,000 setup, ~$500-1,000/yr ongoing, ~21,650 MXN foreign-affairs ministry (SRE) permit fee. Source-link backfill 2026-07-19 ([specialist]): wired to Mexico's own consular (SRE) primary-institutional page, per this project's primary-institutional-sourcing standard — a real upgrade over the aggregator-only alternatives also sitting in sources.md's Property section</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Restricted Zone regime shape</div>
         <div class="fact-value">geographic-band-substitute</div>
-        
+        <div class="fact-notes">Source-link backfill 2026-07-19 ([specialist]): wired to the dedicated Restricted Zone FAQ</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tax residency trigger / worldwide-income taxation</div>
         <div class="fact-value">183 days/year</div>
-        <div class="fact-notes">Unlike Guatemala's territorial system — worldwide income taxed once resident</div>
+        <div class="fact-notes">Unlike Guatemala's territorial system — worldwide income taxed once resident. Source-link backfill 2026-07-19 ([specialist]): direct match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Temporary Resident Visa accepts passive income as qualifying proof</div>
         <div class="fact-value">Not yet checked</div>
-        <div class="fact-notes">Source file's own open question: whether passive/non-employment income qualifies as documentable &quot;income&quot; under this route vs. requiring the savings-based alternative</div>
+        <div class="fact-notes">Source file's own open question: whether passive/non-employment income qualifies as documentable &quot;income&quot; under this route vs. requiring the savings-based alternative. Source-link backfill 2026-07-19 ([specialist]): genuinely open, no source states an answer — left unwired rather than guessed</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Temporary Resident Visa converts to permanent residency</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">4 years continuous temporary residency converts without re-proving solvency — a real on-ramp, not Colombia's V/M dead-end shape</div>
+        <div class="fact-notes">4 years continuous temporary residency converts without re-proving solvency — a real on-ramp, not Colombia's V/M dead-end shape. Source-link backfill 2026-07-19 ([specialist]): wired to the dedicated conversion-mechanics URL</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Temporary Resident Visa income threshold</div>
         <div class="fact-value">4300–4800 $/month</div>
-        <div class="fact-notes">Roughly triple Guatemala's Rentista threshold</div>
+        <div class="fact-notes">Roughly triple Guatemala's Rentista threshold. Source-link backfill 2026-07-19 ([specialist]): wired to mexperience.com, fetched directly and named as authoritative for every official reference-unit (UMA) multiple threshold in this file per the 2026-07-09 full visa-route survey</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Temporary Resident Visa savings/investment alternative</div>
         <div class="fact-value">73000–85000 $</div>
-        <div class="fact-notes">Income or savings, not combined — this route's own structure requires one pool to clear the bar, not two separate ones</div>
+        <div class="fact-notes">Income or savings, not combined — this route's own structure requires one pool to clear the bar, not two separate ones. Source-link backfill 2026-07-19 ([specialist]): same mexperience.com authoritative URL as the income-threshold row</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism cost — fideicomiso</div>
         <div class="fact-value">500–3000 $ (setup)</div>
-        <div class="fact-notes">Plus ~500-1000/yr ongoing, and ~21,650 MXN foreign-affairs ministry (SRE) permit fee, already in the original row's own notes.</div>
+        <div class="fact-notes">Plus ~500-1000/yr ongoing, and ~21,650 MXN foreign-affairs ministry (SRE) permit fee, already in the original row's own notes. Source-link backfill 2026-07-19 ([specialist]): direct fideicomiso-specific match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism — fideicomiso bank trust</div>
         <div class="fact-value">Yes</div>
-        
+        <div class="fact-notes">Source-link backfill 2026-07-19 ([specialist]): wired to the law-firm advisory piece, distinct from the fideicomiso-cost row's janushermes.com citation</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism legality — fideicomiso</div>
         <div class="fact-value">legitimate</div>
-        
+        <div class="fact-notes">Source-link backfill 2026-07-19 ([specialist]): wired to Mexico's own consular (SRE) page as the primary-institutional authority describing this mechanism's legitimacy</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism legality — Mexican corporation</div>
         <div class="fact-value">legitimate</div>
-        
+        <div class="fact-notes">Source-link backfill 2026-07-19 ([specialist])</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism — Mexican corporation</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Named as a second inside-band vehicle in the source file's own prose.</div>
+        <div class="fact-notes">Named as a second inside-band vehicle in the source file's own prose. Source-link backfill 2026-07-19 ([specialist])</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Eligible-nationality list — SAE electronic pre-authorization (air-entry only, replaces full visa)</div>
+        <div class="fact-value">RU, TR, UA, BR</div>
+        <div class="fact-notes">Extracted 2026-07-17 ([specialist], cross-candidate nationality-library pilot, priority nationalities: Turkish, Ukrainian, Russian) -- a genuine third tier between Mexico's ordinary visa-exempt and visa-required lists, not previously in this file. Since 5 February 2026, citizens of Russia, Turkey, Ukraine (plus Brazil) can obtain a free electronic pre-authorization (Sistema de Autorizacion Electronica, SAE) instead of a full consular visa -- but AIR TRAVEL ONLY, single-entry, valid 30 days from issuance for use; land/sea entry still requires a full visa for these nationalities. Stay length upon arrival is set by the immigration officer case-by-case (same discretion mechanics as Mexico's general FMM regime), NOT a guaranteed 180 days -- one aggregator (ivisatravel.com) states 180 days as though fixed, contradicted by direct fetch of the government's own page, which states only that the officer authorizes 'el numero de dias correspondientes.' Directly fetched gob.mx's own immigration-authority page (the National Immigration Institute, INM, and Foreign Ministry, SRE) (gob.mx/inm/acciones-y-programas/sistema-de-autorizacion-electronica-sae) this session -- primary-source-recheck, High confidence. Cross-corroborated by Wikipedia's 'Visa policy of Mexico' and Infobae journalism (2026-05-11). Source-link backfill 2026-07-19 ([specialist]): the exact URL [specialist] own notes describe by domain only is now wired directly and added to sources.md's new nationality-library section; source_count upgraded to primary-institutional, matching the notes' own 'primary-source-recheck' framing || 2026-07-21 ([specialist]): document_conditional_note field added -- entry_tier_kind now correctly emits the conservative default (visa-required, true absent SAE/for land-sea entry) with this facility disclosed in the note, resolving a prior representation gap in how this row was modeled. No new research; same source, same verification as above.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Visa exemption cancelled (Venezuela)</div>
+        <div class="fact-value">VE</div>
+        <div class="fact-notes">Extracted 2026-07-17 ([specialist], cross-candidate nationality-library pilot, priority nationality: Venezuelan). Venezuela's visa-free entry to Mexico was cancelled 22 January 2022 (Wikipedia's 'Visa policy of Mexico') -- regular Venezuelan passport holders are visa-required, full stop; diplomatic/service passport holders retain a narrower 3-month exemption per the same source, not reflected in this row (which states the general-population rule, same convention as Morocco's and Colombia's equivalent rows). NOT eligible for the SAE electronic-authorization tier above -- Venezuela sits on the opposite end of the same nationality-variance picture from Russia/Turkey/Ukraine. Single-source (Wikipedia only); a primary Mexican government confirmation (INM/SRE) was not separately fetched this pass for this specific historical cancellation date -- worth a follow-up primary-source-recheck. || 2026-07-17 ([specialist], pass 2): the third-country-visa facility is now on file at primary tier (MX:third-country-visa-entry-facility, inm.gob.mx fetched directly this pass) -- a Venezuelan national holding a valid multiple-entry US/CA/JP/UK/Schengen visa or PR enters without a Mexican visa, materially softening this row's rule for such holders. VE list membership itself re-corroborated via SRE embassy-Caracas pages + Infobae 2026-05-06 full-list summary (aggregator; INM's own country list renders as an image, machine-unreadable this session -- primary confirmation of membership still owed). Source-link backfill 2026-07-19 ([specialist]): wired to the exact Wikipedia URL, now also added to sources.md's new nationality-library section || 2026-07-21 ([specialist]): document_conditional_note field added (extraction backlog), carrying forward MX:third-country-visa-entry-facility's own already-verified disclosure onto this cell -- a facility layered on top of an already-correct base tier. No new research; this row's own last_verified is unchanged.</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Tourist entry - third-country-visa facility (valid US/CA/JP/UK/Schengen visa waives Mexican visa)</div>
+        <div class="fact-value">Holders of valid multiple-entry US, Canada, Japan, UK, or Schengen visas -- or permanent residence in those countries -- enter without a Mexican visa</div>
+        <div class="fact-notes">Added 2026-07-17. Mexico's national immigration institute's (INM) own countries-requiring-a-visa page (inm.gob.mx, fetched directly 2026-07-17 -- primary tier) states the facility in its own text. Nationality-neutral in form but load-bearing for the nationality library: it materially softens every visa-required tier in Mexico's file (Venezuelan, Chinese, Indian nationals holding qualifying third-country documents skip the Mexican consular visa entirely). Same shape as Argentina's CN/IN US-visa facility (AR:tourist-entry-us-visa-facility-china-india) and Belize's US/CA/Schengen carve-out. Source-link backfill 2026-07-19 ([specialist]): found and wired the exact primary page (confirmed live via direct search this pass); also added to sources.md's new nationality-library section, closing the gap where this row previously named its source by domain only ('inm.gob.mx') with no resolvable URL anywhere in this project's own files</div>
+      </li>
+      <li class="fact-item">
+        <div class="fact-label">Eligible-nationality list — general visa-exempt tourist entry (FMM), up to 180 days</div>
+        <div class="fact-value">AD, AE, AR, AT, AU, BB, BE, BG, BO, BS, BZ, CA, CH, CL, CO, CR, CY, CZ, DE, DK, EE, ES, FI, FM, FR, GB, GR, HK, HR, HU, IE, IL, IS, IT, JM, JP, KR, LI, LT, LU, LV, MC, MH, MO, MT, MY, NL, NO, NZ, PA, PL, PT, PW, PY, RO, SE, SG, SI, SK, SM, TT, US, UY</div>
+        <div class="fact-notes">Extracted 2026-07-23 ([specialist]), Mexico's whole entry-tier-table harvest (joint under [specialist] nationality-library rules). Kadek's Indonesia leg and [specialist] Thailand leg were the explicit templates. 63 nationalities: all 27 EU member states, all 4 EFTA states (Iceland, Liechtenstein, Norway, Switzerland), plus 32 individually-named countries/territories/microstates (Andorra, Argentina, Australia, Bahamas, Barbados, Belize, Bolivia, Canada, Chile, Colombia, Costa Rica, Hong Kong, Israel, Jamaica, Japan, Macao, Malaysia, Marshall Islands, Micronesia, Monaco, New Zealand, Palau, Panama, Paraguay, San Marino, Singapore, South Korea, Trinidad and Tobago, United Arab Emirates, United Kingdom, United States, Uruguay). Mexico's own National Immigration Institute (INM) portal renders this list as an unreadable image, not machine-extractable text -- the exact same primary-source dead end [specialist] 2026-07-17 pilot pass already hit for the Venezuela row (confirmed still true this session, re-fetched directly, still image-only). Cross-corroborated across three independent aggregator sources naming the list by country, not just a headline count: en.wikipedia.org/wiki/Visa_policy_of_Mexico (its own table, sourced to INM, the fullest enumeration found), infobae.com (2026-05-06, named subset matches exactly), viveusa.mx (2026-05-11, near-identical full list, missing only Liechtenstein of the 63 -- flagged, Liechtenstein sits at 2-of-3-source corroboration, everything else at 3-of-3). Two real corrections to Mexico's own prior visa write-up (the 'Tourist/Visitor Visa Basics' section, item 2, and its 2026-07-05 opening note): the count is a sourced 63, not the file's prior approximated 'roughly 65-70'; and 'most of Latin America' overstated the regional coverage -- only 9 of the ~20 Latin American nations actually sit on this list (Argentina, Belize, Bolivia, Chile, Colombia, Costa Rica, Panama, Paraguay, Uruguay), with Ecuador/Venezuela/Brazil/Peru all having had their exemptions specifically rescinded 2021-2024 (Wikipedia's own 'Notable Status Changes' note -- Ecuador 4 Sep 2021, Venezuela 22 Jan 2022, Brazil 18 Aug 2022, Peru 20 Apr 2024) and Guatemala/Honduras/El Salvador/Nicaragua/Dominican Republic/Cuba/Guyana/Suriname/Ecuador/Venezuela/Peru/Brazil not appearing at all -- corrected in visa-legal.md's own prose this session, not just here. trajectory set 'worsening' on that same evidence: four exemption rescissions in under three years is an active contraction pattern, not a static list, worth a recheck on any return to this row. Reconciled, not duplicated, against the two pre-existing MX nationality rows: neither the SAE tier's four nationalities (RU, TR, UA, BR) nor Venezuela (VE) appear on this exempt list -- zero cell overlap, confirmed by direct set-difference before writing this row, so the exporter's own cell-conflict abort never fires. The residual visa-required population (China, India, and the rest of the world not on this list, the SAE list, or Venezuela's own row) stays deliberately unenumerated per this project's membership-only-inference rule -- Mexico does not publish it as its own enumerated list (same structural shape as Indonesia's ordinary visa-required residual, Kadek's 2026-07-22 precedent); those nationalities correctly render as not-yet-verified in the passport lens rather than a guessed 'exempt' or 'visa-required' claim. MX:third-country-visa-entry-facility's own broader China/India disclosure stays exactly as much debt as [specialist] left it 2026-07-21 (no MX base row exists yet for CN/IN to attach a document_conditional_note to) -- not closed this session, named plainly rather than silently left. gob.mx/cms PDF versions of both the required-visa and exempt-visa lists were also fetched directly this session and confirmed the same image-only limitation as the HTML portal (compressed image data, not extractable text).</div>
       </li></ul></details><details class="chapter" open id="sec-property"><summary>Property</summary><p class="chapter-intro">Can you buy here, and what it actually takes to do it — ownership rules, structures, and real price bands, not listing-site optimism.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism — ejido pre-dominio-pleno land</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Communal tenure, not lawfully transferable title to a foreign buyer without formal conversion (dominio pleno).</div>
+        <div class="fact-notes">Communal tenure, not lawfully transferable title to a foreign buyer without formal conversion (dominio pleno). Source-link backfill 2026-07-19 ([specialist]): direct match</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Tenure mechanism legality — ejido pre-dominio-pleno land</div>
         <div class="fact-value">Not yet checked</div>
-        <div class="fact-notes">Named honestly as an open call — the risk here is fraud/title-validity, not a criminal-liability trap the way Thailand's nominee scheme is.</div>
+        <div class="fact-notes">Named honestly as an open call — the risk here is fraud/title-validity, not a criminal-liability trap the way Thailand's nominee scheme is. Source-link backfill 2026-07-19 ([specialist]): genuinely open question, left unwired</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Purchase price — low end</div>
         <div class="fact-value">~914 $/m²</div>
-        <div class="fact-notes">The cheapest of the price tiers surveyed in Mérida — roughly 2.5x cheaper per m² than the Yucatán Country Club/Temozón Norte tier below</div>
+        <div class="fact-notes">The cheapest of the price tiers surveyed in Mérida — roughly 2.5x cheaper per m² than the Yucatán Country Club/Temozón Norte tier below. Source-link backfill 2026-07-19 ([specialist])</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Purchase price — median</div>
         <div class="fact-value">~1660 $/m²</div>
-        <div class="fact-notes">2026 prices ~8% higher nominally than 2025</div>
+        <div class="fact-notes">2026 prices ~8% higher nominally than 2025. Source-link backfill 2026-07-19 ([specialist]): wired to the market-trend URL, distinct from Ciudad Caucel's housing-prices URL above</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Restricted-zone applicability (Mérida)</div>
         <div class="fact-value">outside</div>
-        <div class="fact-notes">City-specific — the Yucatán coast (Progreso, Chicxulub, Telchac) sits inside the band.</div>
+        <div class="fact-notes">City-specific — the Yucatán coast (Progreso, Chicxulub, Telchac) sits inside the band. Source-link backfill 2026-07-19 ([specialist]): no single disambiguating URL — left unwired</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Purchase price — high end</div>
         <div class="fact-value">~2285 $/m²</div>
-        <div class="fact-notes">The priciest of the price tiers surveyed in Mérida</div>
+        <div class="fact-notes">The priciest of the price tiers surveyed in Mérida. Source-link backfill 2026-07-19 ([specialist])</div>
       </li></ul></details><details class="chapter" open id="sec-cost"><summary>Cost of living</summary><p class="chapter-intro">What a month here actually runs, in real numbers — not a nomad-blog average built for a lifestyle that isn't yours.</p><ul class="fact-list">
+      <li class="fact-item">
+        <div class="fact-label">Rent — 2BR apartment</div>
+        <div class="fact-value">11000–23000 MXN/month</div>
+        <div class="fact-notes">Mexican pesos; portal median ~MXN 16,000. Zona Norte furnished stock runs 15,000–20,000; golf-club and premium-amenity units reach ~23,000; cheaper stock from ~11,000 (live listing snapshots across Inmuebles24, Lamudi and Vivanuncios, mid-July 2026 — a listings read, not a published market report). Source-link backfill 2026-07-19 ([specialist]): no matching URL in sources.md — [specialist] own listing-snapshot research, not force-matched</div>
+      </li>
       <li class="fact-item">
         <div class="fact-label">Comfortable budget</div>
         <div class="fact-value">2000–2500 $/month</div>
-        <div class="fact-notes">A couple can live comfortably on the lower end of $1,500-2,500</div>
+        <div class="fact-notes">A couple can live comfortably on the lower end of $1,500-2,500. Source-link backfill 2026-07-19 ([specialist]): too many undifferentiated candidate URLs in the Mérida cost-of-living section — left unwired</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Mérida-specific INPC inflation figure</div>
@@ -196,7 +261,7 @@
       <li class="fact-item">
         <div class="fact-label">Rent — 1BR, city centre / outside</div>
         <div class="fact-value">431–767 $/month</div>
-        <div class="fact-notes">One genuine first-hand account (psimonmyway.com) corroborates, not contradicts, the aggregator range</div>
+        <div class="fact-notes">One genuine first-hand account (psimonmyway.com) corroborates, not contradicts, the aggregator range. Source-link backfill 2026-07-19 ([specialist]): wired to the named first-hand account</div>
       </li></ul></details><details class="chapter" open id="sec-community"><summary>Community</summary><p class="chapter-intro">Who else lives here, how you'd actually meet them, and what it's like once the novelty wears off.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Compound/small-group model check</div>
@@ -206,54 +271,54 @@
       <li class="fact-item">
         <div class="fact-label">Established foreign-resident population</div>
         <div class="fact-value">4000–6000 people</div>
-        <div class="fact-notes">Largest cohorts US/Canada, then Europeans, then Latin Americans from Mexico City/Venezuela/Argentina — a more internationally mixed composition than San Miguel de Allende's</div>
+        <div class="fact-notes">Largest cohorts US/Canada, then Europeans, then Latin Americans from Mexico City/Venezuela/Argentina — a more internationally mixed composition than San Miguel de Allende's. Source-link backfill 2026-07-19 ([specialist]): no single disambiguating URL in sources.md — left unwired</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Subjective community read — stability/safety draw, not a top-tier nomad hotspot</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">One 2-year digital-nomad account frames Mérida honestly as not a &quot;Top-10 global digital-nomad hotspot&quot; but a place offering &quot;a sense of stability that's hard to find in other tropical destinations&quot; — a real first-hand read, one account only</div>
+        <div class="fact-notes">One 2-year digital-nomad account frames Mérida honestly as not a &quot;Top-10 global digital-nomad hotspot&quot; but a place offering &quot;a sense of stability that's hard to find in other tropical destinations&quot; — a real first-hand read, one account only. Source-link backfill 2026-07-19 ([specialist])</div>
       </li></ul></details><details class="chapter chapter-redflags" open id="sec-redflags"><summary>Red flags</summary><p class="chapter-intro">The hard truths, stated plainly — real risks, sitting right next to everything that's actually going well.</p><ul class="fact-list">
       <li class="fact-item">
         <div class="fact-label">Judicial Reform Phase 2 (direct judicial elections)</div>
         <div class="fact-value">Yes</div>
-        <div class="fact-notes">Second round moved from 2027 to June 2028; Business Roundtable/US/Canada flagged USMCA-conflict concerns. criterion_id corrected 2026-07-15 (was missing entirely, a real extraction gap even though the underlying red-flags.md content already existed)</div>
+        <div class="fact-notes">Second round moved from 2027 to June 2028; Business Roundtable/US/Canada flagged USMCA-conflict concerns. criterion_id corrected 2026-07-15 (was missing entirely, a real extraction gap even though the underlying red-flags.md content already existed). Source-link backfill 2026-07-19 ([specialist]): a genuine, real gap — no dedicated Judicial Reform source section exists anywhere in sources.md, despite the finding itself being real and well-established in red-flags.md. Flagged rather than force-matched; a real follow-on task, not something this pass's mechanical matching could close</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">USMCA 2026 review outcome</div>
         <div class="fact-value">Trilateral joint review held July 1, 2026 — no consensus to automatically extend the agreement for a further 16 years; US opted for annual reviews instead, citing trade-deficit concerns</div>
-        <div class="fact-notes">CSIS, Holland &amp; Knight, Steptoe, all 2026-07. Hard bargaining continues over automotive rules-of-origin, Chinese content routed through Mexican manufacturing, and existing steel/aluminum/car tariffs. Sheinbaum's stance is de-escalation, not confrontation — no retaliatory tariffs issued, has avoided the most severe blanket tariffs threatened, though under continued unresolved uncertainty</div>
+        <div class="fact-notes">CSIS, Holland &amp; Knight, Steptoe, all 2026-07. Hard bargaining continues over automotive rules-of-origin, Chinese content routed through Mexican manufacturing, and existing steel/aluminum/car tariffs. Sheinbaum's stance is de-escalation, not confrontation — no retaliatory tariffs issued, has avoided the most severe blanket tariffs threatened, though under continued unresolved uncertainty. Source-link backfill 2026-07-19 ([specialist]): wired to CSIS, one of the several cross-corroborating named sources</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Peso currency stability, explicitly tied to USMCA review risk</div>
         <div class="fact-value">Traded in a narrow 17-18 MXN/USD band through 2026 so far, backed by over USD 257 billion in international reserves; risk framed as binary and directly tied to the USMCA outcome — an acrimonious breakdown could push the pair toward 20+</div>
-        <div class="fact-notes">IMF's own ARA adequacy metric rates reserves sufficient to absorb external shocks; ~300 basis-point interest-rate differential favoring peso carry trades; Banxico cut its overnight rate 25bps to 6.50% effective May 8, 2026. FXStreet and Disruption Banking both frame this as a textbook case of political/institutional risk with a directly-acknowledged binary currency-risk attached, unresolved as of one week after the July 1 review meeting</div>
+        <div class="fact-notes">IMF's own ARA adequacy metric rates reserves sufficient to absorb external shocks; ~300 basis-point interest-rate differential favoring peso carry trades; Banxico cut its overnight rate 25bps to 6.50% effective May 8, 2026. FXStreet and Disruption Banking both frame this as a textbook case of political/institutional risk with a directly-acknowledged binary currency-risk attached, unresolved as of one week after the July 1 review meeting. Source-link backfill 2026-07-19 ([specialist]): wired to FXStreet, one of the two named cross-corroborating sources</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Political continuity — Sheinbaum administration</div>
         <div class="fact-value">Sheinbaum (Morena) won a strong 2024 mandate; no near-term election, coup, or leadership-crisis risk — next presidential election is 2030</div>
-        <div class="fact-notes">Real difference from a Milei-style case: no regime-change risk here, just live externally-driven trade/currency-policy uncertainty layered on top of genuinely stable domestic political continuity, plus the separately-tracked, slower-moving judicial-independence erosion (Judicial Reform Phase 2)</div>
+        <div class="fact-notes">Real difference from a Milei-style case: no regime-change risk here, just live externally-driven trade/currency-policy uncertainty layered on top of genuinely stable domestic political continuity, plus the separately-tracked, slower-moving judicial-independence erosion (Judicial Reform Phase 2). Source-link backfill 2026-07-19 ([specialist])</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Foreign direct investment (FDI) resilience despite USMCA uncertainty</div>
         <div class="fact-value">23.6 $ billion, Q1 2026 record US FDI</div>
-        <div class="fact-notes">Foreign Policy, CSIS. EU separately committed to mobilizing ~$5.8 billion aligned with Sheinbaum's &quot;Plan Mexico&quot; strategy. A real counterweight worth naming plainly alongside the currency-risk finding above, not just the risk side — Sheinbaum has explicitly pointed to USMCA's continued (if unextended) validity as the source of investor &quot;certainty&quot;</div>
+        <div class="fact-notes">Foreign Policy, CSIS. EU separately committed to mobilizing ~$5.8 billion aligned with Sheinbaum's &quot;Plan Mexico&quot; strategy. A real counterweight worth naming plainly alongside the currency-risk finding above, not just the risk side — Sheinbaum has explicitly pointed to USMCA's continued (if unextended) validity as the source of investor &quot;certainty&quot;. Source-link backfill 2026-07-19 ([specialist]): direct match, the EU/FDI figure's own named source</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Climate — dry-season heat</div>
         <div class="fact-value">35–40+ °C</div>
-        <div class="fact-notes">March-May; A/C described as a practical necessity, not a luxury</div>
+        <div class="fact-notes">March-May; A/C described as a practical necessity, not a luxury. Source-link backfill 2026-07-19 ([specialist])</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Gentrification — historic barrio price appreciation</div>
         <div class="fact-value">20–35 % (2-3 years)</div>
-        <div class="fact-notes">Real local grievances, but no organized anti-foreigner protest movement found, unlike CDMX's</div>
+        <div class="fact-notes">Real local grievances, but no organized anti-foreigner protest movement found, unlike CDMX's. Source-link backfill 2026-07-19 ([specialist]): direct topical match, sources.md's build-out section</div>
       </li>
       <li class="fact-item">
         <div class="fact-label">Homicide rate</div>
         <div class="fact-value">~1 per 100,000</div>
-        <div class="fact-notes">SESNSP primary government data, not an aggregator claim — 3rd-lowest crime and 1st-lowest homicide rate among Mexican capital cities</div>
+        <div class="fact-notes">SESNSP primary government data, not an aggregator claim — 3rd-lowest crime and 1st-lowest homicide rate among Mexican capital cities. Source-link backfill 2026-07-19 ([specialist]): wired to the Yucatán Times piece citing SESNSP directly, already in sources.md</div>
       </li></ul></details>
-    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><p class="fact-notes">6 sources are on file here, none with a public link yet — the most recent dates from 2026-07-08.</p></li></ul></details>
+    <details class="chapter" open id="sec-sources"><summary>Sources</summary><ul class="fact-list"><li class="fact-item"><div class="fact-label">Diligence risk — ejido-land fraud rate (Quintana Roo specifically)</div><div class="fact-value"><a class="source-link" href="https://caribeluxuryhomes.com/ejido-land-in-mexico-how-to-avoid-the-foreign-buyers-biggest-risk/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Public health-insurance enrollment (IMSS) — public-system backstop</div><div class="fact-value"><a class="source-link" href="https://www.pacificprime.com/blog/imss-mexico.html" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Permanent Residency direct-from-abroad restricted to retirees/pensioners</div><div class="fact-value"><a class="source-link" href="https://www.mexperience.com/difference-between-temporary-and-permanent-residency-mexico/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Pet import (cat) — species-specific requirement verification</div><div class="fact-value"><a class="source-link" href="https://catabroad.com/mexico/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-09</span></div></li><li class="fact-item"><div class="fact-label">Pet import (dog) — rabies titer / quarantine requirement</div><div class="fact-value"><a class="source-link" href="https://zoovettravel.com/zoopedia/mexico-en.html" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Private health insurance — new-enrollment age ceiling, Private health insurance cost (expat)</div><div class="fact-value"><a class="source-link" href="https://feather-insurance.com/en-mx/blog/health-insurance-mexico-guide" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-label">Property tax (predial) rate</div><div class="fact-value"><a class="source-link" href="https://thelatinvestor.com/blogs/news/mexico-property-taxes-fees" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Residency visa — mandatory health-insurance requirement</div><div class="fact-value"><a class="source-link" href="https://overseascompass.com/mexico/health-insurance-for-mexico-visas-residency-coverage-checklist/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-11</span></div></li><li class="fact-item"><div class="fact-label">Restricted Zone (coastal/border), Tenure mechanism legality — fideicomiso</div><div class="fact-value"><a class="source-link" href="https://consulmex.sre.gob.mx/reinounido/index.php/en/servicios/218-acquisition-of-properties-in-mexico" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Restricted Zone regime shape</div><div class="fact-value"><a class="source-link" href="https://www.mexicolife.com/blog/buying-property-in-mexicos-restricted-zone-complete-faq-for-foreign-buyers.html" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Tax residency trigger / worldwide-income taxation</div><div class="fact-value"><a class="source-link" href="https://www.countrytaxcalc.com/tax-guides/mexico-tax-guide/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Temporary Resident Visa converts to permanent residency</div><div class="fact-value"><a class="source-link" href="https://www.mexperience.com/residency-assist-change-from-temporary-to-permanent/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Temporary Resident Visa income threshold, Temporary Resident Visa savings/investment alternative</div><div class="fact-value"><a class="source-link" href="https://www.mexperience.com/financial-criteria-for-residency-in-mexico/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Tenure mechanism cost — fideicomiso</div><div class="fact-value"><a class="source-link" href="https://janushermes.com/blog/mexico-fideicomiso-foreign-buyers-2026" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">Tenure mechanism — ejido pre-dominio-pleno land</div><div class="fact-value"><a class="source-link" href="https://mycasa.mx/blog/buying-ejido-land-mexico-risks-guide" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Tenure mechanism — fideicomiso bank trust, Tenure mechanism legality — Mexican corporation, Tenure mechanism — Mexican corporation</div><div class="fact-value"><a class="source-link" href="https://ccn-law.com/en/key-considerations-as-to-restrictions-on-the-acquisition-of-real-estate-by-foreigners-in-mexicos-restricted-zone/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-05</span></div></li><li class="fact-item"><div class="fact-label">USMCA 2026 review outcome</div><div class="fact-value"><a class="source-link" href="https://www.csis.org/analysis/usmca-review-2026" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-01</span></div></li><li class="fact-item"><div class="fact-label">Peso currency stability, explicitly tied to USMCA review risk</div><div class="fact-value"><a class="source-link" href="https://www.fxstreet.com/analysis/usd-mxn-price-annual-forecast-peso-poised-for-a-volatile-2026-after-stellar-2025-rally-202512241829" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07</span></div></li><li class="fact-item"><div class="fact-label">Political continuity — Sheinbaum administration</div><div class="fact-value"><a class="source-link" href="https://mexiconewsdaily.com/politics/usmca-remains-in-force-ebrard-says-as-mexico-eyes-tariff-reductions-thursdays-mananera-recapped/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Foreign direct investment (FDI) resilience despite USMCA uncertainty</div><div class="fact-value"><a class="source-link" href="https://foreignpolicy.com/2026/05/29/eu-mexico-trade-deal-investment-sheinbaum-trump-usmca/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-05/07</span></div></li><li class="fact-item"><div class="fact-label">Eligible-nationality list — SAE electronic pre-authorization (air-entry only, replaces full visa)</div><div class="fact-value"><a class="source-link" href="https://www.gob.mx/inm/acciones-y-programas/sistema-de-autorizacion-electronica-sae" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-02-05</span></div></li><li class="fact-item"><div class="fact-label">Visa exemption cancelled (Venezuela), Eligible-nationality list — general visa-exempt tourist entry (FMM), up to 180 days</div><div class="fact-value"><a class="source-link" href="https://en.wikipedia.org/wiki/Visa_policy_of_Mexico" target="_blank" rel="noopener">source</a> <span class="scope-tag">2022-01-22</span></div></li><li class="fact-item"><div class="fact-label">Tourist entry - third-country-visa facility (valid US/CA/JP/UK/Schengen visa waives Mexican visa)</div><div class="fact-value"><a class="source-link" href="https://www.gob.mx/inm/gobmx/word/index.php/paises-requieren-visa-para-mexico/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-17</span></div></li><li class="fact-item"><div class="fact-label">Minimum wage (2026)</div><div class="fact-value"><a class="source-link" href="https://www.littler.com/news-analysis/asap/mexico-increases-minimum-wage-2026" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-01-01</span></div></li><li class="fact-item"><div class="fact-label">Gig/platform-worker social-security (IMSS) mandate, effective 2026</div><div class="fact-value"><a class="source-link" href="https://mexicobusiness.news/talent/news/mexico-updates-platform-worker-income-rules-after-pilot-review" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-01-01</span></div></li><li class="fact-item"><div class="fact-label">Remote-employee wage-zone rule (Mexican-registered employer)</div><div class="fact-value"><a class="source-link" href="https://www.payrollmexico.com/insights/what-is-minimum-wage-in-mexico" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026</span></div></li><li class="fact-item"><div class="fact-label">Nearshoring-linked FDI investment scale (2023-2025)</div><div class="fact-value"><a class="source-link" href="https://coderslink.com/employers/blog/market-insights-nearshoring-in-mexico-and-its-impact" target="_blank" rel="noopener">source</a> <span class="scope-tag">2025</span></div></li><li class="fact-item"><div class="fact-label">Digital-nomad/remote-worker population scale</div><div class="fact-value"><a class="source-link" href="https://www.forbes.com/sites/meggenharris/2026/04/05/where-americans-are-moving-in-2026-as-remote-work-changes-where-we-live/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-04-05</span></div></li><li class="fact-item"><div class="fact-label">Remote work on tourist (FMM) status — legal gray area, not aggressively enforced</div><div class="fact-value"><a class="source-link" href="https://passportfactory.com/blog/working-remotely-tourist-visa-legal" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026</span></div></li><li class="fact-item"><div class="fact-label">Purchase price — low end, Purchase price — high end</div><div class="fact-value"><a class="source-link" href="https://thelatinvestor.com/blogs/news/merida-housing-prices" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Climate — dry-season heat</div><div class="fact-value"><a class="source-link" href="https://weatherspark.com/y/10032/Average-Weather-in-M%C3%A9rida-Mexico-Year-Round" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Distance to emergency care</div><div class="fact-value"><a class="source-link" href="https://yucatanmagazine.com/top-hospitals-in-merida/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Gentrification — historic barrio price appreciation</div><div class="fact-value"><a class="source-link" href="https://theyucatantimes.com/2024/12/gentrification-in-merida-progress-and-development-or-dispossession-and-exclusion/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Homicide rate</div><div class="fact-value"><a class="source-link" href="https://theyucatantimes.com/2026/02/merida-remains-among-the-safest-cities-in-the-country-sesnsp/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-02</span></div></li><li class="fact-item"><div class="fact-label">Purchase price — median</div><div class="fact-value"><a class="source-link" href="https://thelatinvestor.com/blogs/news/merida-real-estate-market" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Rent — 1BR, city centre / outside, Subjective community read — stability/safety draw, not a top-tier nomad hotspot</div><div class="fact-value"><a class="source-link" href="https://www.psimonmyway.com/merida-digital-nomad/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-08</span></div></li><li class="fact-item"><div class="fact-label">Nature/water adjacency — cenotes; Progreso beach 30-45 min away</div><div class="fact-value"><a class="source-link" href="https://traveltomerida.com/best-merida-cenotes/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-19</span></div></li><li class="fact-item"><div class="fact-label">Walkability / car-free living — first-hand account</div><div class="fact-value"><a class="source-link" href="https://traveltomerida.com/living-in-merida-mexico/" target="_blank" rel="noopener">source</a> <span class="scope-tag">2026-07-19</span></div></li><li class="fact-item"><p class="fact-notes">6 more sources are on file here without a public link yet — the most recent dates from 2026-07-18.</p></li></ul></details>
     <div class="next-best" id="where-now"><h2>Where now?</h2><p>Ranked next-best alternatives:</p>
     <ul><li><a href="PT-porto.html">Porto</a> — 3.7/5</li><li><a href="CR-chania.html">Chania</a> — 3.6/5</li><li><a href="ES-valencia.html">Valencia</a> — 3.5/5</li><li><a href="PT-lagos.html">Lagos (Algarve)</a> — 3.5/5</li><li><a href="GT-antigua.html">Antigua</a> — 3.4/5</li></ul>
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>

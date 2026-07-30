@@ -1,25 +1,28 @@
 // CanILiveThere — color logic for the map, lists, and score chips.
 //
-// Light-mode Fit-index scale. **INTERIM REVERT (2026-07-17, direct
-// product instruction): back to the v7 Part 16 red->green ramp** — the
-// v10 Part 11 blue-amber CVD-safe ramp above this comment (dc037437,
-// 2026-07-15) is retired FOR NOW, not deleted from history. Framed
-// plainly by whoever called it: "less terrible, not the solution" —
-// this is a same-day stopgap, not a re-litigation of Part 11's real
-// accessibility argument (still true, still the eventual target). The
-// real fix, scheduled next, is an OKLab-built ramp from felt-read
-// anchor-pair picks — that retires this revert in turn once it ships.
-// Minimal scope, per the instruction itself: swap the five hex values
-// back to their real prior values (pulled from git history, commit
-// dc037437's own parent — not re-derived, not new hex work), touch
-// nothing else in this file (dark-mode ramp untouched, same out-of-scope
-// status it's carried since v6; SCALE_STOP_MEANING labels below stay as
-// meaning-labels, not reverted back to hue names — that was a genuinely
-// separate improvement bundled into the same v10 Part 11 commit, not
-// itself part of tonight's color-only ask, and meaning labels stay
-// honest regardless of which hex ramp is live under them).
-const SCALE_STOPS_LIGHT = ["#7a2213", "#a35a0e", "#ae7d00", "#596e00", "#006726"];
-const SCALE_STOPS_DARK = ["#634c1e", "#916a11", "#bd8c1d", "#e5b147", "#fad99d"];
+// Fit-index scale, both themes (Part 30, the colorblind-safe rewrite —
+// supersedes the 2026-07-17 interim red/brown revert this comment used
+// to document). Real, first-outside-reader
+// evidence drove this: a colorblind reader could not read the prior
+// green-to-red (light) / brown-to-gold (dark) ramps. This is a single
+// continuous OKLCH interpolation between exactly two anchor hues, orange
+// (weakest) and blue (strongest), routed the LONG way around the hue
+// wheel specifically to avoid crossing this file's own amber
+// (CONDITIONAL_COLOR) or green (clearsColor()) meaning-colors at any
+// stop — do not hand this to a generic shortest-hue-distance color
+// utility; these ten hex values (both themes) are the actual ratified
+// deliverable, hardcoded, exactly as before. Every stop clears WCAG
+// >=4.0:1 against its own theme's --paper, and every adjacent-stop pair
+// stays distinguishable (CIE76 dE >=15) after both protanopia and
+// deuteranopia simulation — the middle "Middling fit" stop is
+// deliberately a softer, lower-chroma lilac (not muddy) because that
+// segment's hue span alone collapses under both CVD types; lightness/
+// chroma carry the signal there instead. Full math (OKLCH triples,
+// contrast ratios, dE tables, both raw and CVD-simulated) in Part 30.3
+// of the ramp spec. SCALE_STOP_MEANING (below) is unchanged by this
+// swap — a meaning label has no hue to mismatch.
+const SCALE_STOPS_LIGHT = ["#c64100", "#a1336c", "#7f62a0", "#1455a9", "#007283"];
+const SCALE_STOPS_DARK = ["#f95801", "#dd4f97", "#aa8bcd", "#267cee", "#00adc4"];
 // v10 Part 11: color-NAME labels ("Red"/"Green", v7 Part 16) are retired
 // in favor of MEANING labels — reusing FIT_INDEX_DEFINITION's own already-
 // established vocabulary ("5 is the strongest fit, 1 is the weakest")
@@ -215,12 +218,16 @@ export const ELIMINATED_FILL = "url(#hatch-eliminated)";
 // #846546 dark). Light aubergine clears 10.9-16.3:1 against all three
 // surfaces and stays distinct from every other frozen verdict color
 // (ΔE 66-98) — that distinctness check still holds today, untouched by
-// Part 16. **Resolved, v8 R4:** aubergine vs. the ramp's own weakest stop
-// (now red, #7a2213, since Part 16) separates at ΔE 54.1 — distinctness
-// holds by measurement, hex unchanged. Dark aubergine clears 3.19:1
-// against dark paper, matching brown's old floor — the dark general ramp
-// is still honey-gold with no dark violet/red anchor, so no dark-mode
-// hue-family claim is made either way (carried over, not re-argued).
+// Part 16. **Resolved, v8 R4:** aubergine vs. the ramp's own then-weakest
+// stop (red, #7a2213, since Part 16) separated at ΔE 54.1 — distinctness
+// held by measurement, hex unchanged. **Re-verified, Part 30
+// (2026-07-24):** the ramp itself changed under that Part (the
+// #7a2213 red this comment used to name is gone); Part 30.3's own
+// collision table re-checked eliminatedColor() against every stop of the
+// NEW orange-to-blue ramp, both themes, and every stop clears the 15-ΔE
+// flag floor against it — distinctness still holds, now against the
+// current ramp, not hand-re-measured here. Dark aubergine clears 3.19:1
+// against dark paper, matching brown's old floor.
 export const ELIMINATED_STROKE = "#370036";
 const ELIMINATED_STROKE_DARK = "#984f92";
 export function eliminatedColor() {

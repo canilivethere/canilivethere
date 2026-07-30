@@ -837,6 +837,17 @@ function renderMap(store, lenses) {
     // five no-fixture personas (they have no hand fixture anywhere, so
     // this stays false for them by construction, not a special case).
     let fill, tooltip, eliminated = false, gap = false, faded = false, handChecked = false;
+    // Part 30.8 (score-driven pin draw order): set
+    // alongside `fill` in every branch below. `isRampColored` is true only
+    // when the FINAL rendered fill is a scoreToColor()/indexToColor() call
+    // (the five-stop ramp, gap state included) -- classified by which
+    // function actually produced `fill`, not by whether a verdict color's
+    // hex happens to coincide with a ramp value. Verdict-colored pins
+    // (bandVisual()/verdictVisual() consumers, and the eliminated hatch,
+    // which ignores `fill` entirely at render time) stay false -- Part
+    // 30.8 rules the ramp's own draw order only and explicitly leaves
+    // verdict-pin draw order unanswered, not silently decided here.
+    let isRampColored = false, rampValue = null;
 
     // Tooltip voice (v2 addendum §4): a one-line human answer leads every
     // tooltip, built only from data already computed.
@@ -870,12 +881,15 @@ function renderMap(store, lenses) {
         } else {
           fill = scoreToColor(null);
           gap = true;
+          isRampColored = true; // the gap voice IS a scoreToColor() consumer -- 30.8's own gap rule applies
           tooltip = `${loc.display_name}, ${country.name} — Dog import: not researched yet.`;
         }
       } else {
         const val = activeLens.valueForLocation(loc.location_id);
         fill = scoreToColor(val);
         gap = isGapValue(val);
+        isRampColored = true;
+        rampValue = val;
         tooltip = `${loc.display_name}, ${country.name} — ${activeLens.label}: ${val != null ? val.toFixed(1) + "/5" : "not scored yet"}`;
       }
     } else if (persona === "waldo") {
@@ -892,6 +906,11 @@ function renderMap(store, lenses) {
       const hasPersonaRescore = !!(idx && idx.personaAdjusted === true);
       fill = indexToColor(value);
       gap = isGapValue(value);
+      // Part 15.4's own doctrine holds regardless of what follows below
+      // (engine verdict rides a second tooltip line, never the color
+      // channel) -- Waldo's pin is always a ramp consumer, unconditionally.
+      isRampColored = true;
+      rampValue = value;
       const headline = buildFitHeadline(store, "waldo", loc, country, value);
       const baseTooltip = `${headline}\nWaldo's Fit index: ${value != null ? value.toFixed(1) : "n/a"}/5`;
       if (hasPersonaRescore) {
@@ -935,11 +954,14 @@ function renderMap(store, lenses) {
       const hasRealRead = !!verdict || hasCriterionFixtures || !!engineVerdict;
       fill = indexToColor(underlyingValue);
       gap = isGapValue(underlyingValue);
+      isRampColored = true; // provisional -- both branches below override to false, the else branch (no read at all) keeps this
+      rampValue = underlyingValue;
       faded = !hasRealRead;
       if (verdict) {
         handChecked = true;
         const vHeadline = verdictHeadline(verdict.expected);
         const visual = verdictVisual(vHeadline);
+        isRampColored = false; // a verdictVisual() consumer either way (eliminated hatch ignores `fill`; the else branch overwrites it)
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
         const indexLabel = `Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`;
@@ -953,6 +975,7 @@ function renderMap(store, lenses) {
         fill = visual.color;
         gap = visual.gap;
         eliminated = visual.eliminated;
+        isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note, not a ramp pin
         const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
         // Same instead-line as the `if (verdict)`
         // branch just above, extended to this engine-only case.
@@ -986,6 +1009,8 @@ function renderMap(store, lenses) {
       const value = idx ? idx.value : null;
       fill = indexToColor(value);
       gap = isGapValue(value);
+      isRampColored = true; // never a verdict for this identity (21.7's own scope boundary), always the ramp
+      rampValue = value;
       const headline = buildFitHeadline(store, null, loc, country, value);
       tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${CUSTOM_ESTIMATE_SUFFIX})`;
     } else if (persona) {
@@ -1007,6 +1032,7 @@ function renderMap(store, lenses) {
         fill = visual.color;
         gap = visual.gap;
         eliminated = visual.eliminated;
+        isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note
         const stateText = STATE_HEADLINE[verdict.overall_state] || verdict.overall_state;
         // Same instead-line as the Wenda/Carmen and
         // Waldo engine branches above — the five-no-fixture-persona case
@@ -1026,6 +1052,8 @@ function renderMap(store, lenses) {
         fill = indexToColor(generalValue);
         gap = isGapValue(generalValue);
         faded = true;
+        isRampColored = true; // defensive fallback only (full engine coverage today) -- ramp when it does fire
+        rampValue = generalValue;
         const headline = buildFitHeadline(store, null, loc, country, generalValue);
         tooltip = `${headline}\nFit index: ${generalValue != null ? generalValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
@@ -1033,6 +1061,8 @@ function renderMap(store, lenses) {
       const general = store.generalIndex(loc.location_id);
       fill = indexToColor(general ? general.value : null);
       gap = isGapValue(general ? general.value : null);
+      isRampColored = true;
+      rampValue = general ? general.value : null;
       const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
       tooltip = `${headline}\nFit index: ${general ? general.value.toFixed(1) + "/5" : "not yet scored"}`;
     }
@@ -1043,7 +1073,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue });
   }
 
   const wrap = document.createElement("div");
@@ -1367,6 +1397,31 @@ function renderMap(store, lenses) {
       shadow.setAttribute("aria-hidden", "true");
       shadow.setAttribute("pointer-events", "none");
       svg.appendChild(shadow);
+
+      // Part 30.8, Cap's ruling verbatim: "the
+      // 'better' result goes on top of the weaker pin ... while
+      // maintaining accuracy." Immediately before paint, reorder the
+      // ramp-colored subset of `rendered` into ascending active-view
+      // value -- SVG has no z-index; the last circle appended wins any
+      // overlap, so ascending order leaves the highest-scoring pin
+      // painted last/on top. Gap pins (isGapValue) sort as -Infinity,
+      // i.e. lowest/underneath, per 30.8's own explicit rule (a scored
+      // pin should always show over an unscored one). Scope, per 30.8's
+      // own boundary: only entries whose fill actually came from
+      // scoreToColor()/indexToColor() (isRampColored, set in the pin-data
+      // pass above) are reordered -- their sorted values are written back
+      // into the exact index slots they already occupied, so every
+      // verdict-colored pin (bandVisual()/verdictVisual() consumers) is
+      // left at whatever position it already held. That draw-order
+      // question is explicitly NOT answered by Part 30 -- not decided
+      // here either.
+      const rampSortValue = (e) => (isGapValue(e.rampValue) ? -Infinity : e.rampValue);
+      const rampSlots = [];
+      rendered.forEach((e, i) => { if (e.isRampColored) rampSlots.push(i); });
+      const rampSortedEntries = rampSlots
+        .map((i) => rendered[i])
+        .sort((a, b) => rampSortValue(a) - rampSortValue(b));
+      rampSlots.forEach((slot, k) => { rendered[slot] = rampSortedEntries[k]; });
 
       const visualPins = [];
       for (const entry of rendered) {

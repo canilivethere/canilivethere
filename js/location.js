@@ -9,6 +9,7 @@ import {
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
+  sentenceCaseRuleParagraph,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -332,7 +333,7 @@ function buildVerdictBlock(store, loc, country, persona) {
         // `companion_disclosure` field (the ratified §13.9 item 2
         // sentence), not reworded here.
         const companionParagraph = engineVerdict.companion_disclosure
-          ? `<p class="verdict-prose">${escapeHtml(engineVerdict.companion_disclosure)}</p>`
+          ? `<p class="verdict-prose">${escapeHtml(sentenceCaseRuleParagraph(engineVerdict.companion_disclosure))}</p>`
           : "";
         div.innerHTML = `
           <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>
@@ -431,7 +432,7 @@ function buildVerdictBlock(store, loc, country, persona) {
           : "";
         // Same Part 24.3 companion-disclosure paragraph as the branch above.
         const companionParagraph = engineVerdict.companion_disclosure
-          ? `<p class="verdict-prose">${escapeHtml(engineVerdict.companion_disclosure)}</p>`
+          ? `<p class="verdict-prose">${escapeHtml(sentenceCaseRuleParagraph(engineVerdict.companion_disclosure))}</p>`
           : "";
         div.innerHTML = `
           <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${scopeNote}</p>

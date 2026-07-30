@@ -1199,6 +1199,28 @@ export function verdictChipMarkup(color, label, companionDisclosure) {
   );
 }
 
+// §25.8's rule: "'verbatim from the ratified
+// text' binds the WORDS -- never the leading letter's case or the
+// terminal punctuation of the rendered sentence." Its one named target:
+// the §13.9 companion-disclosure sentence, sourced lowercase-led from
+// `derived/verdicts.jsonl`'s own `companion_disclosure` field (correct
+// there -- quoted mid-sentence in the rule doc) but rendered at
+// location.js's two call sites as its own standalone `<p
+// class="verdict-prose">` paragraph, where a lowercase-led sentence
+// reads as an error on the page's most load-bearing disclosure line.
+// A source-string fix at the render call site, not a CSS transform (the
+// distinction 25.8 itself draws): this returns a real corrected string,
+// so the actual DOM text node -- what copy-paste and screen readers both
+// see -- carries the fix, not just the on-screen pixels. Every other use
+// of `companion_disclosure` on the site (verdictChipMarkup above,
+// lists.js) only tests its truthiness, never renders its text, so this
+// is the sentence's one and only render call site needing the transform.
+export function sentenceCaseRuleParagraph(text) {
+  if (!text) return text;
+  const capitalized = text.charAt(0).toUpperCase() + text.slice(1);
+  return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
+}
+
 // 24.5: a named, deliberately dormant slot for a future renewal-life
 // explainer (a fresh, separate product ask — explicitly NOT this
 // dispatch's own build; the render spec reserves only the slot,

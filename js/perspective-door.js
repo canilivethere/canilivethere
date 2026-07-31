@@ -58,6 +58,13 @@ const DOOR_SEEN_KEY = "door-seen";
 // in this file. Register pass landed 2026-07-21 (C12; the earlier
 // as-shipped-until-reviewed line this comment used to flag is now the
 // reviewed replacement below).
+// Part 34.3: the site identity the hidden topbar was carrying while the
+// door is open. The EXISTING brand string, verbatim (the same one the
+// topbar's .brand link and the page title render) — nothing new
+// authored. Static text, never a link: a brand link from an open,
+// unanswered door reloads index.html, which re-summons the door — a
+// loop.
+const DOOR_BRAND_LINE = "CanILiveThere";
 const WELCOME_LINE =
   "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Start with your passport, your priorities, or one of eight worked examples — three ways to tell the site who's asking.";
 const ESCAPE_HATCH_LABEL = "See the facts as they are.";
@@ -391,7 +398,19 @@ export function initPerspectiveDoor() {
   }
 
   const mapRoot = document.getElementById("map-root");
+  // Part 34: the two door-state classes are set together, synchronously
+  // with the overlay append — `map-fogged` dims the map, `door-open`
+  // hides the topbar (see the stylesheet) — and removed together only in
+  // unfog() below, the one shared close helper, so they can never
+  // diverge. The door summons on load, so the bar paints for the frames
+  // before this line runs; that brief flash is accepted (Part 34), and
+  // adding the class here rather than later minimizes it. Full-reload
+  // exits (persona choose, Continue, forget, passport save, priorities
+  // save) clear both classes with the page itself; none of them renders
+  // anything between its storage writes and location.href, so no path
+  // depends on an explicit pre-reload removal.
   if (mapRoot) mapRoot.classList.add("map-fogged");
+  document.body.classList.add("door-open");
 
   const overlay = document.createElement("div");
   overlay.id = "perspective-door";
@@ -402,7 +421,10 @@ export function initPerspectiveDoor() {
   document.body.appendChild(overlay);
   const panel = overlay.querySelector("#door-panel");
 
-  const unfog = () => { if (mapRoot) mapRoot.classList.remove("map-fogged"); };
+  const unfog = () => {
+    if (mapRoot) mapRoot.classList.remove("map-fogged");
+    document.body.classList.remove("door-open");
+  };
 
   // 25.2/§8AA.2/§8AA.1: dismissing to the no-lens state. If there was a
   // real lens (a saved custom profile or a saved PERSONA choice) that
@@ -456,6 +478,7 @@ export function initPerspectiveDoor() {
       : "";
 
     panel.innerHTML = `
+      <p class="door-brand">${escapeHtml(DOOR_BRAND_LINE)}</p>
       <p class="door-welcome">${escapeHtml(WELCOME_LINE)}</p>
       ${resumeHtml}
       <div class="door-wings" id="door-wings">

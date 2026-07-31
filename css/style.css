@@ -671,6 +671,17 @@ h3 { font-size: 1.05rem; }
    affordance for it; swaps to "grabbing" for the live drag itself. */
 #map-root svg { cursor: grab; }
 #map-root.map-panning svg { cursor: grabbing; }
+/* Part 34: while the door is open, the topbar yields the viewport to it.
+   `visibility` rather than `display` keeps the bar's layout space (no
+   reflow jump behind the backdrop on open/close) and removes it from
+   paint, hit-testing, the accessibility tree, and tab order in one
+   property. The §8AA.6 z-501/opaque-background mechanics on .site-topbar
+   above stay untouched as belt-and-braces for any state where both are
+   ever visible — they simply never engage while the bar is hidden. Never
+   pre-hidden statically: only the door's own JS sets body.door-open, so
+   ?persona= deep links and non-index pages (which never summon the door)
+   never lose the bar. */
+body.door-open .site-topbar { visibility: hidden; }
 #perspective-door {
   position: fixed;
   inset: 0;
@@ -713,6 +724,28 @@ h3 { font-size: 1.05rem; }
    at heights above 400px. */
 @media (max-height: 400px) {
   .door-panel { margin: 0.75rem auto; }
+  /* Part 34 amendment: the brand line retracts entirely at the same
+     trigger — display (not visibility), because it must release its
+     layout space: its own height is exactly what pushed the resume
+     band's continue button below the fold at 568x320. At this height
+     the door opens on the explanation itself; the identity returns at
+     every other viewport and on close. Retraction, not compression —
+     no smaller styling recovers the overflow (measured, not felt). */
+  .door-brand { display: none; }
+}
+/* Part 34.3: with the topbar hidden while the door is open, this static
+   line is the only site identity on a fresh arrival's first screen.
+   Deliberately subordinate to .door-welcome (smaller, muted) so it reads
+   as a running head, never as the panel's first sentence — the welcome
+   line stays the first thing actually read. Plain text, never a link (a
+   brand link from an open unanswered door would re-summon the door — a
+   loop), and not the uppercase kicker device (that device means
+   reader-state meta, not site identity). */
+.door-brand {
+  font-family: "Fraunces", serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
 }
 .door-welcome {
   font-family: "Fraunces", serif;

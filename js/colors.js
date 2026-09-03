@@ -1,0 +1,377 @@
+// CanILiveThere — color logic for the map, lists, and score chips.
+//
+// Fit-index scale, both themes (Part 30, the colorblind-safe rewrite —
+// supersedes the 2026-07-17 interim red/brown revert this comment used
+// to document). Real, first-outside-reader
+// evidence drove this: a colorblind reader could not read the prior
+// green-to-red (light) / brown-to-gold (dark) ramps. This is a single
+// continuous OKLCH interpolation between exactly two anchor hues, orange
+// (weakest) and blue (strongest), routed the LONG way around the hue
+// wheel specifically to avoid crossing this file's own amber
+// (CONDITIONAL_COLOR) or green (clearsColor()) meaning-colors at any
+// stop — do not hand this to a generic shortest-hue-distance color
+// utility; these ten hex values (both themes) are the actual ratified
+// deliverable, hardcoded, exactly as before. Every stop clears WCAG
+// >=4.0:1 against its own theme's --paper, and every adjacent-stop pair
+// stays distinguishable (CIE76 dE >=15) after both protanopia and
+// deuteranopia simulation — the middle "Middling fit" stop is
+// deliberately a softer, lower-chroma lilac (not muddy) because that
+// segment's hue span alone collapses under both CVD types; lightness/
+// chroma carry the signal there instead. Full math (OKLCH triples,
+// contrast ratios, dE tables, both raw and CVD-simulated) in Part 30.3
+// of the ramp spec. SCALE_STOP_MEANING (below) is unchanged by this
+// swap — a meaning label has no hue to mismatch.
+const SCALE_STOPS_LIGHT = ["#c64100", "#a1336c", "#7f62a0", "#1455a9", "#007283"];
+const SCALE_STOPS_DARK = ["#f95801", "#dd4f97", "#aa8bcd", "#267cee", "#00adc4"];
+// v10 Part 11: color-NAME labels ("Red"/"Green", v7 Part 16) are retired
+// in favor of MEANING labels — reusing FIT_INDEX_DEFINITION's own already-
+// established vocabulary ("5 is the strongest fit, 1 is the weakest")
+// rather than inventing new register. Ruled UI copy, transported
+// verbatim — do not reword. Theme-independent by construction (a meaning
+// has no hue to mismatch, unlike a color name against an unrelated
+// dark-mode ramp) — see getScaleLegend() below, which now returns this
+// regardless of theme.
+const SCALE_STOP_MEANING = ["Weakest fit", "Below-average fit", "Middling fit", "Above-average fit", "Strongest fit"];
+
+// Theme detection (v4 addendum R2): reads the `data-theme` attribute
+// app-shared.js's applyStoredTheme()/toggleTheme() set on <html>, not the
+// OS/browser's `prefers-color-scheme` — light is the unconditional
+// default, dark only via an explicit, persisted toggle. Formerly
+// prefersDark() (a cached MediaQueryList read); renamed, same call-site
+// contract (every caller below is unchanged), no OS read left anywhere.
+export function isDarkTheme() {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.dataset.theme === "dark";
+}
+
+function currentScaleStops() {
+  return isDarkTheme() ? SCALE_STOPS_DARK : SCALE_STOPS_LIGHT;
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex([r, g, b]) {
+  return (
+    "#" +
+    [r, g, b]
+      .map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
+// v8 R4: the unscored/null branch no longer returns a bare gray — it
+// adopts the site's existing GAP voice (same family as confidenceBadge()'s
+// badge-gap and the fact-list's own "Not yet researched" treatment), so
+// "not researched" reads as one honest gap-shape site-wide instead of a
+// fourth unrelated gray. Duplicated as literal hex here rather than a CSS
+// var() reference — same intentional-duplication pattern this file already
+// uses for ELIMINATED_STROKE/CONDITIONAL_COLOR/pendingColor(), since this
+// value has to work as a plain SVG fill attribute and an inline chip
+// background alike, not just inside a stylesheet. Matches style.css's own
+// --gap-bg token, both themes (that token already carries a real dark-mode
+// value, so this isn't a new dark-mode surface — reusing an existing one).
+const GAP_BG_LIGHT = "#E4D8BC";
+const GAP_BG_DARK = "#2c2c28";
+
+// value: 1..5 (fractional allowed), or null/NaN for "not researched."
+// v8 R2: quantized to the ramp's 5 NAMED stops — no more linear
+// interpolation between them. A value snaps to its nearest stop
+// (Math.round(clamped) - 1, per the ruling's own arithmetic) everywhere
+// this function is consumed: map pins, list chips, location chips — one
+// semantic per color site-wide. The exact fractional number stays the
+// fact, rendered as text (tooltips/chips already carry it); color now
+// only ever answers "roughly what kind," never "exactly what."
+export function scoreToColor(value) {
+  if (value == null || Number.isNaN(value)) return isDarkTheme() ? GAP_BG_DARK : GAP_BG_LIGHT;
+  const stops = currentScaleStops();
+  const clamped = Math.max(1, Math.min(5, value));
+  const idx = Math.max(0, Math.min(4, Math.round(clamped) - 1));
+  return stops[idx];
+}
+
+// v8: a plain "is this the gap state" check, shared by any caller that
+// needs to branch on it (map.js's per-pin gap stroke class, the dog-import
+// facts lens) instead of re-testing value==null/NaN independently.
+export function isGapValue(value) {
+  return value == null || Number.isNaN(value);
+}
+
+// v12 Part 22.7: the BLENDED Fit index gets its five stops from z-bands
+// around the live distribution's mean (boundaries at mean ± 0.5σ and
+// ± 1.5σ, population σ), not from the fixed 1.5/2.5/3.5/4.5 midpoints —
+// under the fixed bands the measured live occupancy was [0, 2, 34, 2, 0]
+// (one stop carrying 34 of 38 locations, both end stops dead), which made
+// the ruled comparative meaning-labels ("Below-average fit" etc.) false
+// in fact. Z-bands make them literally true: below the average of the
+// researched set. Two transparent statistics (mean, σ), recomputable by
+// any reader from the published data.
+//
+// The consumer split, ruled: this calibrated mapping applies ONLY to
+// blended fit-index values (map pins, Lists' fit column). Raw
+// per-criterion scores keep scoreToColor()'s linear mapping above — a
+// criterion's 5 is an absolute, reachable, authored 5; the blended
+// index's 5.0 is practically unreached. Two entry points, one generated
+// stop set, two honest mappings.
+//
+// Calibration is a RUNTIME act, recomputed at every render from the
+// values actually rendered under the active view (general index by
+// default, a persona's or the reader's own custom index when active) —
+// one basis per view, never mixed, no hand constant that can go stale.
+// A returning visitor may find a location's color shifted because OTHER
+// locations landed: that is the comparative claim being honest, not
+// drift — the exact number stays the fact, rendered as text alongside.
+let indexCalibration = null;
+
+export function calibrateIndexBands(values) {
+  const vals = values.filter((v) => v != null && !Number.isNaN(v));
+  const n = vals.length;
+  if (n < 8) {
+    // Guard (ruled): with almost no population, the absolute linear
+    // reading is the honest degrade — comparative bands over a handful
+    // of values would amplify noise into fake extremes.
+    if (n > 0) console.warn(`Fit-index band calibration: only ${n} scored values (needs 8) — using the linear 1-5 bands instead.`);
+    indexCalibration = { calibrated: false, n };
+    return indexCalibration;
+  }
+  const mean = vals.reduce((a, b) => a + b, 0) / n;
+  const sigma = Math.sqrt(vals.reduce((a, v) => a + (v - mean) * (v - mean), 0) / n);
+  if (sigma < 0.1) {
+    // Guard (ruled): a five-band structure spanning less than ±0.15
+    // index points would read noise as meaning.
+    console.warn(`Fit-index band calibration: σ ${sigma.toFixed(3)} < 0.1 — using the linear 1-5 bands instead.`);
+    indexCalibration = { calibrated: false, n, mean, sigma };
+    return indexCalibration;
+  }
+  indexCalibration = {
+    calibrated: true,
+    n,
+    mean,
+    sigma,
+    boundaries: [mean - 1.5 * sigma, mean - 0.5 * sigma, mean + 0.5 * sigma, mean + 1.5 * sigma],
+  };
+  return indexCalibration;
+}
+
+export function getIndexCalibration() {
+  return indexCalibration;
+}
+
+// Blended-fit-index sibling of scoreToColor(): same five stops, same gap
+// voice, calibrated band assignment. Values beyond the outer boundaries
+// clamp to stops 1 and 5. Falls back to scoreToColor()'s linear mapping
+// whenever no calibration is in effect (guards above, or a page that
+// never calibrates).
+export function indexToColor(value) {
+  if (value == null || Number.isNaN(value)) return isDarkTheme() ? GAP_BG_DARK : GAP_BG_LIGHT;
+  if (!indexCalibration || !indexCalibration.calibrated) return scoreToColor(value);
+  const b = indexCalibration.boundaries;
+  let idx = 0;
+  while (idx < 4 && value >= b[idx]) idx++;
+  return currentScaleStops()[idx];
+}
+
+// v12 Part 22.8: one additive legend line disclosing the comparative
+// basis — the ruled meaning-labels themselves stay verbatim. {N} is the
+// live calibration count, no new fact. Returns "" when no calibration is
+// active (the comparative claim would be false under the linear
+// fallback, so the line only renders when it is true). Draft copy;
+// copy-voice register pass pending, non-blocking.
+export function indexBandDisclosure() {
+  if (!indexCalibration || !indexCalibration.calibrated) return "";
+  return `Colors compare the ${indexCalibration.n} researched places with each other — the strongest color marks the strongest fits among them, not a perfect score. Every exact number is shown alongside.`;
+}
+
+// Recomputed on every call (not a cached const) so it reflects the
+// current theme at render time — call sites re-read this each render,
+// same as scoreToColor.
+//
+// v10 Part 11: each stop carries its own `name`, now a MEANING label
+// (SCALE_STOP_MEANING, above) rather than a hue name — returned
+// regardless of theme. This retires the v7 Part 16 dark-mode withholding:
+// a meaning label has no hue to mismatch against the honey-gold dark
+// ramp the way "Red"/"Green" did, so dark mode's legend — which has
+// shown bare unlabeled swatches since that withholding began — now gets
+// the same five labels for free, zero new authorship, zero new
+// validation needed (no color claim is being made by the text).
+export function getScaleLegend() {
+  const stops = currentScaleStops();
+  return [1, 2, 3, 4, 5].map((v) => ({
+    value: v,
+    color: stops[v - 1],
+    name: SCALE_STOP_MEANING[v - 1],
+  }));
+}
+
+// Live-toggle repaint (2026-08-12 fix, a live-site audit finding):
+// scoreToColor()/indexToColor() were only ever CALLED at render
+// time -- correct for a fresh load (isDarkTheme() reads the live
+// attribute), but every already-rendered swatch (SVG pin fill, HTML
+// swatch background) kept whatever hex string got baked in at that one
+// call, forever, because nothing re-invoked the color function after
+// app-shared.js's toggleTheme() flips data-theme. That silently defeated
+// this exact ramp's whole reason for existing (Part 30, built from a real
+// colorblind reader's feedback) on its single most ordinary interaction.
+//
+// Fix: every DOM node whose fill/background comes from scoreToColor() or
+// indexToColor() gets its OWN raw value (the same number already passed
+// to whichever function painted it) recorded as a plain data attribute at
+// render time -- RAMP_VALUE_ATTR ("" for the null/gap state, matching
+// both functions' own null branch) and RAMP_KIND_ATTR ("score" for a raw
+// per-criterion value, "index" for the calibrated blended Fit index, per
+// this file's own documented consumer split above indexToColor()).
+// repaintRampSwatches() (called by app-shared.js's toggleTheme(), the
+// ramp's only two other callers today) re-reads every marked node and
+// recomputes its color from that stored value against the NOW-current
+// theme -- one shared mechanism, not duplicated per page (map.js/
+// lists.js/location.js each just write the two attributes at their own
+// existing swatch-building call sites; the actual repaint logic lives
+// here once). indexToColor()'s calibration state is untouched by a theme
+// toggle (nothing about WHICH locations render changes), so re-calling it
+// with the same value against the old calibration is correct by
+// construction, not a re-approximation.
+//
+// Scope, named plainly: this covers the orange<->blue Fit-index ramp only
+// (scoreToColor()/indexToColor()) -- the confirmed regression this fix
+// addresses. verdictVisual()/bandVisual()'s own colors (clearsColor(),
+// eliminatedColor(), pendingColor(), CONDITIONAL_COLOR) are consumed the
+// exact same compute-once way at their own call sites and are NOT covered
+// here -- a related but separate finding, reported, not fixed, since it
+// wasn't what broke.
+export const RAMP_VALUE_ATTR = "data-ramp-value";
+export const RAMP_KIND_ATTR = "data-ramp-kind";
+
+function paintRampNode(el) {
+  const raw = el.getAttribute(RAMP_VALUE_ATTR);
+  const value = raw === "" || raw == null ? null : Number(raw);
+  const kind = el.getAttribute(RAMP_KIND_ATTR);
+  const color = kind === "score" ? scoreToColor(value) : indexToColor(value);
+  // SVG pin fills use the `fill` attribute; every other consumer (HTML
+  // <span> swatches) uses an inline background — same distinction
+  // map.js's own makeVisualPin()/legend markup and lists.js/location.js's
+  // <span class="fit-swatch"> already draw between the two element kinds.
+  if (el.namespaceURI === "http://www.w3.org/2000/svg") el.setAttribute("fill", color);
+  else el.style.background = color;
+}
+
+export function repaintRampSwatches() {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(`[${RAMP_VALUE_ATTR}]`).forEach(paintRampNode);
+}
+
+// Distinct, deliberately NOT-on-the-continuum states (per website-brief:
+// "eliminated = visibly dark/hatched" — never just the darkest end of the
+// same scale, which would visually read as "merely low," not "gone").
+// Unchanged in dark mode per the v2 addendum's own contrast table (both
+// already clear their floors against the dark surface) — CONDITIONAL_COLOR
+// is also now the single unified value for this "possible, painfully"
+// concept (v2 addendum §2.5: style.css's `--conditional` token was a
+// different hex for the same meaning; that CSS token now matches this one,
+// not the reverse).
+export const ELIMINATED_FILL = "url(#hatch-eliminated)";
+// v6 addendum §2.2: aubergine, brown retired here too (was #3a2a1a light /
+// #846546 dark). Light aubergine clears 10.9-16.3:1 against all three
+// surfaces and stays distinct from every other frozen verdict color
+// (ΔE 66-98) — that distinctness check still holds today, untouched by
+// Part 16. **Resolved, v8 R4:** aubergine vs. the ramp's own then-weakest
+// stop (red, #7a2213, since Part 16) separated at ΔE 54.1 — distinctness
+// held by measurement, hex unchanged. **Re-verified, Part 30
+// (2026-07-24):** the ramp itself changed under that Part (the
+// #7a2213 red this comment used to name is gone); Part 30.3's own
+// collision table re-checked eliminatedColor() against every stop of the
+// NEW orange-to-blue ramp, both themes, and every stop clears the 15-ΔE
+// flag floor against it — distinctness still holds, now against the
+// current ramp, not hand-re-measured here. Dark aubergine clears 3.19:1
+// against dark paper, matching brown's old floor.
+export const ELIMINATED_STROKE = "#370036";
+const ELIMINATED_STROKE_DARK = "#984f92";
+export function eliminatedColor() {
+  return isDarkTheme() ? ELIMINATED_STROKE_DARK : ELIMINATED_STROKE;
+}
+export const CONDITIONAL_COLOR = "#e07b1a"; // amber/orange, "possible, painfully" — same value both themes
+
+// v8 R4: theme-split — light moves #9a9a9a -> #8A8272 (3.13:1 vs paper,
+// warm family, replacing a cool gray that measured 2.32:1); dark theme
+// keeps its prior value, explicitly out of scope this pass. Was a bare
+// exported constant; now a function (same pattern as clearsColor()/
+// eliminatedColor() above) since the value is theme-dependent. Meaning:
+// "checked, but the verdict itself is unverified" — pending verdicts,
+// never an unscored/gap state (this file's own gap-voice branch above) —
+// two claims, two colors, not one gray standing in for both. (A "count"
+// was a third claim R5's cluster-badge panel used to carry; Part 11
+// retired that mechanism entirely — a knot is now real overlapping pins,
+// no separate badge color at all, so there's nothing left to distinguish
+// this value from on that front.)
+const PENDING_LIGHT = "#8A8272";
+const PENDING_DARK = "#9a9a9a";
+export function pendingColor() {
+  return isDarkTheme() ? PENDING_DARK : PENDING_LIGHT;
+}
+
+// v8 Part 6: the dog-import facts lens's one positive state ("rules on
+// file") — deliberately outside both the ramp and the verdict-color
+// family (minimum ΔE 45.8 against every ramp stop and every verdict
+// color, validated), a third, distinct family for a third kind of claim
+// ("rules exist," never a grade). Same value both themes; the lens's own
+// "nothing on file" state reuses scoreToColor(null)'s gap voice instead of
+// a fourth color, per the same file's own doctrine.
+export const DOG_LENS_COLOR = "#3D5A72";
+
+// "Clears" needs its own dark-mode value. clearsColor()'s only consumer is
+// verdictVisual()'s "clear" branch, whose color is always rendered as a
+// .verdict-chip BACKGROUND under hardcoded white text (never as plain text
+// against the paper) — so the dark value must clear AA as a background
+// under white (needs relative luminance <= ~0.183), not just as text
+// against the dark paper. #319751 (~3.7:1 under white) undershoots that;
+// #1d6b3f clears ~6.5:1.
+const CLEARS_LIGHT = "#1a7a3c";
+const CLEARS_DARK = "#1d6b3f";
+export function clearsColor() {
+  return isDarkTheme() ? CLEARS_DARK : CLEARS_LIGHT;
+}
+
+// v9 Part 6.1: the verdict-coverage engine's own `overall_band` (a closed
+// 4-value enum, derived/verdicts.jsonl) mapped onto the SAME verdict-band
+// channel verdictVisual() already drives for fixture-bearing personas — no
+// new hex, no new CSS, reusing clearsColor()/CONDITIONAL_COLOR/
+// eliminatedColor()/scoreToColor(null) exactly as they already exist.
+// `data_gap` is a distinct claim from `pendingColor()` (spec's own
+// reasoning, quoted): pendingColor() means "checked, but the verdict
+// itself is unverified" (a human-process state); data_gap means "the
+// engine ran and the underlying facts don't reach an answer" — the same
+// claim scoreToColor(null) already carries site-wide, not a process state.
+// Defensive fallback matches verdictVisual()'s own "unknown" idiom: the
+// engine's enum is closed today (verified directly against the live
+// file), but an unrecognized value shouldn't silently mis-render.
+export function bandVisual(band) {
+  switch (band) {
+    case "clean": return { color: clearsColor(), eliminated: false, gap: false };
+    case "uncertain_or_conditional": return { color: CONDITIONAL_COLOR, eliminated: false, gap: false };
+    case "hard_fail": return { color: eliminatedColor(), eliminated: true, gap: false };
+    case "data_gap": return { color: scoreToColor(null), eliminated: false, gap: true };
+    default:
+      console.warn("Unknown overall_band value:", band);
+      return { color: pendingColor(), eliminated: false, gap: false };
+  }
+}
+
+// Wenda/Carmen verdict-headline -> visual treatment. Mechanical keyword
+// match on the fixture's own leading clause (see data.js verdictHeadline),
+// never a re-interpretation of the prose.
+export function verdictVisual(headline) {
+  const h = headline.toLowerCase();
+  // NOTE: the two "type-trap" checks (a real, distinct fixture shape —
+  // "clears the number, fails the type" / "one door opens, leads nowhere")
+  // MUST be checked before the plain "clears" check below, since both
+  // start with a shared prefix and the more specific case would otherwise
+  // be unreachable.
+  if (h.startsWith("clears the number")) return { kind: "typetrap", color: CONDITIONAL_COLOR, label: "Clears the number, fails the type" };
+  if (h.startsWith("one door opens")) return { kind: "typetrap", color: CONDITIONAL_COLOR, label: "One door opens, leads nowhere" };
+  if (h.startsWith("clears")) return { kind: "clear", color: clearsColor(), label: "Clears" };
+  if (h.startsWith("near-miss")) return { kind: "nearmiss", color: CONDITIONAL_COLOR, label: "Near-miss" };
+  if (h.startsWith("unverified")) return { kind: "pending", color: pendingColor(), label: "Unverified" };
+  if (h.startsWith("misses") || h.startsWith("categorical absence"))
+    return { kind: "eliminated", color: eliminatedColor(), label: "Misses" };
+  return { kind: "unknown", color: pendingColor(), label: headline };
+}

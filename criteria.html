@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What each score measures — CanILiveThere</title>
+<meta name="description" content="What each of the site's 13 scored criteria actually measures, how it's weighted, and what a 5 means.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
+</head>
+<body>
+<main>
+  <h1>What each score measures</h1>
+  <p id="criteria-intro">Every "Score breakdown" chip on a location page links here — one definition per criterion, shared by every location instead of repeated 38 times.</p>
+  <p class="fit-def" id="scale-anchor"></p>
+  <div id="criteria-root"></div>
+</main>
+<script type="module" src="js/criteria.js"></script>
+</body>
+</html>

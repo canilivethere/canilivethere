@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lists — CanILiveThere</title>
+<meta name="description" content="Sortable rankings of every researched relocation destination, general or persona-switched.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
+</head>
+<body>
+<main>
+  <h1>Lists</h1>
+  <div id="persona-slot"></div>
+  <p id="persona-context"></p>
+  <div class="purpose-lists" id="purpose-lists"></div>
+  <p class="purpose-explainer" id="purpose-explainer"></p>
+  <div class="filters">
+    <div id="location-search-slot"></div>
+    <label for="country-filter">Filter by country:</label>
+    <select id="country-filter"></select>
+  </div>
+  <table class="rank-table">
+    <caption class="fit-def" id="fit-def-caption"></caption>
+    <thead>
+      <tr>
+        <th data-sort="name">Location</th>
+        <th data-sort="country">Country</th>
+        <th data-sort="fit">Fit index</th>
+        <th>Persona verdict</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody id="rank-tbody"></tbody>
+  </table>
+  <!-- Part 39: the cost-comparison panel — directly after the ranking
+       table (the table answers "which places fit whom," this answers
+       "what do they cost against each other"). Content is rendered by
+       js/cost-comparison.js from derived/cost-comparison.jsonl; an
+       empty data state leaves this section empty, never a stub. -->
+  <section id="compare-costs" aria-labelledby="compare-costs-heading"></section>
+  <p class="judgment-note">
+    Not built yet, deliberately: the Board — the
+    full spreadsheet-style data grid over every fact. This Lists surface is
+    ranking-only, one row per location.
+  </p>
+</main>
+<script type="module" src="js/lists.js"></script>
+</body>
+</html>

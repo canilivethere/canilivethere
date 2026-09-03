@@ -1,0 +1,15 @@
+
+# crash dumps from shell tooling — never publishable
+*.stackdump
+
+# Internal git hooks -- never cross the vault/public boundary.
+# Added 2026-09-01 as a purely defensive guard, per a review finding:
+# .githooks/pre-push was sitting here untracked AND un-ignored, so any
+# `git add -A` would have swept it into the public repo. Measured contents:
+# an internal control name x3, the private vault's directory name x7,
+# internal schema vocabulary x15, and the maintainer's real first name x3 --
+# the last being the very thing the history purge exists to remove.
+# This entry closes the accidental-sweep path only. The separate question of
+# branch githooks-tracking-2026-09-01, which deliberately TRACKS these files,
+# is NOT settled by this line and is held for the publication-boundary gate.
+.githooks/

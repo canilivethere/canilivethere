@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "extracted_at": "2026-09-02T20:09:06Z",
+  "source_ref_policy": "public snapshot - internal provenance removed on export (publication-boundary ruling, 2026-07-10): fact.source_ref truncated to bare source filename (consumed by the site's section bucketing), score/change-event source_ref removed, fixture provenance neutralized; source_url + confidence + source_count are the public trust layer",
+  "extracted_at_note": "Derived from the last commit that actually touched derived/ (bb8d743, 2026-08-27 22:02:42 +0100). Corrected 2026-09-01: this field is hand-maintained -- no exporter writes it -- and had drifted to 2026-08-11, so the site was publishing a freshness claim 16 days older than the data it describes. Until an exporter owns this field it will drift again."
+}

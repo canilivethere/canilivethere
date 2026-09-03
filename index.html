@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CanILiveThere — where in the world could you actually live?</title>
+<meta name="description" content="An interactive world map of relocation destinations: sourced, dated, confidence-tiered, honest about the downsides.">
+<!-- v4 addendum R2's own "build note, not a hard ruling": applies a
+     returning visitor's stored dark preference before first paint, so
+     there's no light-then-dark flash while js/app-shared.js's module
+     script (deferred by default) loads. Must be a synchronous classic
+     script (not type=module) to run before paint; the "theme"/"dark"
+     literals below intentionally duplicate app-shared.js's THEME_KEY
+     constant — a module import here wouldn't run early enough to help. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics: defer, no site-code dependency on it loading
+     or responding, bare cookieless beacon only (no tag manager, no custom
+     events). TOKEN PLACEHOLDER: this is not a real token -- the site owner
+     mints the real one in the Cloudflare dashboard (Sites -> Web Analytics
+     -> "Add a site" -> copy the JS snippet's own token). A public
+     measurement ID grants no read/write access, so it's safe to commit
+     once real, but inventing one here would just silently fail forever --
+     swap the literal string below for the dashboard's real value. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
+</head>
+<body>
+<main>
+  <h1>Where in the world could you actually live?</h1>
+  <p class="home-privacy-note">
+    We're not collecting anything about you — no cookies, no sign-up,
+    no account waiting to be filled in. Whatever you save here (a
+    dark-mode preference, your own priority weighting) stays on your
+    own device. We never see it.
+    <a href="privacy.html">What this site does with your browser</a>
+  </p>
+  <p id="map-intro">Click any place for the full picture, or <a href="lists.html">see every location as a sortable list</a>.</p>
+  <!-- Part 26: the location search — placed right after the intro line,
+       before any interpretive control (persona slot, purpose chips), for
+       the reader who already has a place in mind. -->
+  <div id="location-search-slot"></div>
+  <!-- v6 Amendment 1 §A2: same position, same canonical FIT_INDEX_DEFINITION
+       string set by map.js (script unchanged, same element id) — only
+       placement changes, behind the existing .recede/.recede-body
+       disclosure mechanism (style.css) instead of always-visible. -->
+  <details class="recede">
+    <summary>What this number means, and its limits</summary>
+    <p class="fit-def recede-body" id="fit-def-caption"></p>
+  </details>
+  <div id="persona-slot"></div>
+  <div class="purpose-lists" id="purpose-lists"></div>
+  <p class="purpose-explainer" id="purpose-explainer"></p>
+  <div id="map-root"></div>
+  <div class="map-legend" id="map-legend"></div>
+  <!-- v7 §4.1: re-ruling, finally built — this used to be a bare <p>,
+       mandatory reading before the map itself. Now recedes behind the
+       same details.recede mechanism already live one element above,
+       with a six-word summary stating the real limit without a click. -->
+  <details class="recede judgment-note">
+    <summary>Pin locations are approximate</summary>
+    <p class="recede-body" id="map-judgment-note"></p>
+  </details>
+</main>
+<script type="module" src="js/map.js"></script>
+</body>
+</html>

@@ -1,0 +1,762 @@
+// CanILiveThere — the lens-first landing door. Design rule: you should
+// always meet this door, but have the option of saving your own answer.
+//
+// The site opens with a welcome and a choice of how to see it: three
+// wings (your passport / your priorities / eight worked-example people),
+// the map visible but de-emphasized behind it until the reader acts.
+// index.html-only by construction, since this module is only ever
+// imported by js/map.js, which only index.html loads.
+//
+// Semantic change from the original v7 door (25.2): the door is no
+// longer once-per-browser. Every plain visit to index.html meets it —
+// the OLD door-seen-suppresses-forever gate is retired entirely, not
+// replaced by any new show/don't-show state. The one thing that still
+// bypasses it is an explicit ?persona= deep link (unchanged — an
+// explicit signal beats the ritual, same precedent §8P's
+// getActivePersona() already codifies for URL vs. stored state). A
+// saved perspective (a persona choice, a built weight vector, a saved
+// passport, or any combination) never suppresses the door either — it
+// changes what the door LEADS WITH: a resume band above the wings,
+// pre-offering the saved perspective as one keystroke, not a toll.
+//
+// Reads the SAME source as the top-of-page switcher (VALID_PERSONAS order
+// + the shared descriptor strings, both in app-shared.js) — one true
+// source, two renderings, so the two surfaces can never list a different
+// persona set or different wording from each other.
+//
+// Three wings, not nine tiles: "Your passport" (the data-input box, v1 —
+// this file's own new build, 25.5) leads; "Your priorities" is the
+// existing seven-question flow, now reachable on EVERY visit (fixes the
+// build-your-own dead end — before this rework, the flow only ever lived
+// inside the first-arrival door, and door-seen sealed it off forever
+// after); the eight named personas demote to a labeled reference row
+// below the wings — same tiles, same portraits, same descriptors, same
+// size, just not the primary way in. The old ninth "Build your own" tile
+// is retired: one entry per flow (the wing 2 card), not two doors to the
+// same room.
+
+import {
+  VALID_PERSONAS, personaDescriptorSentence, withPersona, escapeHtml, isActivationKey,
+  hasCustomProfile, loadCustomProfile, saveCustomProfile,
+  loadNationality, saveNationality, loadSavedPerspective, saveSavedPerspective,
+  isExplicitGeneral, setExplicitGeneral, clearExplicitGeneral,
+  hasAnySavedReaderState, wireForgetControl,
+  isDoorAnswered, markDoorAnswered,
+} from "./app-shared.js";
+import { loadStore, defaultWeightForCriterion } from "./data.js";
+import { ISO_COUNTRY_NAMES } from "./iso-names.js";
+import { siteUrl } from "./site-root.js";
+
+// Retired as a show/don't-show gate: the always-meet-the-door rule ends
+// the once-per-browser semantic this key existed to implement. The only remaining code that reads this
+// name is the one-line deletion below — no new key replaces it.
+const DOOR_SEEN_KEY = "door-seen";
+
+// Already-reviewed public-bound copy, transported verbatim, not authored
+// in this file. Register pass landed 2026-07-21 (C12; the earlier
+// as-shipped-until-reviewed line this comment used to flag is now the
+// reviewed replacement below).
+// Part 34.3: the site identity the hidden topbar was carrying while the
+// door is open. The EXISTING brand string, verbatim (the same one the
+// topbar's .brand link and the page title render) — nothing new
+// authored. Static text, never a link: a brand link from an open,
+// unanswered door reloads index.html, which re-summons the door — a
+// loop.
+const DOOR_BRAND_LINE = "CanILiveThere";
+const WELCOME_LINE =
+  "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Start with your passport, your priorities, or one of eight worked examples — three ways to tell the site who's asking.";
+const ESCAPE_HATCH_LABEL = "See the facts as they are.";
+
+// Part 25 copy table, C1-C10 — most ship as originally drafted; four
+// (WING_PASSPORT_SUBLINE, WING_PRIORITIES_SUBLINE, PASSPORT_MORE_LINE,
+// PASSPORT_SCOPE_FOOTER) carry a 2026-07-21 register pass responding to
+// The promise-surface rule: no forward promises, no "soon"/"yet"
+// attached to a capability the site doesn't have. Kept in one place, same discipline the rest of this file already
+// uses for its own committed strings, so a future register pass is cheap.
+const WING_PASSPORT_LABEL = "Your passport";
+const WING_PASSPORT_SUBLINE = "Pick your nationality and see what entry actually looks like for you. Where we haven't checked your passport yet, the site says so plainly.";
+const WING_PRIORITIES_LABEL = "Your priorities";
+const WING_PRIORITIES_SUBLINE = "Seven quick questions about what matters to you.";
+const PERSONA_ROW_HEADING = "Or compare against eight worked examples — fictional people, real rules.";
+const PASSPORT_BOX_HEADING = "Start from your passport";
+const PASSPORT_BOX_SCOPE = "One real thing about you, and the entry rules on this site re-read themselves around it.";
+// §15.4, verbatim (case-adapted per 25.8's own ruling: a ratified rule
+// sentence renders sentence-cased once it becomes its own standalone
+// reader paragraph — words unchanged from the source).
+const DUAL_CITIZEN_LINE = "Holding more than one passport? Check each — the better answer wins.";
+// This line executes the verified-only rule (list only what the data
+// covers, not the full ISO set) — a register pass on
+// the exact wording is owed to the copy owner, not a precondition for
+// tonight's build. "Not yet verified," never "unsupported" (25.6's own
+// ratified register) still holds: this line narrates the site's own
+// unfinished coverage, never the reader's passport as a problem.
+const PASSPORT_ABSENCE_BEFORE = "Don't see your passport? We haven't verified its rules yet — tell us at ";
+const PASSPORT_ABSENCE_LINK_TEXT = "our contact page";
+const PASSPORT_ABSENCE_AFTER = " and we'll research it.";
+const PASSPORT_MORE_LINE = "That's the whole form — one passport, nothing else about you.";
+const PASSPORT_SCOPE_FOOTER = "This reads entry rules from your passport — nothing more.";
+const PASSPORT_SAVE_LABEL = "See it through your passport";
+const PASSPORT_PLACEHOLDER_OPTION = "Choose a passport…";
+const FORGET_LABEL = "Forget what I've saved here";
+const SWITCH_LABEL = "Switch or start over";
+
+// Part 29 copy table, C1-C10 (2026-07-23) — the resume band's own
+// headline fix: a saved nationality was reading as a site question
+// ("ARE YOU TURKISH?"), not reader state. C2-C6 (the five
+// state-sentence templates) and
+// C9/C10 (the wing sublines) are built at render time from the saved-
+// state parts, not stored as flat strings here — see
+// resumeStateParts()/passportWingSubline()/prioritiesWingSubline()
+// below. Only the two fixed strings (the kicker, the neutral button)
+// are plain consts.
+const RESUME_KICKER_LABEL = "Your saved view";
+const RESUME_CONTINUE_LABEL = "Continue where you left off";
+// C3/C10: one true sentence, reused for both the resume band's
+// priorities-only state and the priorities wing's own saved-state
+// subline — not two separate claims about the same fact (29.5).
+const PRIORITIES_SAVED_LINE = "Your own priorities are saved on this device.";
+
+function portraitSrc(id) {
+  return `assets/portraits/${id}.png`;
+}
+
+function personaDisplayName(id) {
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+// A plain, abstract "adjustable/build" glyph — a dial, not a photo and
+// not a silhouette (21.3's own explicit, argued requirement: the eight
+// circles depict actual fictional people, this one depicts a process;
+// a generic human silhouette would visually claim "a ninth person" the
+// site doesn't have). Inline SVG, zero new asset/dependency — colors
+// inherit from the surrounding text color via currentColor. Reused here
+// for the Wing 2 card (the ninth-tile icon's own new home).
+const CUSTOM_TILE_ICON = `
+  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <line x1="12" y1="12" x2="12" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="12" y1="12" x2="16" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+  </svg>
+`;
+// A plain passport-book glyph for Wing 1 — same non-photo, non-silhouette
+// reasoning as the icon above, applied to the passport-lens wing.
+const PASSPORT_TILE_ICON = `
+  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+    <rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <circle cx="12" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <line x1="9" y1="16" x2="15" y2="16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+`;
+
+// 25.2: ?persona= deep links still bypass the door — unchanged, an
+// explicit signal beats the ritual. door-seen is retired (below), and a
+// saved perspective changes what the door LEADS WITH, not whether it
+// shows.
+//
+// §8AA.6 fix (2026-07-21): the always-meet rework above
+// left every non-?persona= completion path (Continue, passport save,
+// priorities save, Escape/explicit-general) ending in a plain reload
+// that met this same check and re-summoned the door over the view that
+// reload had just correctly rendered. clt-door-answered (sessionStorage,
+// set by every one of those completion paths below) is the visit-scoped
+// "already met the door this visit" state that was missing — checked
+// here alongside the existing ?persona= bypass. A genuinely new visit
+// (fresh session) carries no sessionStorage at all, so it still meets
+// the door fresh — the always-meet rule stays per-visit, unchanged.
+function shouldShowDoor() {
+  const params = new URLSearchParams(location.search);
+  if (params.has("persona")) return false;
+  return !isDoorAnswered();
+}
+
+// §8AA.1/25.4: builds the one compound phrase the resume band names in
+// two places (the intro line and the continue button) — every saved
+// dimension named at once (perspective-disclosure law: a reader who
+// saved a passport AND built priorities sees both named, not just one).
+// Returns null when nothing is saved at all (no band renders). A stored
+// PERSONA choice is read here (the door's own memory, §8AA.1) but never
+// applied anywhere outside an explicit "Continue" click — this function
+// only describes it.
+// Part 29: the SHAPE of this function's return value changed (raw
+// parts, not a pre-joined phrase) so the resume band's kicker/state-
+// sentence/button/aria-label (29.2) and the wing sublines (29.3) can
+// each consume the same underlying facts differently — the
+// underlying lookups (VALID_PERSONAS, hasCustomProfile, the ISO name
+// lookup) are unchanged from the pre-29 version; only their assembly
+// into a string moved out of this function, into resumeStateParts()
+// below.
+function savedPerspectiveDescriptor() {
+  const savedPersp = loadSavedPerspective();
+  const nationality = loadNationality();
+  const nationalityName = nationality ? ISO_COUNTRY_NAMES[nationality.code] : null;
+
+  let lensKind = null;
+  let personaName = null;
+  if (savedPersp && savedPersp.kind === "persona" && VALID_PERSONAS.includes(savedPersp.persona_id)) {
+    lensKind = "persona";
+    personaName = personaDisplayName(savedPersp.persona_id);
+  } else if (hasCustomProfile()) {
+    lensKind = "priorities";
+  }
+
+  if (!lensKind && !nationalityName) return null;
+  return { lensKind, personaName, nationalityName };
+}
+
+// 29.2B/29.2D: the shared fragment+verb pair every resume-band string
+// is built from — one branch per saved combination, matching the five
+// spec templates exactly. Callers should already have checked
+// savedPerspectiveDescriptor() truthy.
+function resumeStateParts(descriptor) {
+  const { lensKind, personaName, nationalityName } = descriptor;
+  if (lensKind === "persona" && nationalityName) {
+    return { fragment: `${personaName}'s example and a ${nationalityName} passport`, verb: "are" };
+  }
+  if (lensKind === "priorities" && nationalityName) {
+    return { fragment: `Your own priorities and a ${nationalityName} passport`, verb: "are" };
+  }
+  if (lensKind === "persona") {
+    return { fragment: `${personaName}'s example`, verb: "is" };
+  }
+  if (lensKind === "priorities") {
+    return { fragment: "Your own priorities", verb: "are" };
+  }
+  if (nationalityName) {
+    return { fragment: `A ${nationalityName} passport`, verb: "is" };
+  }
+  return null;
+}
+
+// 29.2B, C2-C6: the resume band's own state sentence — a fact ABOUT
+// the reader, never phrased as an instruction FROM the site (the
+// mechanism a review bounce named — "continue X"
+// reads as the site issuing a command, not reflecting a stored fact).
+function buildResumeStateSentence(descriptor) {
+  const parts = resumeStateParts(descriptor);
+  return parts ? `${parts.fragment} ${parts.verb} saved on this device.` : null;
+}
+
+// 29.2D, C8: the same content, minus the trailing "on this device"
+// clause — voiced only inside the button's own aria-label, where it's
+// inaudible/invisible to a sighted reader (who already read the
+// kicker + state line above) and load-bearing for assistive tech, so
+// the accessible name doesn't regress just because the visible label
+// went neutral.
+function buildResumeAriaFragment(descriptor) {
+  const parts = resumeStateParts(descriptor);
+  return parts ? parts.fragment : null;
+}
+
+// 29.3: the passport wing's own invitation text, state-aware. Doesn't
+// gate on whether the saved code is still in the CURRENT tiers table
+// (a different question, already handled inside renderPassportBox()'s
+// own existingOffered check) — this only answers "is anything on
+// file," same as the resume band's own facts.
+function passportWingSubline() {
+  const nationality = loadNationality();
+  const name = nationality ? ISO_COUNTRY_NAMES[nationality.code] : null;
+  return name
+    ? `Saved: a ${name} passport. Open it to change your answer.`
+    : WING_PASSPORT_SUBLINE;
+}
+
+// 29.3: deliberately NOT "open to review or change them" — that
+// promise isn't true yet (the priorities wing's own click path
+// restarts the questionnaire blank even with a saved profile, 29.1).
+// States the fact and stops.
+function prioritiesWingSubline() {
+  return hasCustomProfile() ? PRIORITIES_SAVED_LINE : WING_PRIORITIES_SUBLINE;
+}
+
+function markSeenLegacyKeyRemoved() {
+  // §8AA.4: delete on sight, not "ignore forever" — a permanently-ignored
+  // live key is a stale index left plugged in, the exact failure class
+  // this project's own schema/storage discipline exists to clear.
+  try { localStorage.removeItem(DOOR_SEEN_KEY); } catch (e) {}
+}
+
+function tilesHtml() {
+  // The old ninth "Build your own" tile is retired (25.3) — the wing 2
+  // card is that same flow's one entry point now. Eight named personas
+  // only, unchanged order/size/portraits/descriptors from before.
+  return VALID_PERSONAS.map((id) => {
+    const name = personaDisplayName(id);
+    const sentence = personaDescriptorSentence(id);
+    return `
+      <button type="button" class="door-tile" data-persona="${id}">
+        <span class="door-portrait"><img class="door-portrait-img" src="${portraitSrc(id)}" alt="" loading="lazy"></span>
+        <span class="door-name">${escapeHtml(name)}</span>
+        <span class="door-descriptor">${escapeHtml(sentence)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function questionRowHtml(q, prefillAnswers) {
+  const prefilled = prefillAnswers ? prefillAnswers[q.criterion_id] : null;
+  const choices = TIER_CHOICES.map(
+    (c) => `
+      <label class="priority-choice">
+        <input type="radio" name="q-${q.criterion_id}" value="${c.value}"${String(c.value) === String(prefilled) ? " checked" : ""}>
+        <span>${escapeHtml(c.label)}</span>
+      </label>`
+  ).join("");
+  return `
+    <fieldset class="door-question" data-criterion="${q.criterion_id}">
+      <legend>${escapeHtml(q.question)}</legend>
+      <div class="priority-choices">${choices}</div>
+    </fieldset>
+  `;
+}
+
+// v11 21.5 — the seven forced-choice questions, restricted to the High/
+// Medium-High weight-class criteria per that Part's own reasoning (the
+// criteria that actually move generalIndex()'s weighted average the
+// most — confirmed against derived/criteria.jsonl directly, not
+// asserted: these seven ARE exactly that tier). Copy-voice pass applied
+// (2026-07-17): five questions reworded, two kept verbatim. Q6
+// deliberately names both short and long stays — a baked-in "long-term"
+// was dropped on purpose: shorter stays are in scope, not a lesser case
+// (a same-day product decision, not drift). The routine-sustainability
+// question (Q4) was rewritten a second time 2026-07-21 (per Part 28.2,
+// the primary over a frame-parallel alternate): both read as
+// AI-Language, plus a ruling on the axis itself
+// (friction/reliability, not tempo) — "pace of life" is dropped from
+// every reader-facing surface; the display name still carrying it
+// (derived/criteria.jsonl) is a separate, routed fix, not this file's.
+const CUSTOM_QUESTIONS = [
+  { criterion_id: "community-social-fabric", question: "How much does being part of a real community — neighbors who know you, a social life that comes easily — matter to you?" },
+  { criterion_id: "nature-water-adjacency", question: "How much do mountains, water, or green space right outside your door matter to you?" },
+  { criterion_id: "income-viability", question: "How much does being able to actually earn a living there matter to you?" },
+  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does it matter to you that daily life there just works — simple errands, reliable services, a routine that doesn't fall apart with the seasons?" },
+  { criterion_id: "cost-of-living-affordability", question: "How much does your money going further — rent, groceries, the ordinary bills — matter to you?" },
+  { criterion_id: "visa-legal-pathway-ease", question: "How much does simple paperwork — a visa that's easy to get and easy to keep, whether for a season or for good — matter to you?" },
+  { criterion_id: "room-for-others-group-viability", question: "How much does having room for friends or family to join you later matter to you?" },
+];
+// Most-important option first, left to right (21.5's own ordering
+// instruction) — value is the exact 0-3 weight this choice sets (8P.1's
+// own tier vocabulary), not a separate code needing translation later.
+// Part 28.1: the literal spoken answers to the shared "how much does …
+// matter to you?" stem, replacing the old per-pill "Matters …"
+// restatement — the accessibility fallback (self-labeling pills) does
+// not apply, since every question renders as a <fieldset>/<legend> pair
+// (questionRowHtml, above), so a screen reader always announces the
+// question with the group.
+const TIER_CHOICES = [
+  { value: 3, label: "A lot" },
+  { value: 2, label: "Some" },
+  { value: 1, label: "Not much" },
+  // No trailing period — matches the other three pills' punctuation
+  // pattern (a review nit, fixed for uniformity across all four).
+  { value: 0, label: "Not at all" },
+];
+
+// 21.4 screen 1's three fixed parts, in order, plus the scope line.
+// Copy-voice pass applied (2026-07-17): the "what it does" line now
+// carries the seven topics AND the no-hard-filter limit inline (this
+// retired the separate topics line and the scope line's own "never show
+// me X" sentence — same substance, one home each, no duplication). The
+// remaining scope sentence is the eligibility boundary (21.7), kept
+// verbatim apart from the site-wide "Fit index" casing fix.
+const CUSTOM_INTRO_WHAT =
+  "Seven quick questions — community, nature, making a living, pace, cost, visas, and room for company — and the same facts every visitor sees get weighed by what matters to you, not by which of the eight examples you most resemble. One limit, worth knowing up front: this tips scales, it doesn't hide places. You can't tell it “never show me X” — only “this matters more, that matters less.” Every place stays on the map.";
+const CUSTOM_INTRO_HONESTY =
+  "Seven answers make a quick sketch of what you care about, not a full profile. Read the result as a rough first fit, not a verdict.";
+const CUSTOM_INTRO_FALLBACK =
+  "A fuller version is coming — one where you set every priority yourself, not just these seven.";
+const CUSTOM_INTRO_SCOPE =
+  "It builds a Fit index, not a visa verdict; no eligibility check runs off these answers.";
+
+export function initPerspectiveDoor() {
+  // §8AA.4: delete on sight, every load this module ever runs on,
+  // regardless of whether the door itself shows this visit — "the door's
+  // own init code," per the ruling, means this function, not just its
+  // show branch.
+  markSeenLegacyKeyRemoved();
+
+  const params = new URLSearchParams(location.search);
+  // "Edit your answers" (app-shared.js's switcher control) lands here with
+  // this flag — reopens the questionnaire directly, pre-filled, even on a
+  // return visit where the door would otherwise stay suppressed.
+  const editRequested = params.get("edit-priorities") === "1" && hasCustomProfile();
+  if (!editRequested && !shouldShowDoor()) return;
+
+  // Strip the one-shot flag from the URL so a later reload of this same
+  // page doesn't reopen the questionnaire unasked — cosmetic, not load-
+  // bearing, wrapped defensively since history.replaceState can throw in
+  // rare sandboxed contexts.
+  if (editRequested) {
+    try {
+      const url = new URL(location.href);
+      url.searchParams.delete("edit-priorities");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch (e) {}
+  }
+
+  const mapRoot = document.getElementById("map-root");
+  // Part 34: the two door-state classes are set together, synchronously
+  // with the overlay append — `map-fogged` dims the map, `door-open`
+  // hides the topbar (see the stylesheet) — and removed together only in
+  // unfog() below, the one shared close helper, so they can never
+  // diverge. The door summons on load, so the bar paints for the frames
+  // before this line runs; that brief flash is accepted (Part 34), and
+  // adding the class here rather than later minimizes it. Full-reload
+  // exits (persona choose, Continue, forget, passport save, priorities
+  // save) clear both classes with the page itself; none of them renders
+  // anything between its storage writes and location.href, so no path
+  // depends on an explicit pre-reload removal.
+  if (mapRoot) mapRoot.classList.add("map-fogged");
+  document.body.classList.add("door-open");
+
+  const overlay = document.createElement("div");
+  overlay.id = "perspective-door";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", "Choose whose eyes to see this map through");
+  overlay.innerHTML = `<div class="door-panel" id="door-panel" tabindex="-1"></div>`;
+  document.body.appendChild(overlay);
+  const panel = overlay.querySelector("#door-panel");
+
+  const unfog = () => {
+    if (mapRoot) mapRoot.classList.remove("map-fogged");
+    document.body.classList.remove("door-open");
+  };
+
+  // 25.2/§8AA.2/§8AA.1: dismissing to the no-lens state. If there was a
+  // real lens (a saved custom profile or a saved PERSONA choice) that
+  // this dismissal is setting aside, that's td12's own mandatory middle
+  // state — set the session flag AND do a full reload, since main()'s
+  // own render may already be under way (or finished) using the
+  // still-precedent-active stored lens; an in-place overlay removal alone
+  // wouldn't retroactively fix an already-painted page. A genuinely fresh
+  // dismissal (nothing saved to set aside) stays a cheap in-place close,
+  // unchanged from before this rework — no reload, no write.
+  const dismissWithoutPersona = () => {
+    const priorSaved = loadSavedPerspective();
+    const hadLensToSetAside = hasCustomProfile()
+      || (priorSaved && priorSaved.kind === "persona" && VALID_PERSONAS.includes(priorSaved.persona_id));
+    // §8AA.6: both branches are a real door completion (Escape/explicit-
+    // general) — mark answered either way, so a within-session return to
+    // index.html doesn't re-summon the door over a reader who already
+    // dismissed it, whether or not there was a lens to set aside.
+    markDoorAnswered();
+    if (hadLensToSetAside) {
+      saveSavedPerspective("none", null);
+      setExplicitGeneral();
+      location.href = location.pathname + location.hash;
+      return;
+    }
+    overlay.remove();
+    unfog();
+  };
+
+  function renderMainScreen() {
+    const descriptor = savedPerspectiveDescriptor();
+    // 29.2: a quiet kicker names the band as reader-state before any
+    // content renders; the state line is a fact ABOUT the reader, never
+    // an instruction FROM the site; the button is state-neutral for
+    // every saved combination, its full state carried in aria-label
+    // instead (29.2D) so the accessible name doesn't regress.
+    const stateSentence = descriptor ? buildResumeStateSentence(descriptor) : null;
+    const ariaFragment = descriptor ? buildResumeAriaFragment(descriptor) : null;
+    const resumeHtml = descriptor
+      ? `
+        <div class="door-resume">
+          <p class="door-resume-kicker">${escapeHtml(RESUME_KICKER_LABEL)}</p>
+          <p class="door-resume-line">${escapeHtml(stateSentence)}</p>
+          <button type="button" class="door-escape door-resume-continue" id="door-continue" aria-label="${escapeHtml(`${RESUME_CONTINUE_LABEL} — ${ariaFragment}`)}">${escapeHtml(RESUME_CONTINUE_LABEL)}</button>
+          <div class="door-resume-controls">
+            <button type="button" class="door-link-btn" id="door-switch">${escapeHtml(SWITCH_LABEL)}</button>
+            ${hasAnySavedReaderState() ? `<button type="button" class="door-link-btn" id="door-forget-resume">${escapeHtml(FORGET_LABEL)}</button>` : ""}
+          </div>
+        </div>
+      `
+      : "";
+
+    panel.innerHTML = `
+      <p class="door-brand">${escapeHtml(DOOR_BRAND_LINE)}</p>
+      <p class="door-welcome">${escapeHtml(WELCOME_LINE)}</p>
+      ${resumeHtml}
+      <div class="door-wings" id="door-wings">
+        <button type="button" class="door-wing" data-wing="passport">
+          <span class="door-portrait door-portrait-icon">${PASSPORT_TILE_ICON}</span>
+          <span class="door-wing-label">${escapeHtml(WING_PASSPORT_LABEL)}</span>
+          <span class="door-wing-subline">${escapeHtml(passportWingSubline())}</span>
+        </button>
+        <button type="button" class="door-wing" data-wing="priorities">
+          <span class="door-portrait door-portrait-icon">${CUSTOM_TILE_ICON}</span>
+          <span class="door-wing-label">${escapeHtml(WING_PRIORITIES_LABEL)}</span>
+          <span class="door-wing-subline">${escapeHtml(prioritiesWingSubline())}</span>
+        </button>
+      </div>
+      <div class="door-persona-row">
+        <p class="door-persona-row-heading">${escapeHtml(PERSONA_ROW_HEADING)}</p>
+        <div class="door-tiles">${tilesHtml()}</div>
+      </div>
+      <button type="button" class="door-escape" id="door-escape">${escapeHtml(ESCAPE_HATCH_LABEL)}</button>
+    `;
+
+    // No entry ever renders a broken-image icon (Part 17's own "no visible
+    // placeholder artifact" discipline): a failed portrait load removes
+    // the <img>, leaving the neutral circle background showing through.
+    panel.querySelectorAll(".door-portrait-img").forEach((img) => {
+      img.addEventListener("error", () => img.remove());
+    });
+
+    panel.querySelectorAll(".door-tile[data-persona]").forEach((btn) => {
+      const choose = () => {
+        const persona = btn.dataset.persona;
+        saveSavedPerspective("persona", persona);
+        clearExplicitGeneral();
+        // §8AA.6: the ?persona= param already bypasses shouldShowDoor() on
+        // its own, but marking answered too keeps every completion path
+        // consistent — a later within-session visit to plain index.html
+        // (no ?persona=) shouldn't re-summon the door either.
+        markDoorAnswered();
+        location.href = withPersona(location.pathname + location.hash, { persona });
+      };
+      btn.addEventListener("click", choose);
+      btn.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); choose(); } });
+    });
+
+    const passportWing = panel.querySelector('.door-wing[data-wing="passport"]');
+    // The picker's own option set now needs the tiers table —
+    // loadStore()'s promise is already in flight by the time
+    // a reader reaches this screen (kicked off at page load, same
+    // precedent as the priorities submit button below), so this await is
+    // normally already-resolved, not a real wait; the door's own first
+    // paint above never depended on it either way.
+    const openPassport = async () => {
+      const store = await loadStore();
+      renderPassportBox(store);
+    };
+    passportWing.addEventListener("click", openPassport);
+    passportWing.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); openPassport(); } });
+
+    const prioritiesWing = panel.querySelector('.door-wing[data-wing="priorities"]');
+    const openIntro = () => renderIntro();
+    prioritiesWing.addEventListener("click", openIntro);
+    prioritiesWing.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); openIntro(); } });
+
+    panel.querySelector("#door-escape").addEventListener("click", dismissWithoutPersona);
+
+    const continueBtn = panel.querySelector("#door-continue");
+    if (continueBtn) {
+      continueBtn.addEventListener("click", () => {
+        // 25.2: activating the offer applies the perspective through the
+        // SAME mechanisms every other door choice already uses — a
+        // ?persona= reload for a saved persona, a plain reload otherwise
+        // (getActivePersona()'s own precedence then resolves the rest:
+        // custom profile if one exists, general otherwise). Choosing a
+        // lens IS leaving the general view (§8AA.2) — clear the flag
+        // either way, even if it wasn't set, harmless.
+        clearExplicitGeneral();
+        // §8AA.6: Continue is a real door completion — mark it before
+        // either reload branch, same as every other completion path.
+        markDoorAnswered();
+        const savedPersp = loadSavedPerspective();
+        if (savedPersp && savedPersp.kind === "persona" && VALID_PERSONAS.includes(savedPersp.persona_id)) {
+          location.href = withPersona(location.pathname + location.hash, { persona: savedPersp.persona_id });
+        } else {
+          location.href = location.pathname + location.hash;
+        }
+      });
+    }
+    const switchBtn = panel.querySelector("#door-switch");
+    if (switchBtn) {
+      // "Scrolls focus to the wings — no data touched" (25.2): purely a
+      // focus/scroll affordance, zero storage writes.
+      switchBtn.addEventListener("click", () => {
+        const wings = panel.querySelector("#door-wings");
+        wings.querySelector(".door-wing")?.focus();
+        wings.scrollIntoView({ block: "nearest" });
+      });
+    }
+    const forgetResumeBtn = panel.querySelector("#door-forget-resume");
+    if (forgetResumeBtn) {
+      wireForgetControl(forgetResumeBtn, {
+        onDone: () => { location.href = location.pathname + location.hash; },
+      });
+    }
+
+    // 25.2: keyboard focus starts on the resume band's own continue
+    // button when one renders; a fresh visitor (no band) starts on the
+    // first wing instead. Never an empty/missing focus target either way.
+    // Part 31: preventScroll, so native focus-scroll can't move the
+    // door's scroll position away from 0 on open — the welcome line at
+    // the panel's top must be the first thing painted, never carried
+    // out of view above the fold by the browser scrolling to the
+    // focused element on short viewports.
+    (continueBtn || panel.querySelector(".door-wing"))?.focus({ preventScroll: true });
+  }
+
+  // Wing 1 interior (picker rebuilt to a single screen):
+  // one screen, no multi-step wizard. The picker used to be a native
+  // <select> over the full ~250-entry ISO list (OS-level type-ahead, no
+  // custom combobox needed) — that reasoning about the WIDGET still
+  // holds, but the OPTION SET is now data-driven instead of exhaustive:
+  // only nationalities the tiers table (store.nationalityCodes, a plain
+  // dedupe in data.js) actually carries a verified row for anywhere. The
+  // list grows the moment new rows land, with no picker edit ever again.
+  // Display names still resolve through the vendored ISO list — that
+  // file is the name authority, never the option source.
+  function renderPassportBox(store) {
+    const tierCodes = new Set(store.nationalityCodes);
+    // A code the tiers table names but the vendored ISO list doesn't
+    // recognize would be a data problem upstream, not a blank option
+    // rendered here — filtered out rather than shown nameless.
+    const codes = store.nationalityCodes
+      .filter((code) => ISO_COUNTRY_NAMES[code])
+      .sort((a, b) => ISO_COUNTRY_NAMES[a].localeCompare(ISO_COUNTRY_NAMES[b]));
+    const optionsHtml = codes
+      .map((code) => `<option value="${code}">${escapeHtml(ISO_COUNTRY_NAMES[code])}</option>`)
+      .join("");
+    const existing = loadNationality();
+    // The saved-nationality edge case: a reader's saved passport could in
+    // principle no longer be in this table (a real retraction, not
+    // expected today but never ruled out) — never preselect a code the
+    // current list doesn't offer, and never touch the reader's own saved
+    // value either. The degrade already exists one layer up: the
+    // location-page passport strip's own not-yet-verified disclosure
+    // fires the same way for "nationality never in the table" as for
+    // "nationality in the table, just not for this country" — one render
+    // condition, no special case needed here.
+    const existingOffered = Boolean(existing) && tierCodes.has(existing.code);
+
+    panel.innerHTML = `
+      <button type="button" class="door-back" id="door-back">&lsaquo; Back</button>
+      <div class="door-passport-box">
+        <h2 class="door-passport-heading">${escapeHtml(PASSPORT_BOX_HEADING)}</h2>
+        <p class="door-passport-scope">${escapeHtml(PASSPORT_BOX_SCOPE)}</p>
+        <label for="door-nationality-select">Your nationality</label>
+        <select id="door-nationality-select">
+          <option value="" disabled${existingOffered ? "" : " selected"}>${escapeHtml(PASSPORT_PLACEHOLDER_OPTION)}</option>
+          ${optionsHtml}
+        </select>
+        <p class="door-passport-absence">${escapeHtml(PASSPORT_ABSENCE_BEFORE)}<a href="${withPersona(siteUrl("contact.html"))}">${escapeHtml(PASSPORT_ABSENCE_LINK_TEXT)}</a>${escapeHtml(PASSPORT_ABSENCE_AFTER)}</p>
+        <p class="door-dual-citizen-line">${escapeHtml(DUAL_CITIZEN_LINE)}</p>
+        <button type="button" class="door-escape door-passport-save" id="door-passport-save" disabled>${escapeHtml(PASSPORT_SAVE_LABEL)}</button>
+        <p class="door-passport-more">${escapeHtml(PASSPORT_MORE_LINE)}</p>
+        <p class="door-passport-footer">${escapeHtml(PASSPORT_SCOPE_FOOTER)}</p>
+      </div>
+    `;
+    const select = panel.querySelector("#door-nationality-select");
+    if (existingOffered) select.value = existing.code;
+    const saveBtn = panel.querySelector("#door-passport-save");
+    const syncSave = () => { saveBtn.disabled = !select.value; };
+    select.addEventListener("change", syncSave);
+    syncSave();
+
+    panel.querySelector("#door-back").addEventListener("click", renderMainScreen);
+    saveBtn.addEventListener("click", () => {
+      if (!select.value) return;
+      // §8Z item 5 / §8AA.5: personal fields never serialize into URLs —
+      // localStorage only. Nothing below ever touches
+      // URLSearchParams/location.search with this value; the full reload
+      // reads it back from storage on the next page build.
+      saveNationality(select.value);
+      // §8AA.2: choosing the passport lens IS leaving the general view.
+      clearExplicitGeneral();
+      // §8AA.6: a real door completion — mark answered before the reload.
+      markDoorAnswered();
+      location.href = location.pathname + location.hash;
+    });
+    select.focus();
+  }
+
+  function renderIntro() {
+    panel.innerHTML = `
+      <button type="button" class="door-back" id="door-back">&lsaquo; Back</button>
+      <div class="door-disclosure">
+        <p>${escapeHtml(CUSTOM_INTRO_WHAT)}</p>
+        <p class="door-intro-list">${escapeHtml(CUSTOM_INTRO_SCOPE)}</p>
+        <p>${escapeHtml(CUSTOM_INTRO_HONESTY)}</p>
+        <p>${escapeHtml(CUSTOM_INTRO_FALLBACK)}</p>
+      </div>
+      <button type="button" class="door-escape door-start" id="door-start">Start</button>
+    `;
+    panel.querySelector("#door-back").addEventListener("click", renderMainScreen);
+    panel.querySelector("#door-start").addEventListener("click", () => renderQuestionnaire(null));
+    panel.focus();
+  }
+
+  // prefillAnswers: { criterion_id: "0".."3" } or null — pre-checks the
+  // matching radio when reopened via "Edit your answers" (21.9).
+  function renderQuestionnaire(prefillAnswers) {
+    panel.innerHTML = `
+      <button type="button" class="door-back" id="door-back">&lsaquo; Back</button>
+      <div class="door-questions">
+        ${CUSTOM_QUESTIONS.map((q) => questionRowHtml(q, prefillAnswers)).join("")}
+      </div>
+      <button type="button" class="door-escape door-submit" id="door-submit" disabled>See my priorities</button>
+    `;
+    panel.querySelector("#door-back").addEventListener("click", renderIntro);
+
+    const submitBtn = panel.querySelector("#door-submit");
+    const allAnswered = () =>
+      CUSTOM_QUESTIONS.every((q) => panel.querySelector(`input[name="q-${q.criterion_id}"]:checked`));
+    const syncSubmit = () => { submitBtn.disabled = !allAnswered(); };
+    panel.querySelectorAll('input[type="radio"]').forEach((input) => {
+      input.addEventListener("change", syncSubmit);
+    });
+    syncSubmit();
+
+    submitBtn.addEventListener("click", async () => {
+      if (!allAnswered()) return;
+      // Disabled during the async save so a double-click can't fire this
+      // twice — cheap, since loadStore()'s own promise is already in
+      // flight/cached by the time a reader reaches this screen.
+      submitBtn.disabled = true;
+      const answers = {};
+      for (const q of CUSTOM_QUESTIONS) {
+        const checked = panel.querySelector(`input[name="q-${q.criterion_id}"]:checked`);
+        answers[q.criterion_id] = checked.value;
+      }
+      // 8P.1: all 13 criterion_ids present, always — the untouched six
+      // default to this criterion's own site-wide weight, never to 0 and
+      // never to an absent key. Needs store.criteria (weight_class per
+      // criterion), fetched here rather than at door-open time so the
+      // door's own first paint never waits on a network round trip.
+      const store = await loadStore();
+      const weights = {};
+      for (const crit of store.criteria) {
+        weights[crit.criterion_id] = Object.prototype.hasOwnProperty.call(answers, crit.criterion_id)
+          ? Number(answers[crit.criterion_id])
+          : defaultWeightForCriterion(crit);
+      }
+      saveCustomProfile(weights, answers);
+      // §8AA.1: this is now a real, explicit door choice — record it as
+      // the door's own memory, same as choosing a named persona does.
+      saveSavedPerspective("custom", null);
+      clearExplicitGeneral();
+      // §8AA.6: "See my priorities" is a real door completion — mark
+      // answered before the reload, so the door doesn't re-summon over
+      // the rendered priorities view this reload is about to produce.
+      markDoorAnswered();
+      // Full reload rather than an in-place re-render — the same idiom
+      // the eight named tiles already use (choose() above) — so every
+      // page-level index computation picks up store.customWeights fresh,
+      // with no URL persona present (getActivePersona()'s own ruled
+      // precedence then resolves to "custom").
+      location.href = location.pathname + location.hash;
+    });
+    panel.focus();
+  }
+
+  if (editRequested) {
+    const existing = loadCustomProfile();
+    renderQuestionnaire(existing ? existing.answers : null);
+  } else {
+    renderMainScreen();
+  }
+
+  // Basic modal keyboard support: focus starts inside the dialog, Escape
+  // dismisses via the same no-persona path as the escape-hatch link,
+  // regardless of which screen is currently showing — a real, if
+  // partial, accessibility pass (full focus-trap looping is NOT built
+  // here, named as a gap rather than silently left unstated).
+  overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); dismissWithoutPersona(); }
+  });
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — CanILiveThere</title>
+<meta name="description" content="Write to us: a place to research, a passport we haven't verified, an error, or anything that left you with a question.">
+<!-- See index.html's matching comment: pre-paint dark-theme apply, same
+     duplicated "theme"/"dark" literals, same reasoning. -->
+<script>
+  try {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/style.css">
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
+     token-placeholder explanation and the privacy/security review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
+</head>
+<body>
+<main>
+  <h1>Tell us what's missing</h1>
+  <p id="contact-why"></p>
+  <p id="contact-what"></p>
+  <p id="contact-address"></p>
+  <p id="contact-mail"></p>
+  <p id="contact-readclaim"></p>
+  <p id="contact-safety"></p>
+  <p id="contact-corrections"></p>
+</main>
+<script type="module" src="js/contact.js"></script>
+</body>
+</html>

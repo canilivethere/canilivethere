@@ -1,0 +1,579 @@
+// CanILiveThere — derived-data loader.
+//
+// Reads the JSONL snapshot in derived/ directly in the browser (no backend,
+// no build step, no bundler — fetch + JSON.parse, per the "boring,
+// dependency-light" craft standard). Facts are per-country files
+// (derived/facts/{country_id}.jsonl), everything else is one flat file.
+//
+// This module ONLY transports and indexes what's already in derived/. It
+// authors nothing: no scores, no facts, no verdicts. The one computed value
+// it produces — generalIndex() — is a documented, transparent aggregation
+// over already-scored criteria (see the comment on WEIGHT_NUMERIC below),
+// clearly labeled wherever it's shown, not a new fact and not a rules-engine
+// verdict.
+//
+// One honest exception to "transports and indexes what's already in
+// derived/," added when the reader-built weight vector shipped: a reader's
+// own locally-stored priority weights (store.customWeights, populated by
+// whichever module owns the localStorage read — see app-shared.js) are a
+// reader-authored input, not a derived/ file. This module still fetches and
+// authors nothing itself — that input is layered onto the already-built
+// store the same way its other runtime indexes are — but the module-level
+// claim above is no longer literally "everything," so it's qualified here
+// rather than left to go quietly stale.
+
+import { siteUrl } from "./site-root.js";
+
+const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
+
+// Exported (Part 39): the cost-comparison panel fetches its own
+// per-page table (derived/cost-comparison.jsonl) through this exact
+// parser rather than forking a second fetch/parse copy. That table is
+// deliberately NOT folded into loadStore() below — only lists.html
+// renders it, and the store is shared by every page.
+export async function fetchJsonl(path) {
+  let res;
+  try {
+    res = await fetch(path);
+  } catch (e) {
+    console.warn("Fetch failed for", path, e);
+    return [];
+  }
+  if (!res.ok) {
+    console.warn("Missing or unreadable:", path, res.status);
+    return [];
+  }
+  const text = await res.text();
+  const rows = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      rows.push(JSON.parse(trimmed));
+    } catch (e) {
+      console.warn("Bad JSONL row in", path, trimmed.slice(0, 80));
+    }
+  }
+  return rows;
+}
+
+let _storePromise = null;
+
+// v7 no-JS fallback: resolved via siteUrl() (site-root.js), not a bare
+// relative "derived/" or a root-absolute "/derived/" — the same call needs
+// to work correctly from a page one level down (l/<location_id>.html) as
+// well as from the site root, and under both a domain-root mount and a
+// project-site subpath mount, with no code change at cutover. A bare
+// relative "derived/" from l/ resolves to l/derived/, which doesn't exist;
+// a root-absolute "/derived/" resolves to the domain root, which 404s
+// under a subpath mount.
+export function loadStore(basePath = siteUrl("derived/")) {
+  if (_storePromise) return _storePromise;
+  _storePromise = buildStore(basePath);
+  return _storePromise;
+}
+
+async function fetchJson(path) {
+  try {
+    const res = await fetch(path);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn("Fetch failed for", path, e);
+    return null;
+  }
+}
+
+async function buildStore(basePath) {
+  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, meta] =
+    await Promise.all([
+      fetchJsonl(basePath + "countries.jsonl"),
+      fetchJsonl(basePath + "locations.jsonl"),
+      fetchJsonl(basePath + "criteria.jsonl"),
+      fetchJsonl(basePath + "scores.jsonl"),
+      fetchJsonl(basePath + "change-events.jsonl"),
+      fetchJsonl(basePath + "profiles.jsonl"),
+      fetchJsonl(basePath + "fixtures.jsonl"),
+      // v9 Part 6/7: the verdict-coverage engine's public export — the
+      // free-text reasons[] audit trail and internal engine_version are
+      // already stripped before this file ever reaches derived/, not
+      // filtered here.
+      fetchJsonl(basePath + "verdicts.jsonl"),
+      // The rules layer's complete route export — one
+      // row per documented threshold, country-scoped (route_key/
+      // threshold_fact_key already public, no new exposure). Previously
+      // published but never fetched client-side; this is the first
+      // consumer. rules.jsonl (the engine's own parameter table, one row
+      // today) is not fetched here — nothing on this site renders it
+      // directly yet; see the location-page build notes.
+      fetchJsonl(basePath + "visa-routes.jsonl"),
+      // Part 23.6: the acronym/glossary registry (term -> expansion ->
+      // first_use_rule) — most rows still carry a null expansion (an
+      // in-progress registry, not a finished dictionary); glossaryWrap()
+      // in app-shared.js only ever acts on rows with a real expansion.
+      fetchJsonl(basePath + "glossary.jsonl"),
+      // Part 25.6/§8Z: the passport-lens v1 table — one row per
+      // (nationality x country) the library has actually verified.
+      // Absence of a row is a defined semantic (not-yet-verified), never
+      // an error — see resolveNationalityTier() below, which is the only
+      // place this array gets read.
+      fetchJsonl(basePath + "nationality-tiers-public.jsonl"),
+      fetchJson(basePath + "meta.json"),
+    ]);
+
+  const factsByCountry = {};
+  await Promise.all(
+    countries.map(async (c) => {
+      factsByCountry[c.country_id] = await fetchJsonl(
+        `${basePath}facts/${c.country_id}.jsonl`
+      );
+    })
+  );
+  const allFacts = Object.values(factsByCountry).flat();
+
+  // factsByKey: fact_key -> fact row (Part 37's own location-gate
+  // provenance render, §37.8, needs to join a
+  // location's education-gate STATE — clears/fails/not-assessed, from
+  // routes_detail — back to the underlying schooling-evidence/homeschool
+  // facts that state was computed FROM, since the public verdict export
+  // deliberately strips the engine's own free-text `reason` (the leak
+  // class 37.3 exists because of). `fact_key` is globally unique by
+  // construction (country/location-prefixed), so one flat map over every
+  // country's facts is exact, no per-country lookup needed. This mirrors
+  // tools/visa-fit-engine.py's own `by_key` index (gate_location_education())
+  // exactly — same two lookups, same fact_key shapes, run client-side
+  // against the same already-public fact rows, not a re-derivation of any
+  // number the engine itself didn't already publish.
+  const factsByKey = new Map(allFacts.map((f) => [f.fact_key, f]));
+
+  criteria.sort((a, b) => a.display_order - b.display_order);
+
+  const countriesById = new Map(countries.map((c) => [c.country_id, c]));
+  const locationsById = new Map(locations.map((l) => [l.location_id, l]));
+  const criteriaById = new Map(criteria.map((c) => [c.criterion_id, c]));
+
+  // scoresByLocation: location_id -> criterion_id -> score row
+  const scoresByLocation = new Map();
+  for (const s of scores) {
+    if (!scoresByLocation.has(s.location_id)) scoresByLocation.set(s.location_id, new Map());
+    scoresByLocation.get(s.location_id).set(s.criterion_id, s);
+  }
+
+  // factsByLocation: location_id -> [facts that apply], i.e. its own
+  // location/sub-location facts PLUS its country's country-scoped facts
+  // (this project's own data-model rule: country-level facts are inherited by locations).
+  const factsByLocation = new Map();
+  for (const loc of locations) {
+    const own = allFacts.filter((f) => f.location_id === loc.location_id);
+    const inherited = allFacts.filter(
+      (f) => f.scope === "country" && f.country_id === loc.country_id
+    );
+    factsByLocation.set(loc.location_id, [...inherited, ...own]);
+  }
+
+  // changeEventsByCountry / ByLocation
+  const changeEventsByCountry = new Map();
+  const changeEventsByLocation = new Map();
+  for (const ev of changeEvents) {
+    if (!changeEventsByCountry.has(ev.country_id)) changeEventsByCountry.set(ev.country_id, []);
+    changeEventsByCountry.get(ev.country_id).push(ev);
+    if (ev.location_id) {
+      if (!changeEventsByLocation.has(ev.location_id)) changeEventsByLocation.set(ev.location_id, []);
+      changeEventsByLocation.get(ev.location_id).push(ev);
+    }
+  }
+
+  // fixturesByPersona: persona_id -> location_id -> { criteria: Map(critId->row), verdict: row|null }
+  // A `:verdict` fixture row is now country-scoped (location_id: null,
+  // country_id set instead) — the same schema shift §8Q made for
+  // verdicts.jsonl, applied here too (§8Q item 7's own flagged
+  // consequence, confirmed live this session: every wenda/carmen
+  // `:verdict` fixture in the current export carries a null location_id).
+  // Indexing straight on `f.location_id` the old way collapsed every
+  // persona's entire verdict-fixture set onto one shared `null` key — real
+  // bug, found live (a hand-checked pin that should carry a ring rendered
+  // with none; traced to this, not assumed from the schema note alone).
+  // Two passes: location-keyed fixtures first (criteria rows, and any
+  // future genuinely location-scoped verdict row), then country-scoped
+  // verdict rows resolved onto every location under that country — same
+  // join shape as resolveVerdict() below, applied to this second source.
+  const fixturesByPersona = new Map();
+  const countryVerdictFixtures = new Map(); // persona_id -> country_id -> row
+  for (const f of fixtures) {
+    if (!fixturesByPersona.has(f.persona_id)) fixturesByPersona.set(f.persona_id, new Map());
+    const perLoc = fixturesByPersona.get(f.persona_id);
+    if (f.location_id) {
+      if (!perLoc.has(f.location_id)) perLoc.set(f.location_id, { criteria: new Map(), verdict: null });
+      const entry = perLoc.get(f.location_id);
+      if (f.criterion_id) entry.criteria.set(f.criterion_id, f);
+      else entry.verdict = f;
+    } else if (f.country_id) {
+      if (!countryVerdictFixtures.has(f.persona_id)) countryVerdictFixtures.set(f.persona_id, new Map());
+      countryVerdictFixtures.get(f.persona_id).set(f.country_id, f);
+    }
+  }
+  for (const loc of locations) {
+    for (const [personaId, byCountry] of countryVerdictFixtures) {
+      const countryVerdict = byCountry.get(loc.country_id);
+      if (!countryVerdict) continue;
+      const perLoc = fixturesByPersona.get(personaId);
+      if (!perLoc.has(loc.location_id)) perLoc.set(loc.location_id, { criteria: new Map(), verdict: null });
+      const entry = perLoc.get(loc.location_id);
+      if (!entry.verdict) entry.verdict = countryVerdict;
+    }
+  }
+
+  const profilesById = new Map(profiles.map((p) => [p.persona_id, p]));
+
+  // glossaryByTerm: TERM -> registry row, expansion-having rows only —
+  // glossaryWrap() (app-shared.js) is the one consumer, filters again
+  // itself defensively, but building the map with only usable rows keeps
+  // the wrap function's own hot loop shorter.
+  const glossaryByTerm = new Map(
+    glossary.filter((g) => g.expansion).map((g) => [g.term, g])
+  );
+
+  // visaRoutesByCountry: country_id -> [route rows] — the general,
+  // non-persona "visa routes on file" list. Grouping only,
+  // no filtering or reshaping — every row transports as exported.
+  const visaRoutesByCountry = new Map();
+  for (const r of visaRoutes) {
+    if (!visaRoutesByCountry.has(r.country_id)) visaRoutesByCountry.set(r.country_id, []);
+    visaRoutesByCountry.get(r.country_id).push(r);
+  }
+
+  // verdictsByPersona: persona_id -> { byLocation: Map(location_id->row),
+  // byCountry: Map(country_id->row) } (v9 Part 6/7, re-shaped v12 Part 23.5
+  // for the export's own §8Q-ruled `scope` field). A `scope:
+  // "country"` row carries `location_id: null` and is the ONE physical row
+  // for every location in that country under this persona. UPDATED
+  // 2026-08-10 (the locverdicts build, Part 37): real scope="location"
+  // rows now exist — 304 of 472, the engine's own
+  // location-gate join (8AJ.3) composed against 8 personas x 38 locations
+  // — no longer the zero-rows-yet state this comment described through
+  // 2026-08-10. Indexing straight on `location_id` the old way would
+  // collapse every country-scope row for a persona onto a single `null`
+  // key; splitting into two maps and resolving through resolveVerdict()
+  // below is the actual fix `8Q.5`'s "join by scope + join key, never
+  // string-matching prose" describes, and is exactly why a scope="location"
+  // row now correctly wins over its country sibling with zero code change
+  // needed here. `routes_detail` stays a JSON-string-of-a-list on the row
+  // exactly as exported, unparsed here.
+  const verdictsByPersona = new Map();
+  for (const v of verdicts) {
+    if (!verdictsByPersona.has(v.persona_id)) {
+      verdictsByPersona.set(v.persona_id, { byLocation: new Map(), byCountry: new Map() });
+    }
+    const perPersona = verdictsByPersona.get(v.persona_id);
+    if (v.scope === "location" && v.location_id) perPersona.byLocation.set(v.location_id, v);
+    else if (v.country_id) perPersona.byCountry.set(v.country_id, v);
+  }
+
+  // nationalityTiersByKey: "{nationality}:{country_id}" -> row (25.6/§8Z —
+  // grain is one row per nationality x country, mechanical, no
+  // interpretation). Absence of a key is not-yet-verified, a defined
+  // semantic the render layer must disclose (§13.2's never-silence rule)
+  // — resolveNationalityTier() below is the one place this gets read, so
+  // that disclosure duty has exactly one gate to pass through, not one
+  // per call site.
+  const nationalityTiersByKey = new Map(
+    nationalityTiers.map((r) => [`${r.nationality}:${r.country_id}`, r])
+  );
+
+  // nationalityCodes: the distinct `nationality` values this table actually
+  // covers, in no particular order — a mechanical dedupe, nothing computed
+  // or judged. This is the passport picker's data-driven option source
+  // — the picker lists exactly these codes, so
+  // it grows automatically as new rows land and never needs a hand edit.
+  // Display names and sort order are the presentation layer's job (see
+  // js/perspective-door.js), not this module's — this array is just the
+  // set of codes the library has verified anything about.
+  const nationalityCodes = [...new Set(nationalityTiers.map((r) => r.nationality))];
+
+  const store = {
+    countries,
+    locations,
+    criteria,
+    scores,
+    changeEvents,
+    profiles,
+    fixtures,
+    verdicts,
+    countriesById,
+    locationsById,
+    criteriaById,
+    scoresByLocation,
+    factsByLocation,
+    factsByCountry,
+    factsByKey,
+    changeEventsByCountry,
+    changeEventsByLocation,
+    fixturesByPersona,
+    verdictsByPersona,
+    visaRoutesByCountry,
+    profilesById,
+    glossaryByTerm,
+    nationalityTiersByKey,
+    nationalityCodes,
+    meta,
+  };
+
+  store.generalIndex = (locationId) => generalIndex(store, locationId);
+  store.personaIndex = (personaId, locationId) => personaIndex(store, personaId, locationId);
+  return store;
+}
+
+// Shared weighted-average loop, extracted per the ruled format at 8P.2
+// when the third door needed a THIRD weight/value source alongside
+// the two below: generalIndex() and personaIndex() (and now the reader-
+// built custom-weight branch) were near-identical loops over
+// store.criteria, differing only in where each criterion's VALUE comes
+// from and, as of the third door, where its WEIGHT comes from. One loop,
+// three thin wrappers — not three hand-rolled copies that could quietly
+// drift from each other (the same one-true-source-applied-to-logic
+// doctrine this codebase already uses elsewhere for a materialized SQL
+// view). `gaps` counts every criterion this walk didn't use, whether
+// because no score row exists at all or because one exists but carries
+// no usable value — a coarser count than the pre-extraction code kept for
+// generalIndex() specifically, harmless since nothing downstream reads
+// `.gaps` today (confirmed: only `.value` is ever consumed by a caller).
+function weightedCriteriaAverage(store, locationId, valueForCriterion, weightForCriterion) {
+  const rows = store.scoresByLocation.get(locationId);
+  if (!rows) return null;
+  let weightedSum = 0;
+  let weightTotal = 0;
+  let gaps = 0;
+  const used = [];
+  for (const crit of store.criteria) {
+    const row = rows.get(crit.criterion_id);
+    const val = valueForCriterion(crit, row);
+    if (val == null) {
+      gaps++;
+      continue;
+    }
+    const w = weightForCriterion(crit);
+    weightedSum += val * w;
+    weightTotal += w;
+    used.push(crit.criterion_id);
+  }
+  if (weightTotal === 0) return null;
+  return {
+    value: weightedSum / weightTotal,
+    criteriaUsed: used.length,
+    criteriaTotal: store.criteria.length,
+    gaps,
+  };
+}
+
+// A criterion's own site-wide default weight (High/Medium-High/Medium ->
+// 3/2/1) — exported so the door's own weight-vector build (perspective-
+// door.js) can fill in the untouched criteria the reader's own question
+// flow never asks about, using the SAME number this file already uses as
+// every criterion's baseline, rather than a second, hand-copied mapping
+// that could drift from this one.
+export function defaultWeightForCriterion(crit) {
+  return WEIGHT_NUMERIC[crit.weight_class] || 1;
+}
+
+// A criterion's own already-scored value (status='scored' only, gap-
+// skipping unchanged from the pre-extraction generalIndex()) — the value
+// source both generalIndex() and the custom-weight branch share; the
+// fixture-override branch below layers a persona's own VALUE override on
+// top of this same fallback.
+function scoredValueFor(crit, row) {
+  if (!row || row.status === "gap" || row.score == null) return null;
+  return row.score;
+}
+
+// The unpersonalized "general relocation-friendliness index": a weighted
+// average of every scored (status='scored') criterion for a location,
+// weighted by the scorecard's own High / Medium-High / Medium weight
+// classes (3 / 2 / 1). This weighting formula is a site-build judgment
+// call, not part of the data layer's own contract — flagged as such in
+// the build notes. It operates only on already-judged criterion scores
+// (scores.jsonl), never on raw facts, and skips any criterion with no
+// usable score rather than silently zero-filling it.
+function generalIndex(store, locationId) {
+  return weightedCriteriaAverage(store, locationId, scoredValueFor, defaultWeightForCriterion);
+}
+
+// Shared per-criterion value resolution (fixture override -> scored
+// fallback -> skip gaps): the one walk over store.criteria that both
+// personaIndex() and topBottomCriteria() reduce over — a weighted average
+// for the former, min/max for the latter — instead of each re-implementing
+// the same fixture-lookup loop independently.
+function resolvedCriterionValues(store, personaId, locationId) {
+  const perLoc = personaId ? store.fixturesByPersona.get(personaId)?.get(locationId) : null;
+  const scoreRows = store.scoresByLocation.get(locationId);
+  const entries = [];
+  let gaps = 0;
+  for (const crit of store.criteria) {
+    const fixtureRow = perLoc?.criteria?.get(crit.criterion_id);
+    let val;
+    if (fixtureRow) {
+      val = Number(fixtureRow.expected);
+    } else {
+      const row = scoreRows ? scoreRows.get(crit.criterion_id) : null;
+      if (!row || row.status === "gap" || row.score == null) {
+        gaps++;
+        continue;
+      }
+      val = row.score;
+    }
+    entries.push({ criterion_id: crit.criterion_id, name: crit.name, weight_class: crit.weight_class, val });
+  }
+  return { entries, gaps };
+}
+
+// Waldo has real per-criterion fixture overrides for 4 dynamic criteria
+// (income-viability, infrastructure-connectivity, land-property-access,
+// visa-legal-pathway-ease) — swap those into the general-index computation.
+// Wenda/Carmen have ONLY a verdict-shaped fixture (no criterion overrides),
+// per the runbook: rendered as "verification pending", never computed.
+//
+// Ruled at 8P.2: "custom" is a reserved personaId,
+// checked FIRST — the third door's own reader-built weight vector. It is
+// deliberately NOT one of the 8 curated personas in VALID_PERSONAS (never
+// flows through the URL-persona/switcher machinery those names feed) —
+// see app-shared.js's getActivePersona() for the one place that decides
+// when "custom" applies. Its value source is the plain scored row (a
+// reader-built profile has no specialist-authored fixture overrides,
+// same as the general reading); only its WEIGHT source differs, reading
+// the reader's own stored vector with a defensive per-key fallback to
+// this criterion's ordinary site-wide weight (belt-and-suspenders: the
+// vector is ruled to always carry all 13 keys at save time, but a stale
+// vector from before a future 14th criterion existed should degrade to
+// the normal weight for that one unrecognized key, not to a silent
+// zero-weight or an outright crash).
+function personaIndex(store, personaId, locationId) {
+  if (personaId === "custom") {
+    const weights = store.customWeights;
+    return weightedCriteriaAverage(
+      store,
+      locationId,
+      scoredValueFor,
+      (crit) => (weights && weights[crit.criterion_id] != null ? weights[crit.criterion_id] : defaultWeightForCriterion(crit))
+    );
+  }
+  const perLoc = store.fixturesByPersona.get(personaId);
+  const entry = perLoc ? perLoc.get(locationId) : null;
+  if (!entry || entry.criteria.size === 0) {
+    // No numeric override data for this persona (Wenda/Carmen) — fall back
+    // to the general index, but the caller MUST label this as general, not
+    // persona-specific (depth-honesty rule). Stay null when there's no
+    // general index either (e.g. no scored criteria yet) rather than
+    // spreading null into a valueless {personaAdjusted:false} object —
+    // callers rely on `idx ? idx.value : ...` to detect "no data".
+    const general = generalIndex(store, locationId);
+    return general ? { ...general, personaAdjusted: false } : null;
+  }
+  // Fixture value overrides never touch weight (unchanged doctrine) — only
+  // the VALUE source differs from generalIndex(), same shared loop, same
+  // default weight function.
+  const result = weightedCriteriaAverage(
+    store,
+    locationId,
+    (crit, row) => {
+      const fixtureRow = entry.criteria.get(crit.criterion_id);
+      if (fixtureRow) return Number(fixtureRow.expected);
+      return scoredValueFor(crit, row);
+    },
+    defaultWeightForCriterion
+  );
+  return result ? { ...result, personaAdjusted: true } : null;
+}
+
+// Tooltip voice (v2 addendum §4.1): the location's own
+// highest- and lowest-scoring criteria, over whichever values actually feed
+// its index (a persona's own fixture override where one exists, the general
+// scorecard everywhere else) — the exact same substitution personaIndex()
+// already does, just returning the extremes instead of the weighted
+// average. `personaId=null` gives the plain general-index reading. Purely a
+// max/min over numbers that already exist; authors nothing.
+export function topBottomCriteria(store, personaId, locationId) {
+  const { entries } = resolvedCriterionValues(store, personaId, locationId);
+  if (!entries.length) return null;
+  let top = entries[0];
+  let bottom = entries[0];
+  for (const e of entries) {
+    if (e.val > top.val) top = e;
+    if (e.val < bottom.val) bottom = e;
+  }
+  return { top, bottom };
+}
+
+// The one place a verdict is looked up for a given persona + location
+// (§8Q.5/§8Q.6, Part 23.5): tries a location-scope row first (the forward
+// path — a route or fact that genuinely varies by location, none live
+// today), falls back to that location's own country's country-scope row.
+// Every call site that used to do
+// `store.verdictsByPersona.get(persona)?.get(loc.location_id)` reads
+// through this instead, so a deep-linked/screenshotted single location
+// still resolves its persona's full verdict even though the row now
+// canonically lives at country grain (§8Q.6's own caution).
+export function resolveVerdict(store, personaId, loc) {
+  if (!loc) return null;
+  const perPersona = store.verdictsByPersona.get(personaId);
+  if (!perPersona) return null;
+  return perPersona.byLocation.get(loc.location_id) || perPersona.byCountry.get(loc.country_id) || null;
+}
+
+// The one place a passport-lens row is looked up (25.6/§8Z): a plain,
+// mechanical key lookup, nothing computed. Returns null for both "no
+// nationality selected" and "a nationality is selected but this table has
+// no row for it" — the CALLER is responsible for §8Z item 2's own
+// never-silence rule (the render condition is the reader's own state,
+// nationality selected, never the table's — this function can't know
+// which case it's in from a bare null, by design; see location.js's
+// passport-strip builder for where that distinction actually renders).
+export function resolveNationalityTier(store, nationalityCode, countryId) {
+  if (!nationalityCode || !countryId) return null;
+  return store.nationalityTiersByKey.get(`${nationalityCode}:${countryId}`) || null;
+}
+
+// Verdict fixtures (Wenda/Carmen) are freeform prose, e.g.
+// "Near-miss - Rentista ~$2,000 threshold missed by ~5%; ...". The leading
+// clause before the first " - " is extracted MECHANICALLY (a plain string
+// split, not an interpretation) as the at-a-glance headline; the full
+// string is always shown too. This is deliberately not a synthesized
+// pass/fail enum — see the build notes.
+export function verdictHeadline(expectedText) {
+  const idx = expectedText.indexOf(" - ");
+  if (idx === -1) return expectedText;
+  return expectedText.slice(0, idx);
+}
+
+// Mechanical fact->section bucketing, keyed off which source research file
+// a fact's source_ref names (the six-file set: overview / visa-legal /
+// property / cost-of-living / community-network / red-flags.md). This is a
+// lookup, not a judgment call — every candidate location's research was
+// authored as one of these six files, and the public export preserves the
+// bare filename. Falls back to a criterion_id-based guess only when
+// source_ref is a [GAP] marker (no real file behind it yet).
+const FILE_SECTION_MAP = [
+  ["red-flags.md", "redflags"],
+  ["visa-legal.md", "visa"],
+  ["property.md", "property"],
+  ["cost-of-living.md", "cost"],
+  ["community-network.md", "community"],
+  ["overview.md", "overview"],
+];
+
+const CRITERION_SECTION_FALLBACK = {
+  "visa-legal-pathway-ease": "visa",
+  "land-property-access": "property",
+  "cost-of-living-affordability": "cost",
+  "community-social-fabric": "community",
+  "room-for-others-group-viability": "community",
+};
+
+export function sectionForFact(fact) {
+  const ref = fact.source_ref || "";
+  for (const [needle, section] of FILE_SECTION_MAP) {
+    if (ref.includes(needle)) return section;
+  }
+  if (fact.criterion_id && CRITERION_SECTION_FALLBACK[fact.criterion_id]) {
+    return CRITERION_SECTION_FALLBACK[fact.criterion_id];
+  }
+  return "overview";
+}

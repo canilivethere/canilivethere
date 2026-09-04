@@ -44,6 +44,7 @@ import {
   isDoorAnswered, markDoorAnswered,
 } from "./app-shared.js";
 import { loadStore, defaultWeightForCriterion } from "./data.js";
+import { createOwnNumbersWing, WING_NUMBERS_LABEL, WING_NUMBERS_SUBLINE } from "./own-numbers.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 import { siteUrl } from "./site-root.js";
 
@@ -63,8 +64,16 @@ const DOOR_SEEN_KEY = "door-seen";
 // unanswered door reloads index.html, which re-summons the door — a
 // loop.
 const DOOR_BRAND_LINE = "CanILiveThere";
+// Replaced 2026-09-04 when the third wing was added. The
+// shipped line ended "three ways to tell the site who's asking" — with a
+// third wing on the door it counted three of four things, and the bar is
+// "nothing false". A count in copy rots every time the door grows, and it
+// has now rotted twice, so the count is gone rather than incremented. The
+// three wings are enumerated; the eight worked examples move from a peer
+// in the list to the alternative. The two existing wing sublines are not
+// touched.
 const WELCOME_LINE =
-  "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Start with your passport, your priorities, or one of eight worked examples — three ways to tell the site who's asking.";
+  "A visa rule, a rent number, a safety record — they read the same to everyone. What they add up to for you doesn't. Tell the site who's asking with your passport, your priorities, or your own numbers — or borrow one of eight worked examples instead.";
 const ESCAPE_HATCH_LABEL = "See the facts as they are.";
 
 // Part 25 copy table, C1-C10 — most ship as originally drafted; four
@@ -146,6 +155,22 @@ const PASSPORT_TILE_ICON = `
     <rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
     <circle cx="12" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
     <line x1="9" y1="16" x2="15" y2="16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+`;
+
+// A plain measuring glyph for Wing 3 (the welcome box) — same
+// non-photo, non-silhouette reasoning as the two icons above, applied to
+// the reader's-own-figures wing. Drawn here rather than sourced as an
+// asset, in the established inline-SVG style (24x24 viewBox, currentColor,
+// 1.6 stroke), and it depicts a PROCESS — a scale reading three different
+// heights against a baseline — never a tenth person.
+const NUMBERS_TILE_ICON = `
+  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+    <line x1="4" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="8" y1="19" x2="8" y2="13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="12" y1="19" x2="12" y2="8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="16" y1="19" x2="16" y2="11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="4" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2"/>
   </svg>
 `;
 
@@ -489,6 +514,11 @@ export function initPerspectiveDoor() {
           <span class="door-wing-label">${escapeHtml(WING_PRIORITIES_LABEL)}</span>
           <span class="door-wing-subline">${escapeHtml(prioritiesWingSubline())}</span>
         </button>
+        <button type="button" class="door-wing" data-wing="numbers">
+          <span class="door-portrait door-portrait-icon">${NUMBERS_TILE_ICON}</span>
+          <span class="door-wing-label">${escapeHtml(WING_NUMBERS_LABEL)}</span>
+          <span class="door-wing-subline">${escapeHtml(WING_NUMBERS_SUBLINE)}</span>
+        </button>
       </div>
       <div class="door-persona-row">
         <p class="door-persona-row-heading">${escapeHtml(PERSONA_ROW_HEADING)}</p>
@@ -538,6 +568,29 @@ export function initPerspectiveDoor() {
     const openIntro = () => renderIntro();
     prioritiesWing.addEventListener("click", openIntro);
     prioritiesWing.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); openIntro(); } });
+
+    // Wing 3 interior — the welcome box (own-numbers.js). Same shape as
+    // Wing 1: a full-panel re-render behind the shared .door-back control,
+    // awaiting the same already-in-flight loadStore() promise the passport
+    // picker awaits, because the box reads visa-routes.jsonl and
+    // countries.jsonl out of the same store. Unlike the other two wings,
+    // this one never reloads the page on completion — its result screen is
+    // an in-panel re-render, because a reload would need the reader's
+    // figures to survive the round trip and the only two mechanisms for
+    // that are storage (opt-in here) and the URL (forbidden here).
+    const numbersWing = panel.querySelector('.door-wing[data-wing="numbers"]');
+    const openNumbers = async () => {
+      const store = await loadStore();
+      createOwnNumbersWing({
+        panel,
+        store,
+        listsHref: withPersona(siteUrl("lists.html")),
+        onBack: renderMainScreen,
+        onOpenPassport: () => renderPassportBox(store),
+      }).render();
+    };
+    numbersWing.addEventListener("click", openNumbers);
+    numbersWing.addEventListener("keydown", (e) => { if (isActivationKey(e)) { e.preventDefault(); openNumbers(); } });
 
     panel.querySelector("#door-escape").addEventListener("click", dismissWithoutPersona);
 

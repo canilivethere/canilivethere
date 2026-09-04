@@ -967,6 +967,146 @@ body.door-open .site-topbar { visibility: hidden; }
 .door-passport-more { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0; }
 .door-passport-footer { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.5rem; }
 
+/* Wing 3 interior — the welcome box (2026-09-04). Layout only: no new
+   colours, no new type scale, no new spacing tokens. Every value below
+   is an existing token (--muted, --line, --panel, --ink) or the same
+   rem step the door's own screens already use. .door-wings itself needed
+   no change at all — it is already a wrapping auto-fit grid
+   (repeat(auto-fit, minmax(240px, 1fr))) that collapses to one column
+   under 500px, so a third card wraps and stacks with zero CSS work. */
+.own-numbers-box { display: flex; flex-direction: column; gap: 0.6rem; max-width: 46em; }
+.own-numbers-box p { margin: 0; }
+.own-numbers-box label { font-size: 0.85rem; font-weight: 600; }
+
+/* The privacy paragraph. Boxed, at body size, above the first input —
+   a disclosure a reader can miss is not a disclosure. */
+.own-privacy {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.7rem 0.8rem;
+  margin: 0.2rem 0 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.own-privacy-heading { font-weight: 700; }
+.own-privacy p { font-size: 0.9rem; max-width: 46em; }
+
+.own-field { margin: 0.35rem 0; display: flex; flex-direction: column; gap: 0.4rem; border: none; padding: 0; }
+.own-field legend { font-weight: 600; font-size: 0.95rem; padding: 0; margin: 0 0 0.4rem; }
+.own-field-note { font-size: 0.82rem; color: var(--muted); max-width: 46em; }
+.own-choices-column { flex-direction: column; align-items: flex-start; }
+.own-choice { cursor: pointer; }
+.own-amount-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.own-amount-row input[type="text"] {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--ink);
+  width: 10em;
+}
+.own-amount-row select { font-size: 0.95rem; padding: 0.35rem 0.5rem; }
+.own-property-group {
+  border-left: 2px solid var(--line);
+  padding-left: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.own-limits { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.own-limits p { font-size: 0.8rem; color: var(--muted); max-width: 46em; }
+
+/* The result screen. */
+.own-perspective { font-size: 0.9rem; color: var(--muted); max-width: 46em; }
+.own-perspective-note { font-size: 0.85rem; color: var(--muted); max-width: 46em; }
+/* The standing caveat sits above the results, at body size, never as a
+   footnote under them: a caveat below the answer is one a reader has
+   already formed a belief without. */
+.own-caveat {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0;
+  margin: 0.4rem 0;
+  max-width: 46em;
+}
+.own-group-heading {
+  font-family: "Fraunces", serif;
+  font-size: 1rem;
+  margin: 1.1rem 0 0.4rem;
+}
+.own-country { margin: 0 0 1rem; }
+.own-country h4 { font-family: "Fraunces", serif; font-size: 0.95rem; margin: 0.8rem 0 0.4rem; }
+.own-route { border-top: 1px solid var(--line); padding: 0.55rem 0; }
+.own-route-name { font-weight: 600; font-size: 0.92rem; }
+.own-route-chips { margin: 0.3rem 0 !important; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* Every chip renders identically. "Below the stated bar" is not red and
+   "Above" is not green: green/red would render a legal bar as a personal
+   score, which is exactly the eligibility claim the copy is forbidden to
+   make — colour must not say what the words may not. */
+.own-chip {
+  display: inline-block;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+.own-route-note { font-size: 0.88rem; margin: 0.25rem 0 !important; max-width: 46em; }
+.own-route-figure { font-size: 0.95rem; margin: 0.2rem 0 !important; }
+.own-route-unit { font-size: 0.82rem; color: var(--muted); margin: 0.15rem 0 !important; max-width: 46em; }
+/* A route whose own words say "does not clear on income alone" reads at
+   body size, not in the small print. */
+.own-route-unit-promoted { font-size: 0.95rem; color: var(--ink); }
+.own-route-record { font-size: 0.85rem; color: var(--muted); margin: 0.3rem 0; }
+.own-route-record-heading { margin: 0 0 0.2rem !important; }
+.own-route-record ul { margin: 0; padding-left: 1.1rem; }
+/* The three per-row lines added 2026-09-04 — where a route leads, the age
+   it sets, and how fresh the record is. Meta type, below the figure,
+   because none of them is the answer to the question the reader asked:
+   they are the reasons that answer isn't the whole story, and a reason
+   placed above the thing it qualifies is a maze. */
+.own-route-meta { font-size: 0.82rem; color: var(--muted); margin: 0.15rem 0 !important; max-width: 46em; }
+/* One scannable word, at the row's body weight, above a destination the
+   site's own record says is contested. The full string still renders in
+   full underneath — this marks it, it does not replace it. Seven copies of
+   the same 40-word paragraph at body weight would not be emphasis; it
+   would be the same thing said seven times, and it would drown the
+   conditional promotions that already earn body type. */
+.own-route-disputed { font-size: 0.95rem; font-weight: 600; color: var(--ink); margin: 0.3rem 0 0 !important; }
+/* The heading links out to what the box does not cover: the country's own
+   locations carry more about every one of these routes than this box
+   does, and a reader holding a chip is the one most likely to need it. */
+.own-country-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.own-country-link { font-family: inherit; font-size: 0.8rem; font-weight: 400; }
+/* .own-verbatim is a BOUNDARY, not a style: it wraps every value that
+   reaches the reader out of the data layer, so that "authored copy" has a
+   mechanical definition — all rendered text in this feature that is not
+   inside this selector. It deliberately carries no visual treatment at
+   all. Do not give it any: the moment it changes how something looks,
+   somebody will use it for that instead of for what it means, and the
+   boundary stops being checkable. */
+.own-verbatim { }
+
+/* The sixteen refusals render open, on first paint, at the same type
+   size as the answers — never a <details>, never behind a "show more".
+   The site's own incompleteness gets no smaller type than its answers. */
+.own-refusal-line { font-size: 0.92rem; max-width: 46em; margin: 0 0 0.5rem !important; }
+.own-refusal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  font-size: 0.92rem;
+}
+.own-save { margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+.own-footer { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.8rem !important; }
+
 @media (max-width: 500px) {
   .door-wings { grid-template-columns: 1fr; }
 }

@@ -174,6 +174,12 @@ const FIELD_D_COVERAGE =
 // Leaning on
 // the field's own checkbox wording, "capital I could put into property".
 const FIELD_D_AMOUNT_LABEL = "How much capital?";
+// AUTHORED-CHOICE: the input screen keeps its button disabled until it
+// can answer, and gives no line for the one case where the reader has
+// said something the box cannot use — the box ticked, the amount empty.
+// The line names both ways out, in the field's own note pattern.
+const FIELD_D_INCOMPLETE_NOTE =
+  "You've ticked the capital box but not put an amount in it — enter one, or untick the box.";
 
 // The last three lines of the input screen.
 const COVERAGE_LINE =
@@ -236,6 +242,12 @@ const GROUP_B_SENTENCE =
 const SAVE_LABEL = "Keep this on my device";
 const SAVE_NOTE =
   "Off by default. Saving puts your figures in this browser's storage so the box remembers them next time. Nothing is sent anywhere either way.";
+// AUTHORED-CHOICE: the tick-box is unticked whenever what is stored is
+// not what is on screen, and an unticked box beside figures a reader
+// knows they once saved is ambiguous on its own — this says which of the
+// two it is. One sentence, in the same note pattern as the line above.
+const SAVE_DIFFERS_LINE =
+  "The figures already kept on this device are different from the ones on this screen — ticking this replaces them.";
 // AUTHORED-CHOICE: B9 asks for one plain line saying why, without
 // giving the line.
 const SAVE_UNAVAILABLE_LINE =
@@ -601,6 +613,29 @@ function routeRowHtml(row, result, input) {
     </div>`;
 }
 
+// Whether the figures kept on this device are the same figures the
+// reader is looking at — field by field, including the optional property
+// capital, whose PRESENCE is as much a part of the answer as its amount.
+// A stored object always carries created_at/updated_at that the on-screen
+// input has no counterpart for, so this compares the answered fields
+// rather than the two objects.
+function savedMatchesInput(saved, input) {
+  if (!saved || !input) return false;
+  if (saved.amount !== input.amount) return false;
+  if (saved.currency !== input.currency) return false;
+  if (saved.period !== input.period) return false;
+  if (saved.income_type !== input.income_type) return false;
+  if (saved.duration_band !== input.duration_band) return false;
+  const savedProperty = saved.property_capital;
+  const inputProperty = input.property_capital;
+  if (Boolean(savedProperty) !== Boolean(inputProperty)) return false;
+  if (savedProperty && inputProperty) {
+    if (savedProperty.amount !== inputProperty.amount) return false;
+    if (savedProperty.currency !== inputProperty.currency) return false;
+  }
+  return true;
+}
+
 // listsHref: the destination the sixteen refused countries link to.
 // AUTHORED-CHOICE: the spec says each of the sixteen links "to its existing
 // country/location surface", and the site has no per-country page — only
@@ -686,6 +721,7 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
                      value="${hasProperty ? escapeHtml(String(saved.property_capital.amount)) : ""}">
               ${selectHtml("own-property-currency", CURRENCY_OPTIONS, hasProperty ? saved.property_capital.currency : "USD", ARIA_PROPERTY_CURRENCY)}
             </div>
+            <p class="own-field-note" id="own-property-note" hidden>${escapeHtml(FIELD_D_INCOMPLETE_NOTE)}</p>
           </div>
         </div>
 
@@ -706,6 +742,7 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
     const submit = panel.querySelector("#own-submit");
     const localNote = panel.querySelector("#own-local-note");
     const currencyNote = panel.querySelector("#own-currency-note");
+    const propertyNote = panel.querySelector("#own-property-note");
 
     // Readers type "2,400" and "2 400". Stripping separators at PARSE
     // time is not the "thousands-separator coercion on keystroke" the
@@ -724,16 +761,25 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
 
     // The same syncSave() idiom renderPassportBox() already uses: the
     // submit stays disabled until the box can actually answer.
+    // Ticking the optional capital box and leaving the amount empty is
+    // the reader saying something the box then quietly dropped: the
+    // figure never reached the answer and nothing on screen said so. The
+    // optional field is optional to TICK, not optional to finish, so it
+    // holds the button the same way every required field does.
     const sync = () => {
-      submit.disabled = !(parseAmount(amount) && checkedValue("own-duration") && checkedValue("own-type"));
+      const propertyIncomplete = propToggle.checked && !parseAmount(propAmount);
+      submit.disabled = !(parseAmount(amount) && checkedValue("own-duration") && checkedValue("own-type"))
+        || propertyIncomplete;
       localNote.hidden = checkedValue("own-type") !== "local_active";
       currencyNote.hidden = currency.value !== "OTHER";
       propGroup.hidden = !propToggle.checked;
+      propertyNote.hidden = !propertyIncomplete;
     };
     amount.addEventListener("input", sync);
     currency.addEventListener("change", sync);
     period.addEventListener("change", sync);
     propToggle.addEventListener("change", sync);
+    propAmount.addEventListener("input", sync);
     panel.querySelectorAll('input[type="radio"]').forEach((r) => r.addEventListener("change", sync));
     sync();
 
@@ -854,13 +900,21 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
     const block = panel.querySelector("#own-save-block");
     if (!block) return;
     const available = isReaderStorageAvailable();
-    const alreadySaved = Boolean(loadOwnNumbers());
+    // The tick means "these figures are kept on this device", so it is
+    // ticked only when what is stored IS these figures. Testing merely
+    // that SOMETHING is stored ticked the box for a returning reader who
+    // had just changed their figures and read the new answer — a ticked
+    // box over an old number, and nothing saved.
+    const saved = loadOwnNumbers();
+    const savedIsThis = savedMatchesInput(saved, input);
+    const savedIsDifferent = Boolean(saved) && !savedIsThis;
     block.innerHTML = `
       <label class="priority-choice own-choice">
-        <input type="checkbox" id="own-save-toggle"${alreadySaved ? " checked" : ""}${available ? "" : " disabled"}>
+        <input type="checkbox" id="own-save-toggle"${savedIsThis ? " checked" : ""}${available ? "" : " disabled"}>
         <span>${escapeHtml(SAVE_LABEL)}</span>
       </label>
       <p class="own-field-note">${escapeHtml(SAVE_NOTE)}</p>
+      ${savedIsDifferent ? `<p class="own-field-note">${escapeHtml(SAVE_DIFFERS_LINE)}</p>` : ""}
       ${available ? "" : `<p class="own-field-note">${escapeHtml(SAVE_UNAVAILABLE_LINE)}</p>`}
       ${available && hasAnySavedReaderState()
         ? `<button type="button" class="door-link-btn" id="own-forget">${escapeHtml(FORGET_LABEL)}</button>`
@@ -886,7 +940,12 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
     // In-panel re-render on completion, never a reload: B1 forbids this
     // screen depending on a round trip, and a reload here would also throw
     // away figures the reader may not have chosen to save.
-    if (forget) wireForgetControl(forget, { onDone: () => renderSaveBlock(input) });
+    // The whole result panel is redrawn, not just this block: forgetting
+    // clears the saved passport too, and the line above the results that
+    // names that passport was painted when the panel was built. Redrawing
+    // one corner left that line on screen describing something that no
+    // longer exists.
+    if (forget) wireForgetControl(forget, { onDone: () => renderResult(input) });
   }
 
   return { render: () => renderInput(null), tableCheck };

@@ -6,13 +6,19 @@
 // is exercisable outside a browser and a later maintainer can change a
 // rule without reading a line of render code. Every reader-facing string
 // lives in the render half (own-numbers.js); this file returns reasons,
-// never sentences.
+// never sentences. Its one import is the four vocabulary lists (below):
+// no function here reads or writes the page, and none is called at load.
 //
 // Zero facts authored here. Every number, threshold, unit, condition and
 // route name that reaches a reader comes verbatim out of
 // derived/visa-routes.jsonl. ROUTE_BARS below is transcription of what
 // each row's own `unit` string already says in words — see the header
 // comment on that table.
+
+import {
+  OWN_NUMBERS_INCOME_TYPES, OWN_NUMBERS_CURRENCIES,
+  OWN_NUMBERS_PERIODS, OWN_NUMBERS_DURATION_BANDS,
+} from "./app-shared.js";
 
 // Gate 0. The five countries the box reads. CR is Crete
 // (derived/countries.jsonl: {"country_id":"CR","name":"Crete"}), not
@@ -22,15 +28,23 @@
 // instead of vanishing.
 export const READ_SET = ["TH", "GT", "PT", "ES", "CR"];
 
+// The four vocabularies, taken from the storage module rather than
+// written out again here. Both files check a value against these lists —
+// this one before an answer is computed, that one before a stored value
+// is handed back — and two copies of a list that both sides validate
+// against is a way to lose a reader's saved figures to a one-line edit.
+// The names below stay, because they are what this file's own code and
+// its callers already say; the values are the storage module's.
+//
 // The stored token is the corpus vocabulary's stem, never a display
 // label. The join to a route row is one string concatenation —
 // "income_type_" + token — and the four resulting names are exactly the
 // four that exist in the data. "unspecified" is the fifth option offered
 // to the reader and maps to no field lookup at all (Gate 1 is skipped).
-export const INCOME_TYPE_TOKENS = ["pension", "passive", "remote_active", "local_active", "unspecified"];
-export const CURRENCY_TOKENS = ["USD", "EUR", "THB", "OTHER"];
-export const PERIOD_TOKENS = ["month", "year"];
-export const DURATION_BANDS = ["visit", "long_stay"];
+export const INCOME_TYPE_TOKENS = OWN_NUMBERS_INCOME_TYPES;
+export const CURRENCY_TOKENS = OWN_NUMBERS_CURRENCIES;
+export const PERIOD_TOKENS = OWN_NUMBERS_PERIODS;
+export const DURATION_BANDS = OWN_NUMBERS_DURATION_BANDS;
 
 // The near-the-bar band. Ratified elsewhere in this project's data
 // conventions as the same-currency margin buffer (`margin_buffer`, tier

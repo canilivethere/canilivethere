@@ -41,7 +41,7 @@ import {
   loadNationality, saveNationality, loadSavedPerspective, saveSavedPerspective,
   isExplicitGeneral, setExplicitGeneral, clearExplicitGeneral,
   hasAnySavedReaderState, wireForgetControl,
-  isDoorAnswered, markDoorAnswered,
+  isDoorAnswered, markDoorAnswered, loadOwnNumbers,
 } from "./app-shared.js";
 import { loadStore, defaultWeightForCriterion } from "./data.js";
 import { createOwnNumbersWing, WING_NUMBERS_LABEL, WING_NUMBERS_SUBLINE } from "./own-numbers.js";
@@ -497,7 +497,21 @@ export function initPerspectiveDoor() {
           </div>
         </div>
       `
-      : "";
+      // Figures kept on this device are saved state, but they are not a
+      // lens, so they build no resume band and used to leave this screen
+      // with no way to clear them at all — the one thing the reader most
+      // needs to be able to take back was reachable only from inside the
+      // wing that wrote it. The control renders on its own here: there is
+      // nothing to resume, and nothing to switch away from.
+      : loadOwnNumbers()
+        ? `
+        <div class="door-resume">
+          <div class="door-resume-controls">
+            <button type="button" class="door-link-btn" id="door-forget-resume">${escapeHtml(FORGET_LABEL)}</button>
+          </div>
+        </div>
+      `
+        : "";
 
     panel.innerHTML = `
       <p class="door-brand">${escapeHtml(DOOR_BRAND_LINE)}</p>

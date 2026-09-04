@@ -182,17 +182,27 @@ export function saveSavedPerspective(kind, personaId) {
 // checkbox is not that claim.
 // ---------------------------------------------------------------------
 
-// The ruled vocabularies, restated here (and only here) so the
-// loader can validate without importing the box's engine module — every
-// page loads app-shared.js, only index.html loads the box. "OTHER" is an
-// explicit sentinel, not an ISO code: it exists because currency is a
-// required sub-unit of the amount field, so null would be ambiguous
-// between "another currency" and "not answered". No code path may feed it
-// to a rate lookup or default it to anything.
-const OWN_NUMBERS_CURRENCIES = ["USD", "EUR", "THB", "OTHER"];
-const OWN_NUMBERS_PERIODS = ["month", "year"];
-const OWN_NUMBERS_INCOME_TYPES = ["pension", "passive", "remote_active", "local_active", "unspecified"];
-const OWN_NUMBERS_DURATION_BANDS = ["visit", "long_stay"];
+// The ruled vocabularies, and this file is where they live — the values
+// are unchanged, only their one home is now stated. They were written out
+// twice, here and in the box's engine module, and the loader below
+// REJECTS a stored value outside these lists: a later hand that added an
+// option in one copy and not the other would silently throw away figures
+// a reader had saved, with nothing in either file to say why.
+// Direction, deliberately: the box's engine imports these from here, not
+// the other way round. Every page on the site loads this file and only
+// the front page loads the box, so pointing the import the other way
+// would put the box's route table on every page for the sake of thirteen
+// strings — and this file is the base every feature imports, so a base
+// that reached back into a feature is the shape a cycle grows out of.
+// This file imports nothing from the box, and the box is a leaf.
+// "OTHER" is an explicit sentinel, not an ISO code: it exists because
+// currency is a required sub-unit of the amount field, so null would be
+// ambiguous between "another currency" and "not answered". No code path
+// may feed it to a rate lookup or default it to anything.
+export const OWN_NUMBERS_CURRENCIES = ["USD", "EUR", "THB", "OTHER"];
+export const OWN_NUMBERS_PERIODS = ["month", "year"];
+export const OWN_NUMBERS_INCOME_TYPES = ["pension", "passive", "remote_active", "local_active", "unspecified"];
+export const OWN_NUMBERS_DURATION_BANDS = ["visit", "long_stay"];
 
 // Returns null — never {} — when the key is absent or the stored value
 // doesn't validate, as ruled. This is load-bearing for
@@ -322,11 +332,17 @@ export function markDoorAnswered() {
 // switcher block), so it's never a dead affordance for a reader with
 // nothing stored.
 // Extended 2026-09-04 for the welcome box, as ruled: a
-// reader who saves ONLY their figures used to get `false` here, which
-// meant the forget control — gated on this function at both its surfaces
-// — never rendered. That is a stranger's income sitting in storage with
-// no visible way to clear it, which is the exact failure this function
-// was written to prevent, arriving through a new door.
+// reader who saves ONLY their figures used to get `false` here, and a
+// stranger's income then sat in storage with no visible way to clear it
+// — the exact failure this function was written to prevent, arriving
+// through a new door.
+// This function is necessary but not sufficient at either surface: each
+// one wraps the control in a block of its own, and that block has its own
+// condition. The welcome box renders it inside the save block at the foot
+// of the result screen; the door renders it inside the resume band, which
+// exists only where a saved LENS does — so the door carries a second,
+// figures-only branch as well. A reader with figures and nothing else has
+// to reach the control from both, and does.
 // forgetReaderPreferences() below needs no change: it removes the whole
 // envelope key, so own_numbers is covered by construction.
 export function hasAnySavedReaderState() {

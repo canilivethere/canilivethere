@@ -714,9 +714,13 @@ function buildSectionNav() {
 // country-scope fact already gets; (2) surface confinement is already
 // true by construction — this function is only ever called from
 // buildSection(), i.e. inside a location-page chapter, never from the map,
-// a tooltip, or Lists; (3) the consequence-gap fallback string below is
-// the ruled fixed string for this row type specifically (v5's named-gap
-// form, not the generic "Not yet researched" every other fact uses).
+// a tooltip, or Lists; (3) the consequence line renders only when the
+// published data carries a consequence. The former named-gap fallback
+// string (v5's "...isn't researched yet.") was removed once `notes` left
+// the published export: it would have asserted "not researched" over
+// consequences that HAD been researched and were simply no longer
+// published. Silence is the honest empty state here, matching the same
+// absent-note discipline the plain fact rows already use.
 function buildIllegalRoutesHtml(facts) {
   const illegalFacts = facts.filter(
     (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
@@ -731,8 +735,9 @@ function buildIllegalRoutesHtml(facts) {
     // (a) the practice, plain language, verbatim from the researched
     // fact, never softened or dramatized — never authored here.
     const practice = mechanismFact ? mechanismFact.fact_label : legalityFact.fact_label;
-    // (c) the real, sourced consequence if researched, GAP-marked
-    // honestly if not — never a severity invented to fill the gap.
+    // (c) the real, sourced consequence if researched. If it isn't in the
+    // published data, this line renders nothing at all — say nothing rather
+    // than say something false. Never a severity invented to fill the gap.
     const consequence = (mechanismFact && mechanismFact.notes) || legalityFact.notes || "";
     // v5 why+instead: a sibling `mechanism` fact in the same group whose
     // own legality sibling reads "legitimate" is a real lawful
@@ -753,7 +758,7 @@ function buildIllegalRoutesHtml(facts) {
       <div class="illegal-route-row">
         <div class="fact-label">${escapeHtml(practice)}</div>
         <div class="fact-value"><strong>Illegal</strong></div>
-        <div class="fact-notes">${consequence ? escapeHtml(consequence) : "What enforcement actually looks like here isn't researched yet."}</div>
+        ${consequence ? `<div class="fact-notes">${escapeHtml(consequence)}</div>` : ""}
         ${insteadHtml}
       </div>
     `;

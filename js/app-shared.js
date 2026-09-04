@@ -161,6 +161,110 @@ export function saveSavedPerspective(kind, personaId) {
 }
 
 // ---------------------------------------------------------------------
+// The welcome box's own figures (own_numbers) — the envelope's fourth
+// sibling key, and ruled to be exactly that: one new
+// sibling key, snake_case, bare inside the envelope, written ONLY through
+// writeReaderPreferenceKey(); schema_version stays 1, because the change
+// is purely additive, nothing enumerates envelope keys, and a bump would
+// silently wipe every returning reader's saved passport and priorities
+// for no gain at all.  Same fail-open, merge-write discipline as the
+// three siblings above.
+//
+// The ruled shape: { amount, currency, period, income_type,
+// duration_band, property_capital?: { amount, currency }, created_at,
+// updated_at }. The amount is stored exactly as the reader entered it,
+// in the currency and period they chose — period arithmetic is a
+// render-time operation on the way into a comparison, never a storage
+// transformation, so the box can never hand back a figure the reader
+// never typed. property_capital is ABSENT entirely when the optional
+// checkbox is off — not null, and above all not 0: a stored zero is a
+// claim the reader made about themselves, and an unticked optional
+// checkbox is not that claim.
+// ---------------------------------------------------------------------
+
+// The ruled vocabularies, and this file is where they live — the values
+// are unchanged, only their one home is now stated. They were written out
+// twice, here and in the box's engine module, and the loader below
+// REJECTS a stored value outside these lists: a later hand that added an
+// option in one copy and not the other would silently throw away figures
+// a reader had saved, with nothing in either file to say why.
+// Direction, deliberately: the box's engine imports these from here, not
+// the other way round. Every page on the site loads this file and only
+// the front page loads the box, so pointing the import the other way
+// would put the box's route table on every page for the sake of thirteen
+// strings — and this file is the base every feature imports, so a base
+// that reached back into a feature is the shape a cycle grows out of.
+// This file imports nothing from the box, and the box is a leaf.
+// "OTHER" is an explicit sentinel, not an ISO code: it exists because
+// currency is a required sub-unit of the amount field, so null would be
+// ambiguous between "another currency" and "not answered". No code path
+// may feed it to a rate lookup or default it to anything.
+export const OWN_NUMBERS_CURRENCIES = ["USD", "EUR", "THB", "OTHER"];
+export const OWN_NUMBERS_PERIODS = ["month", "year"];
+export const OWN_NUMBERS_INCOME_TYPES = ["pension", "passive", "remote_active", "local_active", "unspecified"];
+export const OWN_NUMBERS_DURATION_BANDS = ["visit", "long_stay"];
+
+// Returns null — never {} — when the key is absent or the stored value
+// doesn't validate, as ruled. This is load-bearing for
+// hasAnySavedReaderState() below, which is a truthiness test: an empty
+// object is truthy, and would render the "Forget what I've saved here"
+// control for a reader with nothing saved.
+export function loadOwnNumbers() {
+  const prefs = readReaderPreferences();
+  const v = prefs && prefs.own_numbers;
+  if (!v || typeof v !== "object") return null;
+  if (!Number.isFinite(v.amount) || v.amount <= 0) return null;
+  if (!OWN_NUMBERS_CURRENCIES.includes(v.currency)) return null;
+  if (!OWN_NUMBERS_PERIODS.includes(v.period)) return null;
+  if (!OWN_NUMBERS_INCOME_TYPES.includes(v.income_type)) return null;
+  if (!OWN_NUMBERS_DURATION_BANDS.includes(v.duration_band)) return null;
+  if (v.property_capital !== undefined) {
+    const p = v.property_capital;
+    if (!p || typeof p !== "object") return null;
+    if (!Number.isFinite(p.amount) || p.amount <= 0) return null;
+    if (!OWN_NUMBERS_CURRENCIES.includes(p.currency)) return null;
+  }
+  return v;
+}
+
+// fields: { amount, currency, period, income_type, duration_band,
+// property_capital? }. created_at is preserved across an edit; updated_at
+// always reflects this write — the same shape custom_profile and
+// nationality already implement. Returns true/false rather than throwing.
+export function saveOwnNumbers(fields) {
+  const now = new Date().toISOString();
+  const existing = readReaderPreferences();
+  const createdAt = existing?.own_numbers?.created_at || now;
+  return writeReaderPreferenceKey("own_numbers", { ...fields, created_at: createdAt, updated_at: now });
+}
+
+// Un-ticking an opt-in save has to actually un-save, or the control is a
+// lie. Writing `undefined` through the merge-write path drops the key
+// from the serialized envelope entirely (JSON.stringify omits undefined
+// values), leaving every sibling key untouched — the same "remove the
+// whole key, never field surgery" discipline forgetReaderPreferences()
+// uses one level up.
+export function clearOwnNumbers() {
+  return writeReaderPreferenceKey("own_numbers", undefined);
+}
+
+// Whether this browser will let the site read its own envelope at all
+// (private-browsing lockdowns, disabled storage, some enterprise
+// policies). Read-only probe, no new key written, no reader value
+// touched: the welcome box uses it to render its opt-in save control
+// disabled with a plain reason instead of offering a save that silently
+// fails. Quota failures still surface at write time, where the writer's
+// own false return is the signal.
+export function isReaderStorageAvailable() {
+  try {
+    localStorage.getItem(READER_PREFS_KEY);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------
 // Explicit-general session view state (§8AA.2) — td12's real fix:
 // viewing plainly and forgetting permanently are two different acts.
 // sessionStorage (not the envelope): lives exactly as long as "this
@@ -227,8 +331,22 @@ export function markDoorAnswered() {
 // at all, at either of its two surfaces (the door's resume band, the
 // switcher block), so it's never a dead affordance for a reader with
 // nothing stored.
+// Extended 2026-09-04 for the welcome box, as ruled: a
+// reader who saves ONLY their figures used to get `false` here, and a
+// stranger's income then sat in storage with no visible way to clear it
+// — the exact failure this function was written to prevent, arriving
+// through a new door.
+// This function is necessary but not sufficient at either surface: each
+// one wraps the control in a block of its own, and that block has its own
+// condition. The welcome box renders it inside the save block at the foot
+// of the result screen; the door renders it inside the resume band, which
+// exists only where a saved LENS does — so the door carries a second,
+// figures-only branch as well. A reader with figures and nothing else has
+// to reach the control from both, and does.
+// forgetReaderPreferences() below needs no change: it removes the whole
+// envelope key, so own_numbers is covered by construction.
 export function hasAnySavedReaderState() {
-  return !!(hasCustomProfile() || loadNationality() || loadSavedPerspective());
+  return !!(hasCustomProfile() || loadNationality() || loadSavedPerspective() || loadOwnNumbers());
 }
 
 // §8AA.3: forget = remove the envelope key, whole — never field surgery.
@@ -257,7 +375,15 @@ export function wireForgetControl(btn, { onDone } = {}) {
   btn.addEventListener("click", () => {
     if (!confirming) {
       confirming = true;
-      btn.textContent = "Sure? This clears your answers and passport on this device.";
+      // Amended 2026-09-04 for the welcome box. This control now also
+      // clears the reader's own income figures, and the old string — which
+      // enumerated answers and passport — no longer named them. A confirm
+      // dialogue that under-describes what it deletes is a false sentence
+      // the reader acts on, created by the new feature and therefore that
+      // feature's to fix. Enumerating four things would rot again at the
+      // fifth, so the count is gone; the wording matches the control's own
+      // label, "Forget what I've saved here".
+      btn.textContent = "Sure? This clears everything you've saved on this device.";
       return;
     }
     forgetReaderPreferences();

@@ -47,7 +47,7 @@ function buildCriterionSection(crit) {
   const definitionHtml = crit.definition
     ? `<p>${escapeHtml(crit.definition)}</p>`
     : `<p class="fact-notes">What this measures, in plain language, isn't drafted yet for this criterion — a copy gap, not a claim that it doesn't matter. Every location's own score is real; this page's own explanation is what's still on its way.</p>`;
-  // v10 Part 16.3: the §8J disclosure, same marker + same shared paragraph
+  // The pending-ruling disclosure, same marker + same shared paragraph
   // as location.js's chapter (16.1) and lists.js's explainer (16.2),
   // keyed off the identical field check so it's structural in this page
   // from the day it ships, not retrofitted after.

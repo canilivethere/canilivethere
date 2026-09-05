@@ -207,7 +207,7 @@ function updatePurposeExplainer(store) {
   const clause = crit.kind === "threshold-shaped"
     ? "how comfortably a place clears this, not just a number"
     : "how strong this factor is here";
-  // v10 Part 16.2: the §8J disclosure, extended with the mechanical
+  // The pending-ruling disclosure, extended with the mechanical
   // field-gloss pattern this function already uses for `kind` — one more
   // clause, same template-not-hand-written style, appended only when the
   // sorted criterion's own reader_dependency reads "pending-ruling"

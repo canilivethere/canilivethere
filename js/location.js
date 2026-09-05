@@ -592,7 +592,7 @@ function buildScoreBar(store, loc, persona) {
     else if (scoreRow && scoreRow.status === "scored") { val = scoreRow.score; }
     else { val = null; }
     swatch = scoreToColor(val);
-    // v10 Part 16.1: the §8J disclosure -- a marker on any criterion whose
+    // The pending-ruling disclosure -- a marker on any criterion whose
     // reader_dependency reads "pending-ruling" (today: Community & social
     // fabric only), reusing .scope-tag verbatim (the existing "small
     // italic muted annotation beside a value" class). Zero new claim: this

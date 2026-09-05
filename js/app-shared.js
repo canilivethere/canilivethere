@@ -404,7 +404,7 @@ export function applyStoredCustomWeights(store) {
 
 // The one place precedence between an explicit URL persona, the
 // explicit-general session flag, and a stored custom weight vector gets
-// decided (8P.2's original ruling, extended by §8AA.2 for the new middle
+// decided (the original ruling, later extended for the new middle
 // tier) — deliberately NOT folded into getPersona() itself, since
 // "custom" is deliberately kept out of VALID_PERSONAS (see that export's
 // own comment). URL persona always wins (same "explicit signal beats
@@ -1186,7 +1186,7 @@ export const WEIGHT_CLASS_LABEL = {
   Medium: "weighted normally in the index",
 };
 
-// The §8J disclosure for any criterion whose `reader_dependency` field
+// The pending-ruling disclosure for any criterion whose `reader_dependency` field
 // reads "pending-ruling" (today: Community & social fabric only) — a
 // criterion score that structurally blends more than one distinct fact,
 // honestly labeled rather than rendered identically to a single-fact
@@ -1640,7 +1640,7 @@ function educationGatePhrase(rt, countryId, locationId, factsByKey) {
     case "not_assessed":
       return "Education: not yet assessed — that's our homework, not your no.";
     case "conditional":
-      console.warn("Part 37 §0: education gate returned 'conditional' — no ratified copy exists for this state today. Rendering nothing for this line rather than inventing one.");
+      console.warn("Education gate returned 'conditional' — no ratified copy exists for this state today. Rendering nothing for this line rather than inventing one.");
       return null;
     default:
       return null;

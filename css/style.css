@@ -245,7 +245,7 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
 .site-nav a { text-decoration: none; color: var(--muted); padding: 0.25rem 0; border-bottom: 2px solid transparent; }
 .site-nav a.active, .site-nav a:hover { color: var(--ink); border-bottom-color: var(--accent); }
 
-/* Theme toggle (v4 addendum R2 §"Toggle placement/copy"): fixed label,
+/* Theme toggle: fixed label,
    state-reflecting aria-pressed + .active hook, not label-swapping. */
 #theme-toggle {
   margin-left: auto;
@@ -319,7 +319,7 @@ details.recede .recede-body { margin-top: 0.4rem; }
   padding: 0.4rem 0.6rem;
 }
 
-/* ---------- home-screen privacy note (Part 38, §38.3): after the h1,
+/* ---------- home-screen privacy note: after the h1,
    before #map-intro -- reuses the footer's own quiet-aside pairing
    (0.8rem / var(--muted)), no new token. ---------- */
 .home-privacy-note {

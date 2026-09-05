@@ -232,6 +232,25 @@ const GROUP_B_HEADING = "Not read against your figures";
 const GROUP_B_SENTENCE =
   "This box has only been built against Thailand, Guatemala, Portugal, Spain and Crete so far. These sixteen aren't in it yet, so the site won't guess at them — their route pages are still there, unread by this box.";
 
+// The way out. Rendered review, 2026-09-05: the result screen
+// rendered the answer inside itself and offered no way out but "Change
+// my answers" — no route to the door, the map or the lists.
+//
+// The results DRIVING the map and the lists is the v2 shape, filed for
+// a later version. Until that exists, no label here may imply the reader's
+// figures travel with them: a control's promise counts as a claim
+// (perspective-disclosure law). Hence plain navigation wording and a note
+// that says outright what these destinations do NOT carry. The note is
+// not decoration — without it, three links straight out of a result
+// screen read as "and here are your results elsewhere", which is the
+// one thing they are not.
+const EXIT_HEADING = "Leave this box";
+const EXIT_NOTE =
+  "Your figures stay in this box. The map and the lists show the general view, not your numbers.";
+const EXIT_DOOR_LABEL = "Back to the door";
+const EXIT_MAP_LABEL = "The map";
+const EXIT_LISTS_LABEL = "Every location as a list";
+
 // The save control. Opt-in, after the answer. The passport and
 // priorities wings both save on submit; this one deliberately does not.
 // A stranger's income is the most sensitive thing this site has ever
@@ -463,9 +482,40 @@ const ARIA_PROPERTY_CURRENCY = "Currency of your property capital";
 // comma-groups digit runs, and formatValue() is deliberately NOT used
 // here because it appends an FX-derived approximation (B4: this box does
 // no currency conversion).
+//
+// Rendered review, 2026-09-05: amounts rendered inconsistently here —
+// "3500" bare beside "100,000" grouped. The cause is that
+// formatNumbersInText() groups runs of 5+ digits only, and that floor is
+// deliberate: it also formats free text elsewhere (map.js, app-shared.js)
+// where a 4-digit run is as likely to be a real year as money, and
+// lowering it there would print "2,019". The floor is right there and
+// wrong here, for two DIFFERENT reasons, which is why the fix lives at
+// these two call sites and not in the shared formatter:
+//   - value_num_low IS a number. A 4-digit run in it cannot be a year.
+//     Group it as a number.
+//   - income_threshold is a STRING, and the live data has it three ways:
+//     a bare figure ("3500"), a range ("1705-1715", "11600-12810", en
+//     dash included, sometimes "~2000"), and a whole prose paragraph
+//     containing real dates ("1 Jul 2026") and already-formatted money.
+//     Grouping the prose would render "1 Jul 2,026". So group a
+//     threshold string ONLY when the whole string is a figure or a range
+//     of figures; hand anything else to the shared formatter unchanged.
+const PURE_FIGURE_RE = /^\s*~?\s*\d+(?:\s*[-–]\s*\d+)?\s*$/;
+const groupDigitRuns = (text) =>
+  text.replace(/\d{4,}/g, (run) => Number(run).toLocaleString("en-US"));
+
 function figureText(row) {
-  if (Number.isFinite(row.value_num_low)) return formatNumbersInText(String(row.value_num_low));
-  if (row.income_threshold != null) return formatNumbersInText(String(row.income_threshold));
+  // maximumFractionDigits guards a silent rounding change: no
+  // value_num_low currently carries decimals (checked — 48 numeric rows,
+  // 0 with a fractional part), but the default would round any that
+  // arrive later to three places with nobody noticing.
+  if (Number.isFinite(row.value_num_low)) {
+    return row.value_num_low.toLocaleString("en-US", { maximumFractionDigits: 20 });
+  }
+  if (row.income_threshold != null) {
+    const raw = String(row.income_threshold);
+    return PURE_FIGURE_RE.test(raw) ? groupDigitRuns(raw) : formatNumbersInText(raw);
+  }
   return "";
 }
 
@@ -644,7 +694,11 @@ function savedMatchesInput(saved, input) {
 // of them would not be. The door passes the resolved URL in, so this
 // module never builds one itself (B1: no URL is constructed here, and
 // nothing derived from a reader field ever reaches an href).
-export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPassport }) {
+//
+// mapHref: the same arrangement for the way out added 2026-09-05 — the
+// door resolves it and passes it in, so B1 still holds and this module
+// still builds no URL of its own.
+export function createOwnNumbersWing({ panel, store, listsHref, mapHref, onBack, onLeaveBox, onOpenPassport }) {
   const allRoutes = [].concat(...[...store.visaRoutesByCountry.values()]);
   // B10 — the lookup table is asserted, not trusted. A mismatch puts
   // the whole box in its refusal state with one line, rather than a
@@ -885,12 +939,75 @@ export function createOwnNumbersWing({ panel, store, listsHref, onBack, onOpenPa
         <ul class="own-refusal-list">${groupBHtml}</ul>
 
         <div class="own-save" id="own-save-block"></div>
+        ${exitBlockHtml()}
         ${snapshot}
       </div>`;
 
     wireBack(() => renderInput(input));
     renderSaveBlock(input);
+    wireExitBlock();
     panel.focus();
+  }
+
+  // The way out of the result screen. "Back to the door" reuses onBack —
+  // the same in-panel re-render the input screens already use, so it
+  // costs no page load and no round trip for figures that deliberately
+  // never leave this box. The other two are ordinary links to URLs the
+  // door resolved and passed in.
+  //
+  // REVIEW FINDING, 2026-09-05, a real bug in the first build of this
+  // block: the map link looped straight back into the door. The box is
+  // only reachable when shouldShowDoor() was true, which requires no
+  // ?persona= param AND an unanswered session flag; withPersona() then
+  // resolves mapHref to a bare "index.html"; so following it landed the
+  // reader on the map with the flag still unset and the door popped up
+  // over the view — the door's own known re-summon failure, and the one link built
+  // to prove there IS a way out was the link that undid itself. Every
+  // other navigation in perspective-door.js calls markDoorAnswered()
+  // first; this one did not.
+  // onLeaveBox is that call, owned by the door (which already imports
+  // it) and passed in, so B1 holds and this module still builds no URL
+  // and reaches into no other module's state. It fires on BOTH links,
+  // not just the map: lists.html loads no door today (js/map.js is the
+  // only importer of initPerspectiveDoor, and only index.html loads
+  // it), but leaving to the lists and then clicking through to the map
+  // is the same defect by a two-step path. The reader HAS answered the
+  // door by this point; the flag should say so however they leave.
+  function exitBlockHtml() {
+    const mapLink = mapHref
+      ? `<li><a href="${mapHref}">${escapeHtml(EXIT_MAP_LABEL)}</a></li>`
+      : "";
+    return `
+      <div class="own-exit">
+        <h3 class="own-group-heading">${escapeHtml(EXIT_HEADING)}</h3>
+        <p class="own-field-note">${escapeHtml(EXIT_NOTE)}</p>
+        <ul class="own-exit-list">
+          <li><button type="button" class="door-link-btn" id="own-exit-door">${escapeHtml(EXIT_DOOR_LABEL)}</button></li>
+          ${mapLink}
+          <li><a href="${listsHref}">${escapeHtml(EXIT_LISTS_LABEL)}</a></li>
+        </ul>
+      </div>`;
+  }
+
+  function wireExitBlock() {
+    const btn = panel.querySelector("#own-exit-door");
+    if (btn) {
+      btn.addEventListener("click", onBack);
+      // wireBack() binds click only; this control is a button, so it
+      // needs the keyboard path the rest of the box's buttons already
+      // get. "Back to the door" stays in-panel, so no flag is marked:
+      // the reader is not leaving the door, they are returning to it.
+      btn.addEventListener("keydown", (e) => {
+        if (isActivationKey(e)) { e.preventDefault(); onBack(); }
+      });
+    }
+    if (typeof onLeaveBox !== "function") return;
+    // The anchors keep their real href and their default navigation, so
+    // middle-click, right-click and a JS failure all still work; the
+    // handler only records that the door was answered on the way past.
+    panel.querySelectorAll(".own-exit-list a").forEach((link) => {
+      link.addEventListener("click", () => { onLeaveBox(); });
+    });
   }
 
   // The opt-in save, rendered at the foot of the result screen.

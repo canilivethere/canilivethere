@@ -1105,6 +1105,24 @@ body.door-open .site-topbar { visibility: hidden; }
   font-size: 0.92rem;
 }
 .own-save { margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+/* The way out of the result screen, added 2026-09-05. Same list shape as
+   .own-refusal-list so the two blocks on this screen read as siblings. */
+.own-exit { margin-top: 1.4rem; border-top: 1px solid var(--line); padding-top: 0.9rem; }
+.own-exit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  font-size: 0.92rem;
+}
+/* Review finding, 2026-09-05: "Back to the door" has to be a <button> —
+   it is an in-panel re-render, not a URL — but .door-link-btn is the
+   muted 0.82rem tertiary idiom used for "Forget", and beside two plain
+   anchors it read as the demoted option of three. These three are peers,
+   so the button borrows the anchors' size and colour here only. */
+.own-exit-list .door-link-btn { font-size: inherit; color: var(--accent); }
 .own-footer { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.8rem !important; }
 
 @media (max-width: 500px) {

@@ -599,7 +599,13 @@ export function initPerspectiveDoor() {
         panel,
         store,
         listsHref: withPersona(siteUrl("lists.html")),
+        mapHref: withPersona(siteUrl("index.html")),
         onBack: renderMainScreen,
+        // Review finding, 2026-09-05: without this the box's own way out
+        // re-summoned the door over the page it had just navigated to —
+        // the door's own known re-summon failure. Every other completion path marks
+        // the door answered before it leaves; the box's exits now do too.
+        onLeaveBox: markDoorAnswered,
         onOpenPassport: () => renderPassportBox(store),
       }).render();
     };

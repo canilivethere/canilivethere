@@ -1,119 +1,119 @@
-{"term": "AADE", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "ACA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "AFIP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "AIMA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "AMKA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "AMO", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "ARCA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "B211A", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "BOI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "BPJS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "CABA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "CBP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "CDI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "identity-document", "added_date": "2026-07-13"}
-{"term": "CHU", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "CNSS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "COFA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "COHSASA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "CPLP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "CPV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "AADE", "country_scope": null, "expansion": "Greece's tax authority", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "ACA", "country_scope": null, "expansion": "Affordable Care Act", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "AFIP", "country_scope": null, "expansion": "Argentina's federal tax agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "AIMA", "country_scope": null, "expansion": "Portugal's immigration and asylum agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "AMKA", "country_scope": null, "expansion": "a Greek social security number", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "AMO", "country_scope": null, "expansion": "Morocco's employment-based public health-insurance system", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "ARCA", "country_scope": null, "expansion": "Argentina's tax authority (renamed from AFIP in 2024)", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "B211A", "country_scope": null, "expansion": "Indonesia's longer-stay visit visa", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "BOI", "country_scope": null, "expansion": "Thailand's Board of Investment", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "BPJS", "country_scope": null, "expansion": "Indonesia's national health-insurance program", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "CABA", "country_scope": null, "expansion": "Buenos Aires city", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "CBP", "country_scope": null, "expansion": "Customs and Border Protection", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "CDI", "country_scope": null, "expansion": "an Argentine tax ID", "first_use_rule": "generic-then-acronym", "category": "identity-document", "added_date": "2026-07-13"}
+{"term": "CHU", "country_scope": null, "expansion": "a public university hospital", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "CNSS", "country_scope": "MA", "expansion": "Morocco's public social-security fund covering private-sector employees (Caisse Nationale de Sécurité Sociale)", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-19", "source": "https://www.cnss.ma/fr/content/accueil (CNSS official site, created 1959, manages private-sector social security incl. health/maternity/disability/old-age/family allowances)"}
+{"term": "COFA", "country_scope": "US", "expansion": "the Compacts of Free Association, agreements between the US and the Marshall Islands, Micronesia, and Palau; \"COFA migrants\" are citizens of those states lawfully residing in the US", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-19", "source": "https://www.hhs.gov/guidance/document/medicaid-eligibility-cofa-migrants (HHS guidance); https://www.medicaid.gov/federal-policy-guidance/downloads/sho21005.pdf (CMS/Medicaid.gov, 2021, confirming Medicaid eligibility restored to COFA migrants effective Dec 27 2020)"}
+{"term": "COHSASA", "country_scope": null, "expansion": "Council for Health Service Accreditation of Southern Africa", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "CPLP", "country_scope": null, "expansion": "the Community of Portuguese Language Countries", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "CPV", "country_scope": null, "expansion": "the Communist Party of Vietnam", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
 {"term": "CVI", "country_scope": null, "expansion": "Certificate of Veterinary Inspection", "first_use_rule": "full-name-then-acronym", "category": "animal-import", "added_date": "2026-07-18"}
 {"term": "D7", "country_scope": null, "expansion": "Portugal's passive-income residency visa", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-18"}
-{"term": "DANE", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "DHA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "DIAN", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "DNI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "identity-document", "added_date": "2026-07-13"}
-{"term": "DNM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "DNU", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "DNV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "DTIC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "DANE", "country_scope": null, "expansion": "Colombia's national statistics agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "DHA", "country_scope": null, "expansion": "South Africa's Department of Home Affairs", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "DIAN", "country_scope": null, "expansion": "Colombia's tax authority", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "DNI", "country_scope": null, "expansion": "an Argentine national ID", "first_use_rule": "generic-then-acronym", "category": "identity-document", "added_date": "2026-07-13"}
+{"term": "DNM", "country_scope": null, "expansion": "Argentina's National Directorate of Migration", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "DNU", "country_scope": null, "expansion": "a presidential emergency decree", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "DNV", "country_scope": null, "expansion": "a Digital Nomad Visa", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "DTIC", "country_scope": null, "expansion": "South Africa's Department of Trade, Industry and Competition", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
 {"term": "DTV", "country_scope": null, "expansion": "Destination Thailand Visa", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "E33", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "E33E", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "E33F", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "E33G", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "EES", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "EHIC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "EKAV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "EOPYY", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "EPP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "EPS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "ESTA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "ETIAS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "FAVN", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "accreditation", "added_date": "2026-07-13"}
-{"term": "FCDO", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "E33", "country_scope": null, "expansion": "Indonesia's Second Home Visa", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "E33E", "country_scope": null, "expansion": "Indonesia's 'Silver Hair' retirement-visa route", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "E33F", "country_scope": null, "expansion": "Indonesia's standard retirement-visa route", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "E33G", "country_scope": null, "expansion": "Indonesia's Remote Worker Visa", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "EES", "country_scope": null, "expansion": "the EU's Entry/Exit System", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "EHIC", "country_scope": null, "expansion": "the European Health Insurance Card", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "EKAV", "country_scope": null, "expansion": "Greece's national air-ambulance and emergency-care service", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "EOPYY", "country_scope": null, "expansion": "Greece's National Organization for Health Care Services", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "EPP", "country_scope": null, "expansion": "the European People's Party", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "EPS", "country_scope": null, "expansion": "Colombia's public health-insurance scheme", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "ESTA", "country_scope": null, "expansion": "the US Electronic System for Travel Authorization", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "ETIAS", "country_scope": null, "expansion": "the European Travel Information and Authorisation System", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "FAVN", "country_scope": null, "expansion": "a rabies-antibody titer test", "first_use_rule": "generic-then-acronym", "category": "accreditation", "added_date": "2026-07-13"}
+{"term": "FCDO", "country_scope": null, "expansion": "the UK's Foreign, Commonwealth & Development Office", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
 {"term": "FIP", "country_scope": null, "expansion": "Financially Independent Person", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-18"}
-{"term": "FRRO", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "GNU", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "HB1788", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "HCP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "HGB", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "ICEX", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "IER", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "IGM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "IGSS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "IMSS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "IMT", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "identity-document", "added_date": "2026-07-13"}
-{"term": "INDEC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "INM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "IPC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "IPREM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "IPS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "IRDAI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "ITAP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "JCI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "accreditation", "added_date": "2026-07-13"}
-{"term": "KITAP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "KITAS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "KKM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "KUHP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "LPR", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "FRRO", "country_scope": null, "expansion": "India's Foreigners Regional Registration Office", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "GNU", "country_scope": null, "expansion": "South Africa's Government of National Unity", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "HB1788", "country_scope": null, "expansion": "Tennessee's foreign land-ownership law", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "HCP", "country_scope": null, "expansion": "Morocco's statistics agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "HGB", "country_scope": null, "expansion": "an Indonesian Right to Build property title", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "ICEX", "country_scope": null, "expansion": "Spain's foreign-investment promotion agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "IER", "country_scope": null, "expansion": "the US International Entrepreneur Rule", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "IGM", "country_scope": null, "expansion": "Guatemala's immigration authority", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "IGSS", "country_scope": null, "expansion": "Guatemala's public social-security health system", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "IMSS", "country_scope": null, "expansion": "Mexico's public health-insurance system", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "IMT", "country_scope": null, "expansion": "Portugal's non-resident property transfer tax", "first_use_rule": "generic-then-acronym", "category": "identity-document", "added_date": "2026-07-13"}
+{"term": "INDEC", "country_scope": null, "expansion": "Argentina's national statistics agency", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "INM", "country_scope": null, "expansion": "Mexico's National Immigration Institute", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "IPC", "country_scope": null, "expansion": "a consumer price index", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "IPREM", "country_scope": null, "expansion": "Spain's multi-purpose public income indicator", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "IPS", "country_scope": null, "expansion": "Paraguay's Social Security Institute", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "IRDAI", "country_scope": null, "expansion": "India's insurance regulator", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "ITAP", "country_scope": null, "expansion": "Indonesia's permanent stay permit", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "JCI", "country_scope": null, "expansion": "Joint Commission International", "first_use_rule": "full-name-then-acronym", "category": "accreditation", "added_date": "2026-07-13"}
+{"term": "KITAP", "country_scope": null, "expansion": "Indonesia's Permanent Stay Permit", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "KITAS", "country_scope": null, "expansion": "Indonesia's Limited Stay Permit", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "KKM", "country_scope": null, "expansion": "Malaysia's Ministry of Health", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "KUHP", "country_scope": null, "expansion": "Indonesia's Criminal Code", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "LPR", "country_scope": null, "expansion": "a lawful permanent resident", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
 {"term": "LTR", "country_scope": "CR", "expansion": "long-term residence under the EU Long-Term Residence Directive", "first_use_rule": "generic-then-acronym", "category": "residency-status", "added_date": "2026-07-18"}
 {"term": "LTR", "country_scope": "PT", "expansion": "long-term residence under the EU Long-Term Residence Directive", "first_use_rule": "generic-then-acronym", "category": "residency-status", "added_date": "2026-07-18"}
 {"term": "LTR", "country_scope": "TH", "expansion": "Long-Term Resident visa", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-18"}
-{"term": "MAGA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "MEP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "MHTC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "MM2H", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "MSPBS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "MSQH", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "NABH", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "NDPS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "NHIF", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "NIF", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "identity-document", "added_date": "2026-07-13"}
-{"term": "NIW", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "NLV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "NRI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "OCI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "OCRET", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "OIC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "OOD", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "OSW", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "PERM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "PIO", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "PMA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "MAGA", "country_scope": null, "expansion": "Guatemala's agriculture ministry", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "MEP", "country_scope": null, "expansion": "Argentina's official electronic-payment exchange rate", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "MHTC", "country_scope": null, "expansion": "Malaysia's Healthcare Travel Council", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "MM2H", "country_scope": null, "expansion": "Malaysia's My Second Home programme", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "MSPBS", "country_scope": null, "expansion": "Paraguay's public healthcare system", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "MSQH", "country_scope": null, "expansion": "Malaysia's hospital-accreditation standard", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "NABH", "country_scope": null, "expansion": "India's national hospital-accreditation body", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "NDPS", "country_scope": null, "expansion": "India's Narcotic Drugs and Psychotropic Substances Act", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "NHIF", "country_scope": null, "expansion": "Bulgaria's National Health Insurance Fund", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "NIF", "country_scope": null, "expansion": "a Portuguese tax identification number", "first_use_rule": "generic-then-acronym", "category": "identity-document", "added_date": "2026-07-13"}
+{"term": "NIW", "country_scope": null, "expansion": "the US National Interest Waiver", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "NLV", "country_scope": null, "expansion": "Spain's Non-Lucrative Visa", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "NRI", "country_scope": null, "expansion": "a Non-Resident Indian", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "OCI", "country_scope": null, "expansion": "an Overseas Citizen of India", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "OCRET", "country_scope": null, "expansion": "Guatemala's government land-reserve lease", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "OIC", "country_scope": null, "expansion": "Thailand's Office of Insurance Commission", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "OOD", "country_scope": null, "expansion": "a Bulgarian limited-liability company", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "OSW", "country_scope": null, "expansion": "the Centre for Eastern Studies", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "PERM", "country_scope": null, "expansion": "the US labor-certification process", "first_use_rule": "generic-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "PIO", "country_scope": null, "expansion": "a Person of Indian Origin", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "PMA", "country_scope": null, "expansion": "an Indonesian foreign-owned investment company", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
 {"term": "PR", "country_scope": null, "expansion": "permanent residency", "first_use_rule": "generic-then-acronym", "category": "residency-status", "added_date": "2026-07-18"}
-{"term": "PROMESA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "PROMESA", "country_scope": null, "expansion": "Puerto Rico's federal fiscal oversight board", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
 {"term": "QRP", "country_scope": null, "expansion": "Qualified Retired Persons programme", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "RAMED", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "RNATT", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "accreditation", "added_date": "2026-07-13"}
-{"term": "SAPS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "SARS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "SB2424", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "SMI", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "SMLMV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "SMMLV", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "SMVM", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "SNS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "SPAK", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "SRE", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "SST", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "SUACE", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "statute-code", "added_date": "2026-07-13"}
-{"term": "TRC", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "UCS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "UMA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "USCIS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "public-institution", "added_date": "2026-07-13"}
-{"term": "UVT", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "wage-price-index", "added_date": "2026-07-13"}
-{"term": "VOA", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
-{"term": "VSS", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "health-system", "added_date": "2026-07-13"}
-{"term": "VWP", "country_scope": null, "expansion": null, "first_use_rule": null, "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "RAMED", "country_scope": "MA", "expansion": "Morocco's former public medical-assistance scheme for low-income residents (Régime d'Assistance Médicale), phased out and merged into the AMO-Tadamon programme in 2022", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-19", "source": "https://www.sante.gov.ma/Reglementation/ramed/Pages/default.aspx (Morocco Ministry of Health, RAMED regulatory page); WHO EMRO coverage of RAMED launch/extension; RAMED-to-AMO-Tadamon merger, 2022"}
+{"term": "RNATT", "country_scope": null, "expansion": "a rabies-antibody titer test", "first_use_rule": "generic-then-acronym", "category": "accreditation", "added_date": "2026-07-13"}
+{"term": "SAPS", "country_scope": null, "expansion": "the South African Police Service", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "SARS", "country_scope": null, "expansion": "the South African Revenue Service", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "SB2424", "country_scope": null, "expansion": "Tennessee's foreign land-ownership law", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "SMI", "country_scope": null, "expansion": "Spain's national minimum wage", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "SMLMV", "country_scope": null, "expansion": "Colombia's national monthly minimum wage", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "SMMLV", "country_scope": null, "expansion": "Colombia's national monthly minimum wage", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "SMVM", "country_scope": null, "expansion": "Argentina's national minimum wage", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "SNS", "country_scope": null, "expansion": "Portugal's national health service", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "SPAK", "country_scope": null, "expansion": "Albania's Special Court Against Corruption and Organised Crime", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "SRE", "country_scope": null, "expansion": "Mexico's foreign-affairs ministry", "first_use_rule": "generic-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "SST", "country_scope": null, "expansion": "Malaysia's Sales and Service Tax", "first_use_rule": "full-name-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "SUACE", "country_scope": null, "expansion": "Paraguay's one-stop business-facilitation investor route", "first_use_rule": "generic-then-acronym", "category": "statute-code", "added_date": "2026-07-13"}
+{"term": "TRC", "country_scope": null, "expansion": "a Temporary Residence Card", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "UCS", "country_scope": null, "expansion": "Thailand's Universal Coverage Scheme", "first_use_rule": "full-name-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "UMA", "country_scope": null, "expansion": "Mexico's annually-updated reference value for calculating income/savings thresholds", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "USCIS", "country_scope": null, "expansion": "US Citizenship and Immigration Services", "first_use_rule": "full-name-then-acronym", "category": "public-institution", "added_date": "2026-07-13"}
+{"term": "UVT", "country_scope": null, "expansion": "Colombia's tax-value unit", "first_use_rule": "generic-then-acronym", "category": "wage-price-index", "added_date": "2026-07-13"}
+{"term": "VOA", "country_scope": null, "expansion": "a Visa on Arrival", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
+{"term": "VSS", "country_scope": null, "expansion": "Vietnam's social health insurance", "first_use_rule": "generic-then-acronym", "category": "health-system", "added_date": "2026-07-13"}
+{"term": "VWP", "country_scope": null, "expansion": "the US Visa Waiver Program", "first_use_rule": "full-name-then-acronym", "category": "visa-route", "added_date": "2026-07-13"}
 {"term": "WOAH", "country_scope": null, "expansion": "World Organisation for Animal Health", "first_use_rule": "full-name-then-acronym", "category": "animal-import", "added_date": "2026-07-18"}

@@ -232,7 +232,16 @@ const SECTION_TITLES = {
   overview: "Overview", visa: "Visa & residency", property: "Property",
   cost: "Cost of living", community: "Community", redflags: "Red flags",
 };
-const SECTION_ORDER = ["overview", "visa", "property", "cost", "community", "redflags"];
+// Chapter order (2026-09-08): verdict, intro, visa, cost of living,
+// property, community, red flags, score breakdown, sources. Cost of
+// living now precedes property. Must stay identical to js/location.js's
+// own SECTION_ORDER/INTRO_SECTION so the prerendered and hydrated pages
+// agree — same hand-kept-in-sync duplication class as sectionForFact().
+const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "redflags"];
+// The overview chapter is folded into the intro: it renders with the
+// portrait block, second on the page after the verdict, not down in the
+// chapter run. Content untouched — position only.
+const INTRO_SECTION = "overview";
 
 function formatValue(fact) {
   if (fact.value_raw === "[GAP]") return "Not yet researched";
@@ -291,7 +300,7 @@ for (const loc of locations) {
     bySection.get(s).push(f);
   }
 
-  const chaptersHtml = SECTION_ORDER.map((key) => {
+  const chapterHtml = (key) => {
     const list = bySection.get(key) || [];
     const title = SECTION_TITLES[key];
     const intro = CHAPTER_INTROS[key] ? `<p class="chapter-intro">${escapeHtml(CHAPTER_INTROS[key])}</p>` : "";
@@ -309,7 +318,10 @@ for (const loc of locations) {
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`).join("");
     return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}</details>`;
-  }).join("");
+  };
+
+  const introChapterHtml = chapterHtml(INTRO_SECTION);
+  const chaptersHtml = SECTION_ORDER.filter((key) => key !== INTRO_SECTION).map(chapterHtml).join("");
 
   // Part 23.2 (F3), same fix and same copy as the JS-hydrated page's
   // buildSourcesSection() (js/location.js) — kept in sync by hand, same
@@ -402,9 +414,10 @@ ${THEME_SCRIPT}
       <p class="verdict-headline">${escapeHtml(headline)}</p>
       <p class="fit-link-line"><a href="#sec-breakdown">See the full score breakdown</a></p>
     </div>
-    ${portraitHtml}
-    ${eventsHtml}
     <nav class="section-nav">${SECTION_ORDER.map((s) => `<a href="#sec-${s}">${SECTION_TITLES[s]}</a>`).join("")}</nav>
+    ${portraitHtml}
+    ${introChapterHtml}
+    ${eventsHtml}
     ${chaptersHtml}
     ${sourcesHtml}
     ${nextBestHtml}

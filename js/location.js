@@ -28,7 +28,16 @@ const SECTION_TITLES = {
   community: "Community",
   redflags: "Red flags",
 };
-const SECTION_ORDER = ["overview", "visa", "property", "cost", "community", "redflags"];
+// Chapter order (2026-09-08): verdict, intro, visa, cost of living,
+// property, community, red flags, score breakdown, sources. Cost of
+// living now precedes property. Must stay identical to
+// tools/prerender-locations.mjs's own copy of these two constants so the
+// prerendered and hydrated pages agree.
+const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "redflags"];
+// The overview chapter is folded into the intro: it renders with the
+// portrait block, second on the page after the verdict, not down in the
+// chapter run. Content untouched — position only.
+const INTRO_SECTION = "overview";
 
 async function main() {
   // Run together, not sequentially: the FX lookup is a best-effort
@@ -76,15 +85,14 @@ async function main() {
   // for me" read) — kept distinct on purpose, not merged.
   renderPersonaBlock(persona, headerDiv.querySelector("h1"));
 
-  // v7 §2.1: new top-to-bottom order — verdict block, portrait, change
-  // events, section nav, chapters (collapsed), score breakdown (its own
-  // chapter now), sources/verify-yourself (chapters), "Where now?"
-  // (always visible, uncollapsed, at the very bottom).
-  root.appendChild(buildVerdictBlock(store, loc, country, persona));
-  root.appendChild(buildPortrait(loc));
-  root.appendChild(buildChangeEvents(store, loc, country));
-  root.appendChild(buildSectionNav());
-
+  // Top-to-bottom order (2026-09-08, superseding v7 §2.1's own list) —
+  // verdict block, section nav, intro (portrait + the folded-in overview
+  // chapter), change events, the remaining chapters (collapsed), score
+  // breakdown (its own chapter), sources/verify-yourself (chapters),
+  // "Where now?" (always visible, uncollapsed, at the very bottom). The
+  // nav sits ABOVE the intro so its first link (#sec-overview) scrolls
+  // forward, never backward; it is kept above the portrait rather than
+  // between portrait and overview so the intro stays one unbroken block.
   const facts = store.factsByLocation.get(loc.location_id) || [];
   const bySection = new Map(SECTION_ORDER.map((s) => [s, []]));
   for (const f of facts) {
@@ -92,6 +100,12 @@ async function main() {
     if (!bySection.has(s)) bySection.set(s, []);
     bySection.get(s).push(f);
   }
+
+  root.appendChild(buildVerdictBlock(store, loc, country, persona));
+  root.appendChild(buildSectionNav());
+  root.appendChild(buildPortrait(loc));
+  root.appendChild(buildSection(INTRO_SECTION, bySection.get(INTRO_SECTION) || [], ""));
+  root.appendChild(buildChangeEvents(store, loc, country));
 
   // Part 25.6: the passport lens re-renders the ENTRY LAYER only, inside
   // this one section — nothing else on the page changes under it (25.9's
@@ -105,6 +119,7 @@ async function main() {
   const nationalityRow = nationality ? resolveNationalityTier(store, nationality.code, country.country_id) : null;
 
   for (const sectionKey of SECTION_ORDER) {
+    if (sectionKey === INTRO_SECTION) continue; // already rendered, up in the intro
     const extraHtml = sectionKey === "visa"
       ? buildPassportStripHtml(store, nationality, nationalityRow, country) + buildVisaRoutesHtml(store, country, nationalityRow)
       : "";

@@ -20,14 +20,16 @@
   } catch (e) {}
 </script>
 <link rel="stylesheet" href="css/style.css">
-<!-- Cloudflare Web Analytics: defer, no site-code dependency on it loading
-     or responding, bare cookieless beacon only (no tag manager, no custom
-     events). TOKEN PLACEHOLDER: this is not a real token -- the site owner
-     mints the real one in the Cloudflare dashboard (Sites -> Web Analytics
-     -> "Add a site" -> copy the JS snippet's own token). A public
-     measurement ID grants no read/write access, so it's safe to commit
-     once real, but inventing one here would just silently fail forever --
-     swap the literal string below for the dashboard's real value. -->
+<!-- Cloudflare Web Analytics -- the only third-party script on this site.
+     If you're reading the source to check what privacy.html claims, this
+     is the line to check.
+     Loading: deferred, with no site-code dependency on it loading or
+     responding. Block it and every page still works exactly as it does now.
+     Scope: a bare cookieless beacon and nothing else -- no tag manager, no
+     custom events.
+     The token below is real and live. It is a public measurement ID, which
+     grants no read or write access, so committing it in the clear in a
+     public repository is its intended use, not an oversight. -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
 </head>
 <body>

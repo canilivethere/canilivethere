@@ -398,9 +398,10 @@ for (const loc of locations) {
 <meta name="description" content="${escapeHtml(`${loc.display_name}, ${country.name}: sourced, dated relocation research — visa routes, property, cost of living, community, and red flags.`)}">
 ${THEME_SCRIPT}
 <link rel="stylesheet" href="../css/style.css">
-<!-- Cloudflare Web Analytics -- see index.html's matching comment for the
-     token-placeholder explanation and the privacy/security review behind it. -->
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "REPLACE_WITH_CLOUDFLARE_BEACON_TOKEN"}'></script>
+<!-- Cloudflare Web Analytics -- see index.html's matching comment for what
+     this script does, why its token is public, and the privacy/security
+     review behind it. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "aadba803db5d47e3a91b7c99aa9f0890"}'></script>
 </head>
 <body data-loc-id="${escapeHtml(loc.location_id)}">
 <div class="site-topbar">

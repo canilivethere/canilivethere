@@ -119,15 +119,28 @@ function locationLink(loc, country) {
 // local label in parens (feel-clever law — the generic phrase is the
 // panel title's own noun, the parenthetical is the export's
 // `local_term` field, data not copy); then the anchor's scope/season
-// note verbatim; then the fact's date in the location pages' own
-// "last checked" register; then the shared source-line affordance.
+// note verbatim; then the figure's own date; then the shared source-line
+// affordance.
+//
+// Date vocabulary, a hard rule across every surface: `date` is when the
+// figure was TRUE or the rule took effect, not when anyone re-checked it.
+// The check date is a separate field, `last_verified_date`. "Checked" is
+// only ever said from `last_verified_date`; a row without one shows its
+// date and makes no check claim at all. Note the cost-comparison export
+// does not currently carry `last_verified_date` on any row (0 of 38), so
+// today every row takes the second branch — the first is kept so this
+// label agrees with the location pages the moment the field ships.
 function rowDetailHtml(row) {
   const parts = [];
   if (row.local_term) {
     parts.push(`2-bedroom apartment (${escapeHtml(row.local_term)})`);
   }
   if (row.scope_note) parts.push(escapeHtml(row.scope_note));
-  if (row.date) parts.push(`last checked ${escapeHtml(row.date)}`);
+  if (row.date && row.last_verified_date) {
+    parts.push(`dated ${escapeHtml(row.date)}, checked ${escapeHtml(row.last_verified_date)}`);
+  } else if (row.date) {
+    parts.push(`dated ${escapeHtml(row.date)}`);
+  }
   const src = sourceLine(row);
   if (src) parts.push(src);
   return parts.join(" · ");

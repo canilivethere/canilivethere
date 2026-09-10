@@ -56,6 +56,86 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// --- Date semantics: a hard rule, not a style choice -------------------
+// A fact's `date` is when the figure was true or the rule took effect —
+// it never moves on a recheck. The check date is a separate field,
+// `last_verified_date`, and it is SPARSE (165 of 2,196 public rows carry
+// one). Absent is therefore the default case, and nothing below may say
+// "checked" from `date`. Hand-synced with the identical block in
+// js/location.js — same duplication class this file's header comment
+// already names for generalIndex()/sectionForFact().
+const ISO_DATE_RE = /^\d{4}-\d{2}(-\d{2})?$/;
+
+// One date value as a chip that names its own subject.
+// `dated X` is the same string the inline source pull-down renders
+// (sourceDetailHtml(), js/app-shared.js), so both surfaces name this field
+// pair with the same two words instead of two vocabularies for one pair.
+// `Not stated` is the date field's only null-marker — an exact stored
+// string — and it is glossed rather than printed raw: "dated Not stated"
+// is not a sentence, and a bare "Not stated" chip sitting beside the word
+// "source" reads as "the source is not stated", which is false, since
+// every one of those rows carries a live link. Same move, and the same
+// class of copy, as this chapter's "Source noted — no link available yet".
+function dateChip(value) {
+  return value === "Not stated"
+    ? `<span class="scope-tag">date not stated</span>`
+    : `<span class="scope-tag">dated ${escapeHtml(value)}</span>`;
+}
+
+// One fact's own dates: its effective date, plus the check date only
+// where one really exists.
+function factDateTags(f) {
+  const parts = [];
+  if (f.date) parts.push(dateChip(f.date));
+  if (f.last_verified_date) parts.push(`<span class="scope-tag">checked ${escapeHtml(f.last_verified_date)}</span>`);
+  return parts.join(" ");
+}
+
+// The group-level date claim for a URL group. URL grouping is kept. This
+// prints on the row's TRAILING attribution line beside the link, never
+// above the facts, and only ever states something true of EVERY fact in
+// the group:
+//   - all dates and check dates identical -> that one date (+ check),
+//     and no per-fact breakdown is needed;
+//   - dates identical, check dates differ -> the shared date alone, with
+//     no check claim, because no check claim is true of all of them;
+//   - dates differ, all real ISO dates -> a span, earliest to latest;
+//   - dates differ and any is not a plain ISO date ("Not stated",
+//     "2026-06-02 (passed)") -> no date at all; a span across a non-date
+//     would be nonsense. The per-fact lines carry the truth.
+// Position is load-bearing: printed BELOW the per-fact lines, a span can
+// only be read as a summary of what the reader has just read. Printed
+// above them, in the same chip style a single fact's date uses, it reads
+// as one figure's validity period, which it is not.
+function sourceGroupDate(groupFacts) {
+  const dates = [...new Set(groupFacts.map((f) => f.date || ""))];
+  const checks = [...new Set(groupFacts.map((f) => f.last_verified_date || ""))];
+  if (dates.length === 1 && checks.length === 1) {
+    return { uniform: true, html: factDateTags(groupFacts[0]) };
+  }
+  if (dates.length === 1) {
+    return { uniform: false, html: dates[0] ? dateChip(dates[0]) : "" };
+  }
+  if (dates.every((d) => ISO_DATE_RE.test(d))) {
+    const sorted = dates.slice().sort();
+    return {
+      uniform: false,
+      html: `<span class="scope-tag">dated ${escapeHtml(sorted[0])} to ${escapeHtml(sorted[sorted.length - 1])}</span>`,
+    };
+  }
+  return { uniform: false, html: "" };
+}
+
+// The per-fact breakdown, rendered whenever a group's facts do not share
+// one date: every fact named with its OWN date, in data order (no
+// re-sort — string-sorting mixed date shapes is exactly the bug this
+// avoids). The span on the attribution line below is therefore a summary
+// of the set, not a claim about this list's order, and nothing on the
+// page says otherwise.
+function sourceFactLinesHtml(groupFacts) {
+  return `<ul class="source-facts">${groupFacts.map((f) => `<li class="source-fact"><span class="source-fact-label">${escapeHtml(f.fact_label)}</span> ${factDateTags(f)}</li>`).join("")}</ul>`;
+}
+
 const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
 
 const countries = readJsonl(join(DERIVED, "countries.jsonl"));
@@ -337,8 +417,8 @@ for (const loc of locations) {
       // distinct URL, but every fact this URL backs gets named, not just
       // the first one kept for its link/date — a bare "source" link gave
       // a reader no way to tell which claim it documented.
-      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, { fact: f, labels: [] });
-      linkedSeen.get(f.source_url).labels.push(f.fact_label);
+      if (!linkedSeen.has(f.source_url)) linkedSeen.set(f.source_url, { fact: f, facts: [] });
+      linkedSeen.get(f.source_url).facts.push(f);
     } else {
       // Same dedup key as the old single-list code (source_ref/
       // fact_label) — a "source" is a distinct citation, not one row per
@@ -349,7 +429,26 @@ for (const loc of locations) {
   }
   const linkedRows = [...linkedSeen.values()];
   const unlinkedFacts = [...unlinkedSeen.values()];
-  const linkedSourceHtml = linkedRows.map(({ fact: f, labels }) => `<li class="fact-item"><div class="fact-label">${escapeHtml(labels.join(", "))}</div><div class="fact-value"><a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a> <span class="scope-tag">${escapeHtml(f.date || "")}</span></div></li>`).join("");
+  // A row must NOT print the FIRST fact's date for the whole URL group: a
+  // corrected date sitting behind a URL whose first fact was untouched
+  // would never reach the page at all. The attribution line states only
+  // what is true of every fact in the group, and the moment they disagree
+  // each fact prints its own date.
+  //
+  // Facts first, source last, in both shapes: the row leads with fact
+  // identification — joined labels when the group's dates agree, one line
+  // per fact when they don't — and closes with a single attribution line
+  // carrying the link. A reader scanning the chapter meets a fact label at
+  // the top of every row without exception. Hand-synced with the same
+  // branch in js/location.js.
+  const linkedSourceHtml = linkedRows.map(({ fact: f, facts: groupFacts }) => {
+    const { uniform, html: dateHtml } = sourceGroupDate(groupFacts);
+    const leadHtml = uniform
+      ? `<div class="fact-label">${escapeHtml(groupFacts.map((g) => g.fact_label).join(", "))}</div>`
+      : sourceFactLinesHtml(groupFacts);
+    const link = `<a class="source-link" href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">source</a>`;
+    return `<li class="fact-item">${leadHtml}<div class="fact-value">${link}${dateHtml ? ` ${dateHtml}` : ""}</div></li>`;
+  }).join("");
   let mostRecentUnlinkedDate = null;
   for (const f of unlinkedFacts) {
     if (f.date && (!mostRecentUnlinkedDate || f.date > mostRecentUnlinkedDate)) mostRecentUnlinkedDate = f.date;

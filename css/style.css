@@ -1408,6 +1408,20 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .fact-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.78rem; color: var(--muted); }
 .fact-notes { font-size: 0.85rem; color: var(--muted); }
 .scope-tag { font-size: 0.72rem; color: var(--muted); font-style: italic; }
+/* The Sources chapter's per-fact date breakdown — rendered only when the
+   facts behind one URL do NOT share a date, so no single date can honestly
+   be stated for all of them. One line per claim, and it LEADS its row: the
+   attribution line (link + any group-level date) follows beneath it.
+   Deliberately no indent, no left rule and no size reduction — the listed
+   form's first element has to sit in the same scan column, at the same
+   weight, as the joined form's `.fact-label`, or the ~10% of rows whose
+   facts disagree about their dates read as subordinate to the ~90% that
+   agree, which is exactly backwards. Grouping is carried by proximity
+   alone: 0.06rem intra-row spacing against `.fact-item`'s 0.6rem padding
+   and its dotted bottom rule. No new class, no caption. */
+.source-facts { list-style: none; margin: 0; padding: 0; }
+.source-fact { padding: 0.06rem 0; }
+.source-fact-label { font-weight: 600; }
 /* Part 23.6: the glossary-registry abbr wrap (glossaryWrap(), app-shared.js)
    -- native <abbr title> everywhere a registered term renders, not just at
    a field's mechanical first occurrence, so a reader landing on any single

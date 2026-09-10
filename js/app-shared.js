@@ -1754,15 +1754,23 @@ export function locationGateProvenanceHtml(store, engineVerdict, personaId, coun
 }
 
 // The expand content for the confidence-badge pull affordance above —
-// source name/link plus last-checked date, the two pieces that used to
-// render as separate, always-visible elements next to the badge.
+// source name/link plus the fact's dates, the pieces that used to render
+// as separate, always-visible elements next to the badge.
+//
+// Date vocabulary, a hard rule across every surface: `date` is when the
+// figure was true or the rule took effect; "checked" is only ever said
+// from `last_verified_date`, and a fact without one makes no check claim
+// at all. The two nouns `dated` / `checked` are the same two the Sources
+// chapter uses (dateChip()/factDateTags(), js/location.js), so the two
+// surfaces name one field pair with one vocabulary.
 export function sourceDetailHtml(fact) {
   if (fact.value_raw === "[GAP]") return "";
   const src = fact.source_url
     ? `<a href="${escapeHtml(fact.source_url)}" target="_blank" rel="noopener">source link</a>`
     : "Source noted — no link available yet";
   const parts = [src];
-  if (fact.date) parts.push(`last checked ${escapeHtml(fact.date)}`);
+  if (fact.date) parts.push(`dated ${escapeHtml(fact.date)}`);
+  if (fact.last_verified_date) parts.push(`checked ${escapeHtml(fact.last_verified_date)}`);
   return parts.join(" · ");
 }
 

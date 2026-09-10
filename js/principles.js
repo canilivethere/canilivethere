@@ -65,9 +65,9 @@ const PRINCIPLES = [
   {
     lead: "Check us. Don't just trust us.",
     body:
-      "Every fact here carries where it came from and when we last " +
-      "confirmed it. A site you can verify is worth more than one you " +
-      "merely believe.",
+      "Every fact here carries where it came from; where we've " +
+      "re-checked it, when. A site you can verify is worth more than " +
+      "one you merely believe.",
   },
   {
     lead: "There's no average relocator, so we don't build for one.",

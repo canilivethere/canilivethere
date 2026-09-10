@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
-  verdictBand, BAND_ORDER, BAND_LABEL, STATE_HEADLINE,
+  verdictBand, BAND_ORDER, BAND_LABEL, stateHeadline,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
 } from "./app-shared.js";
@@ -583,7 +583,7 @@ function buildVerdictHtml(store, row, persona) {
     // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
     // comment cites).
     const visual = bandVisual(row.engineVerdict.overall_band);
-    const stateText = STATE_HEADLINE[row.engineVerdict.overall_state] || row.engineVerdict.overall_state;
+    const stateText = stateHeadline(row.engineVerdict.overall_state);
     // Sourcing-confidence tier badge, same skip-on-data-gap rule as
     // location.js's own verdict block (a data-gap band already says "not
     // enough to judge" — a tier badge there would wrongly imply one exists).

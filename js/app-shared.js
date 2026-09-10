@@ -508,14 +508,34 @@ export const FIT_INDEX_DEFINITION =
 export const SCALE_ANCHOR_STRING =
   "A 5 isn't perfection — it means as good as this realistically gets anywhere in the world, tradeoffs included.";
 
-// v9 Part 6.2/7.1: the verdict-coverage engine's own `overall_state` (a
-// closed 6-value enum, derived/verdicts.jsonl, strictly finer-grained than
-// `overall_band` — UNCERTAIN_TYPE and QUALIFIES_CONDITIONAL both paint
-// CONDITIONAL_COLOR via colors.js's bandVisual() but mean different things
-// in words). Text always carries the finer read; color only the coarser
-// one (v8 Part 1's own "color answers roughly what kind, text answers
-// exactly what" doctrine, cited not restated). Committed UI copy, same
-// class as BAND_LABEL/WEIGHT_CLASS_LABEL below.
+// v9 Part 6.2/7.1: the verdict-coverage engine's own `overall_state`
+// (derived/verdicts.jsonl, strictly finer-grained than `overall_band` —
+// UNCERTAIN_TYPE and QUALIFIES_CONDITIONAL both paint CONDITIONAL_COLOR
+// via colors.js's bandVisual() but mean different things in words). Text
+// always carries the finer read; color only the coarser one (v8 Part 1's
+// own "color answers roughly what kind, text answers exactly what"
+// doctrine, cited not restated). Committed UI copy, same class as
+// BAND_LABEL/WEIGHT_CLASS_LABEL below.
+//
+// SEVEN cases, not six. This comment read "a closed 6-value enum" until
+// 2026-09-10 and was wrong: the enum has six NAMED values, but the field
+// itself has a seventh legal value — `null` — which no key in this object
+// can hold. The verdict engine emits no state on a location-scope row
+// whose band was capped: when a LOCATION gate
+// (cost, property, and in principle safety/education) caps that location's
+// band away from its country's band, the national state stops describing
+// the location, so the engine emits none rather than a state it no longer
+// earns. That is deliberate fail-closed behaviour and is not a defect.
+// What WAS a defect, live for some time and found by a human reading the
+// site on 2026-09-10: every consumer looked the value up as
+// `STATE_HEADLINE[state] || state`, so the `|| state` fallback surfaced the
+// raw null — an empty verdict sentence in the Lists table, the literal
+// string "null" on the map card. Measured the same day: 24 rows carry it,
+// 6 personas x 13 locations, 13 `hard_fail` / 11 `uncertain_or_conditional`.
+// The seventh case therefore lives in STATE_HEADLINE_LOCATION_CAPPED below
+// and is reached through stateHeadline(), never by a bracket lookup — a
+// null key would only work by JS coercing it to the string "null", which is
+// exactly the kind of cleverness a later reader breaks by accident.
 export const STATE_HEADLINE = {
   QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
   QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
@@ -525,11 +545,49 @@ export const STATE_HEADLINE = {
   GAP_INSUFFICIENT_DATA: "Not enough documented yet for a real read.",
 };
 
+// The seventh case (see the long note on STATE_HEADLINE above): the state
+// the engine deliberately does NOT name, because a location gate capped
+// this location's band away from its country's band and the national state
+// no longer describes it. ONE sentence serves both bands on purpose: the
+// band color already carries the direction, so this text names only WHAT
+// HAPPENED and never a direction the color could contradict (the same
+// "color answers roughly what kind, text answers exactly what" doctrine
+// cited above). "Narrowed" is not new vocabulary — it is the verb this
+// site already ships for this exact event, in the deciding-gate marker
+// ("This is what narrowed it:") and its resting twin ("Nothing here
+// narrowed the national result — this location's own gates line up with
+// the country-level answer"), both rendered by renderGateProvenance()
+// further down this file. Directionally safe by construction:
+// band composition is downward-only, so a capped band is always worse
+// than the national one, never better.
+export const STATE_HEADLINE_LOCATION_CAPPED =
+  "The country-level answer doesn't describe this place — this location's own gates narrowed it.";
+
+// The one lookup every consumer uses. Kept as a function rather than a
+// seventh object key because the seventh case's key is `null`, and the
+// only way an object literal can hold it is by string coercion.
+// Unknown non-null states still fall through to the raw value on purpose
+// (fail-visible: a new engine state should look wrong on screen, not
+// silently borrow another state's sentence).
+export function stateHeadline(state) {
+  if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
+  return STATE_HEADLINE[state] || state;
+}
+
 // Which of the four `overall_band` values each `overall_state` belongs to —
 // verified by a direct cross-tab of the real 304-row derived/verdicts.jsonl
 // (every state maps to exactly one band, confirmed, not assumed from the
 // enum names alone). Used only by the map legend (v9 Part 6.5), to group
 // STATE_HEADLINE's six labels under their four band colors.
+//
+// The seventh case is DELIBERATELY ABSENT from this map and must stay
+// absent: it is the one state that does not belong to exactly one band.
+// Measured 2026-09-10 on the real derived/verdicts.jsonl — 13 of its 24
+// rows are `hard_fail`, 11 are `uncertain_or_conditional`. Giving it an
+// entry here would hand it a single legend color and tell half those
+// readers the wrong direction. Whether the legend needs a seventh row at
+// all — and what a two-color meaning would even look like — is a design
+// call, not a mechanical one. Named, not invented.
 export const STATE_HEADLINE_BAND = {
   QUALIFIES_AND_CONVERTS: "clean",
   QUALIFIES_CONDITIONAL: "uncertain_or_conditional",

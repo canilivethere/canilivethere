@@ -4,7 +4,7 @@ import {
   applyStoredTheme, renderTopBar, renderPersonaSlot,
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
-  formatNumbersInText, splitFactSentences, STATE_HEADLINE, STATE_HEADLINE_BAND,
+  formatNumbersInText, splitFactSentences, stateHeadline, STATE_HEADLINE_BAND,
   CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX, initLocationSearch,
 } from "./app-shared.js";
 
@@ -930,7 +930,7 @@ function renderMap(store, lenses) {
         const engineVerdict = resolveVerdict(store, "waldo", loc);
         if (engineVerdict) {
           faded = false;
-          const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+          const stateText = stateHeadline(engineVerdict.overall_state);
           // Same no-bare-no instead-line every other
           // branch in this file carries, extended here too. Waldo's own pin
           // color/eliminated channel stays Fit-index-only per Part 15.4 —
@@ -987,7 +987,7 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note, not a ramp pin
-        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        const stateText = stateHeadline(engineVerdict.overall_state);
         // Same instead-line as the `if (verdict)`
         // branch just above, extended to this engine-only case.
         const insteadLine = visual.eliminated
@@ -1045,7 +1045,7 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note
-        const stateText = STATE_HEADLINE[verdict.overall_state] || verdict.overall_state;
+        const stateText = stateHeadline(verdict.overall_state);
         // Same instead-line as the Wenda/Carmen and
         // Waldo engine branches above — the five-no-fixture-persona case
         // (Adira, Teo, Noa, Marek, Marguerite).
@@ -1860,6 +1860,20 @@ function renderOrmenLange(svg, svgNS) {
 // (text carries the finer read, color only the coarser one). Now the one
 // shared vocabulary every persona's legend uses (renderVerdictKey(),
 // below) -- no longer split across two differently-worded legend blocks.
+//
+// NO SEVENTH ROW HERE, deliberately (2026-09-10). This object is a COLOR
+// key -- renderVerdictKey() below reads STATE_HEADLINE_BAND[state] to pick
+// each row's swatch -- and the seventh verdict state (the location-capped
+// null; see STATE_HEADLINE's own note in app-shared.js) is precisely the
+// one state with no single band: 13 of its 24 real rows are hard_fail, 11
+// uncertain_or_conditional. A row here would have to claim one color and
+// would mislead the other half. The `includePending` row below is NOT a
+// precedent for adding one -- pending has its own real color
+// (pendingColor()); this case has two. Pins carrying it are already
+// painted correctly by bandVisual(overall_band), and their sentence is
+// carried by stateHeadline() in the tooltip; what is genuinely missing is
+// a legend line explaining WHY such a pin is that color, and that is a
+// design call, not a mechanical one. Named, not invented.
 const STATE_CHIP_LABEL = {
   QUALIFIES_AND_CONVERTS: "Clears, leads to permanent residency",
   QUALIFIES_CONDITIONAL: "Clears, with conditions",

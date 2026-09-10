@@ -5,7 +5,7 @@ import {
   renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
-  STATE_HEADLINE, verdictDisclosureSentence, verdictConfidenceBadge,
+  stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
@@ -307,7 +307,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       const engineVerdict = resolveVerdict(store, persona, loc);
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
-        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        const stateText = stateHeadline(engineVerdict.overall_state);
         // The fixture branch above's v5/v7 no-bare-no
         // instead-line, extended to the engine-only case. The line is pure
         // page navigation (two anchors already on this page) with no
@@ -439,7 +439,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       const engineVerdict = resolveVerdict(store, persona, loc);
       if (engineVerdict) {
         const visual = bandVisual(engineVerdict.overall_band);
-        const stateText = STATE_HEADLINE[engineVerdict.overall_state] || engineVerdict.overall_state;
+        const stateText = stateHeadline(engineVerdict.overall_state);
         // Same instead-line extension as the branch above (Waldo/Wenda/
         // Carmen's own no-fixture-at-this-location case), same Part 24.3
         // widening — see that branch's own comment for the reasoning.

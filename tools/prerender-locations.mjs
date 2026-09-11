@@ -56,6 +56,22 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// Hand-kept copy of js/app-shared.js's escapeParagraphs() — same
+// duplication class as escapeHtml()/formatValue()/sectionForFact() above,
+// which this file's own header comment already names. Keep the two
+// identical: the static page and the JS-hydrated page have to render a
+// change event's paragraphs the same way. The reasoning behind the
+// mechanism (one <p> per author paragraph, chosen over CSS pre-line or
+// <br><br> for screen-reader structure) lives in app-shared.js, once.
+function escapeParagraphs(str) {
+  if (str == null) return "";
+  const text = String(str);
+  if (!text) return "";
+  const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (paras.length <= 1) return escapeHtml(text);
+  return paras.map((para) => `<p>${escapeHtml(para)}</p>`).join("");
+}
+
 // --- Date semantics: a hard rule, not a style choice -------------------
 // A fact's `date` is when the figure was true or the rule took effect —
 // it never moves on a recheck. The check date is a separate field,
@@ -363,12 +379,17 @@ for (const loc of locations) {
     ...(changeEventsByLocation.get(loc.location_id) || []),
     ...(changeEventsByCountry.get(country.country_id) || []).filter((e) => !e.location_id),
   ].sort((a, b) => (a.date < b.date ? 1 : -1));
+  // Position on the page: below every content section, sources included,
+  // directly above "Where now?" — same order the JS-hydrated page builds
+  // (js/location.js's own top-to-bottom comment carries the reasoning).
+  // Both emitters have to agree, or a no-JS visitor and a JS visitor read
+  // the same page in two different orders.
   const eventsHtml = events.length
     ? `<h2>Recent change events</h2>` + events.map((ev) => `
         <div class="change-event sev-${ev.severity}">
           <strong>${escapeHtml(ev.date)}</strong> — ${escapeHtml(ev.headline)}
           <span class="badge">${ev.category}</span> <span class="badge">severity ${ev.severity}</span>
-          ${ev.detail ? `<div class="fact-notes">${escapeHtml(ev.detail)}</div>` : ""}
+          ${ev.detail ? `<div class="fact-notes">${escapeParagraphs(ev.detail)}</div>` : ""}
         </div>`).join("")
     : "";
 
@@ -517,9 +538,9 @@ ${THEME_SCRIPT}
     <nav class="section-nav">${SECTION_ORDER.map((s) => `<a href="#sec-${s}">${SECTION_TITLES[s]}</a>`).join("")}</nav>
     ${portraitHtml}
     ${introChapterHtml}
-    ${eventsHtml}
     ${chaptersHtml}
     ${sourcesHtml}
+    ${eventsHtml}
     ${nextBestHtml}
   </div>
 </main>

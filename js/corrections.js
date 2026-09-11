@@ -21,7 +21,7 @@
 // already follow on other pages.
 
 import { loadStore } from "./data.js";
-import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml, withPersona } from "./app-shared.js";
+import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml, escapeParagraphs, withPersona } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 
 applyStoredTheme();
@@ -100,8 +100,13 @@ function whereCell(store, ev) {
   return escapeHtml(country ? country.name : ev.country_id);
 }
 
+// The detail cell is the only long-form field on this page — some rows
+// run past 3,000 characters, written as several paragraphs. escapeParagraphs()
+// (app-shared.js, where the mechanism and the reason for it are written
+// out) keeps the author's own breaks; it still escapes every character of
+// the text, and changes not one of them.
 function buildRow(store, ev) {
-  const detailHtml = ev.detail ? `<div class="fact-notes">${escapeHtml(ev.detail)}</div>` : "";
+  const detailHtml = ev.detail ? `<div class="fact-notes">${escapeParagraphs(ev.detail)}</div>` : "";
   return `
     <tr class="change-event sev-${escapeHtml(String(ev.severity))}">
       <td>${escapeHtml(ev.date)}</td>

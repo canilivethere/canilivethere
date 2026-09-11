@@ -1460,6 +1460,15 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
    a spacing need specific to this module's position on the page. */
 .next-best { margin-top: 2rem; }
 .change-event { border-left: 3px solid var(--line); padding-left: 0.6rem; margin-bottom: 0.6rem; }
+/* A change event's detail text is the site's only multi-paragraph stored
+   field; it renders as one <p> per author paragraph (escapeParagraphs(),
+   js/app-shared.js). Without this the browser's own 1em default would
+   open a gap above the first line, floating the text off its headline.
+   Tighter than a body paragraph on purpose — these sit inside a row, not
+   on the page. Single-paragraph details carry no <p> at all and are
+   untouched by both rules. */
+.change-event .fact-notes p { margin: 0 0 0.5rem; }
+.change-event .fact-notes p:last-child { margin-bottom: 0; }
 .sev-3 { border-left-color: #b02a2a; }
 .sev-2 { border-left-color: #b95d00; }
 .sev-1 { border-left-color: #2c7fb8; }

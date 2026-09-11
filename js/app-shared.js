@@ -16,6 +16,41 @@ export function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// Author-written paragraph breaks in a stored free-text field (today: a
+// change event's `detail`, on the location pages and the Corrections
+// page) are real "\n\n" characters in the data. escapeHtml() alone drops
+// them: HTML collapses newlines to spaces, so seven rows and 11k
+// characters of GT-antigua rendered as one unbroken wall.
+//
+// Three mechanisms were possible -- CSS `white-space: pre-line` (the
+// idiom the map tooltip and teaser already use), literal <br><br>, or
+// one element per paragraph. This is the third, and the reason is
+// assistive tech, not looks: a 3,215-character block is a single
+// paragraph to a screen reader under either of the other two, and the
+// longest detail rows on file are exactly that long. Splitting into real
+// <p> elements gives the same visible break AND the structure a screen
+// reader can navigate by.
+//
+// Content-safe by construction: the text is still escaped, one segment
+// at a time, and the only characters dropped are the newline separators
+// themselves -- nothing is added, reworded or reordered. Splits on runs
+// of 2+ newlines (a blank line = a paragraph break); a lone newline
+// inside a paragraph stays inside it, where HTML's own whitespace
+// collapsing renders it as the space the author's line-wrap meant. Every
+// newline run in the current data is exactly one blank line, so no row
+// today exercises that second branch -- it is there so an odd one later
+// degrades quietly instead of breaking.
+//
+// Returns "" for empty/absent input, same contract as escapeHtml().
+export function escapeParagraphs(str) {
+  if (str == null) return "";
+  const text = String(str);
+  if (!text) return "";
+  const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (paras.length <= 1) return escapeHtml(text);
+  return paras.map((para) => `<p>${escapeHtml(para)}</p>`).join("");
+}
+
 // v7 §7.1: widened from 3 to all 8 locked personas (Amendment 1 §A1.2's
 // own widening trigger applies to the whole switcher, not just the three
 // that had fixture data first). Exported (v7 Part 10/11): the

@@ -9,7 +9,7 @@ import {
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
-  sentenceCaseRuleParagraph, locationGateProvenanceHtml,
+  sentenceCaseRuleParagraph, locationGateProvenanceHtml, escapeParagraphs,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -85,14 +85,22 @@ async function main() {
   // for me" read) — kept distinct on purpose, not merged.
   renderPersonaBlock(persona, headerDiv.querySelector("h1"));
 
-  // Top-to-bottom order (2026-09-08, superseding v7 §2.1's own list) —
-  // verdict block, section nav, intro (portrait + the folded-in overview
-  // chapter), change events, the remaining chapters (collapsed), score
-  // breakdown (its own chapter), sources/verify-yourself (chapters),
-  // "Where now?" (always visible, uncollapsed, at the very bottom). The
+  // Top-to-bottom order (2026-09-11, superseding the 2026-09-08 list this
+  // comment used to carry) — verdict block, section nav, intro (portrait
+  // + the folded-in overview chapter), the remaining chapters
+  // (collapsed), score breakdown (its own chapter), sources/
+  // verify-yourself (chapters), RECENT CHANGE EVENTS, "Where now?". The
   // nav sits ABOVE the intro so its first link (#sec-overview) scrolls
   // forward, never backward; it is kept above the portrait rather than
   // between portrait and overview so the intro stays one unbroken block.
+  //
+  // Change events used to sit third, directly under the intro. They now
+  // sit below every content section, sources included: a dated log of
+  // what moved recently answers a question a reader can only have AFTER
+  // reading the place itself, so it cannot stand between them and it.
+  // "Where now?" stays the page's last element — it is wayfinding, not
+  // content, and its own rule (always visible, uncollapsed, at the very
+  // bottom) is untouched by this move.
   const facts = store.factsByLocation.get(loc.location_id) || [];
   const bySection = new Map(SECTION_ORDER.map((s) => [s, []]));
   for (const f of facts) {
@@ -105,7 +113,6 @@ async function main() {
   root.appendChild(buildSectionNav());
   root.appendChild(buildPortrait(loc));
   root.appendChild(buildSection(INTRO_SECTION, bySection.get(INTRO_SECTION) || [], ""));
-  root.appendChild(buildChangeEvents(store, loc, country));
 
   // Part 25.6: the passport lens re-renders the ENTRY LAYER only, inside
   // this one section — nothing else on the page changes under it (25.9's
@@ -138,6 +145,7 @@ async function main() {
   }
   root.appendChild(buildSourcesSection(sourcedFacts));
   root.appendChild(buildVerifyYourself(gapFacts));
+  root.appendChild(buildChangeEvents(store, loc, country));
   root.appendChild(buildNextBest(store, loc, persona));
 }
 
@@ -686,7 +694,7 @@ function buildChangeEvents(store, loc, country) {
     <div class="change-event sev-${ev.severity}">
       <strong>${escapeHtml(ev.date)}</strong> — ${escapeHtml(ev.headline)}
       <span class="badge">${ev.category}</span> <span class="badge">severity ${ev.severity}</span>
-      ${ev.detail ? `<div class="fact-notes">${escapeHtml(ev.detail)}</div>` : ""}
+      ${ev.detail ? `<div class="fact-notes">${escapeParagraphs(ev.detail)}</div>` : ""}
     </div>`).join("");
   return div;
 }

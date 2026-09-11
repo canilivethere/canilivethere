@@ -1537,9 +1537,9 @@ export function formatUsdRange(low, high) {
 // inference from `householdSize` alone (the public export drops the
 // engine's free-text `reason`, so the real cause never reached this
 // render). Fixed 2026-08-11: the data now carries `not_assessed_cause`
-// ("no_fact" | "fx_blocked") straight from the engine's own two real
-// not-assessed branches, so this reads the real cause instead of
-// guessing. The household-specific sentence fires ONLY for the
+// ("no_fact" | "fx_blocked" | "household_only") straight from the
+// engine's own real not-assessed branches, so this reads the real cause
+// instead of guessing. The household-specific sentence fires ONLY for the
 // no-fact-at-this-household-size cause — a currency-conversion block
 // hits every household size alike, so it always takes the general
 // sentence, never the household one, regardless of `householdSize`.
@@ -1559,6 +1559,26 @@ function costGatePhrase(rt, householdSize) {
     case "fails":
       return `Cost: doesn't clear — documented range ${range}${confClause}, even at the low end.`;
     case "not_assessed": {
+      // THE PER-HOUSEHOLD-ONLY CAUSE (added 2026-09-11, on a ruling of the
+      // same day). `"household_only"` says usable monthly cost figures DO
+      // exist at this location, but every one of them declares a per-
+      // household denominator, so there is no single-person band to
+      // report. On that path both sentences below are false: a figure
+      // exists, it simply describes the wrong unit, and "not yet assessed
+      // at this location" tells the reader nothing is on file. The
+      // sentence returned here is RULED COPY, quoted verbatim — do not
+      // reword it for line length or to match the register of its
+      // siblings, and do not append "that's our homework, not your no."
+      // It is deliberately NOT prefixed "Cost: " the way every sibling
+      // phrase is: it carries its own subject, and the prefix would read
+      // "Cost: The cost figures on file here…". Rendering it whole,
+      // prefix included, is a design call and not a mechanical one — it
+      // is flagged upward in this change's report, not settled here.
+      if (rt.not_assessed_cause === "household_only") {
+        return "The cost figures on file here describe a household, not one person — not assessed for a single reader.";
+      }
+      // BOTH BRANCHES BELOW ARE UNTOUCHED: each is correct on its own
+      // cause and the ruling said nothing about either.
       const isHouseholdSpecific = rt.not_assessed_cause
         ? rt.not_assessed_cause === "no_fact" && householdSize > 1
         : householdSize > 1; // no cause on the row - fall back to the prior guess

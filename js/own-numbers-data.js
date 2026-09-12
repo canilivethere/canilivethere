@@ -157,6 +157,31 @@ export const ROUTE_BARS = {
     { currency: null, period: null, kind: "none" },
 };
 
+// The truth condition behind the baht line — and the MECHANISM, not the
+// literal. The note must RETIRE ITSELF the day a baht income bar exists,
+// so the sentence cannot outlive the table it describes. This is the one predicate both
+// the note and the option-label suffix are gated on, and it takes the
+// table as a defaultable argument for exactly one reason: it has to be
+// PROVABLE. A caller can hand it a copy with one income row flipped to
+// THB and watch the answer change: the self-retire proven, not asserted.
+// Nothing here reads or writes data — it is a question about this
+// module's own hand-transcribed table, the declared debt this build
+// carries, and this predicate retires with that table on the day real
+// currency_code/bar_kind fields land on the route rows.
+//
+// MEASURED over ROUTE_BARS as shipped: zero rows satisfy
+// kind === "income" && currency === "THB". The three baht rows are
+// TH:route:destination-thailand-visa and
+// TH:route:non-immigrant-o-x-retirement-visa (kind "capital" — a bank
+// balance and a security deposit) and TH:route:non-immigrant-o-a-
+// retirement-visa (kind "none", a compound OR with no single comparable
+// figure). So a baht figure is compared against no route by construction,
+// income or capital, which is why the 12-of-12 failure is structural and
+// not a data gap.
+export function hasIncomeBarInCurrency(currencyCode, bars = ROUTE_BARS) {
+  return Object.values(bars).some((b) => b.kind === "income" && b.currency === currencyCode);
+}
+
 // The slice is every ':route:'-kind row in the five read countries.
 // ':visit:' rows are bare tier pointers with no threshold and
 // no income field — the tourist layer is the passport wing's answer, and

@@ -6,7 +6,7 @@
 // method).
 //
 // LICENCE — CC BY-SA 3.0, NOT MIT. An earlier version of this comment said
-// "MIT-licensed". That was wrong, corrected 2026-08-26 after reading the
+// "MIT-licensed". That was wrong, and was corrected after reading the
 // upstream LICENSE file directly rather than trusting the earlier note.
 // The upstream repository is licensed Creative Commons
 // Attribution-ShareAlike 3.0 Unported, with no code/asset split.

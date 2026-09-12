@@ -3,17 +3,17 @@
    step now runs before publish for the no-JS static fallback (see
    tools/prerender-locations.js) — that step is offline/local, not a
    runtime dependency.
-   Accessibility/readability outrank cleverness (mission brief, 2026-07-09).
+   Accessibility/readability outrank cleverness (mission brief).
 
    Light-mode tokens below + the dark-mode block at the end are the v2
-   addendum's "site warmth + dark theme" ruling (2026-07-10): a subtle
+   addendum's "site warmth + dark theme" ruling: a subtle
    warm-neutral shift on chrome tokens
    (surface/panel/border/gap), one real pre-existing WCAG AA fix
    (--accent), and a full dark theme — "an atlas at night," not the
    light theme with the lights off; every text/background pair below is
    WCAG-contrast-checked in the addendum itself, not eyeballed.
 
-   v7 ("The Explorer's Atlas", 2026-07-12): parchment/oxblood palette,
+   v7 ("The Explorer's Atlas"): parchment/oxblood palette,
    replacing the v2 near-white/blue pair below — every new pairing
    re-checked (WCAG relative-luminance contrast) against the new
    parchment ground, not carried over on the old numbers. Dark theme is
@@ -219,7 +219,7 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
   flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   padding: 0.75rem 1.25rem;
-  /* §8AA.6 bounce fix (2026-07-21): the perspective door
+  /* §8AA.6 bounce fix: the perspective door
      (#perspective-door, position:fixed/z-index:500) is appended to
      <body> after this bar and, being a positioned element, paints above
      any non-positioned sibling regardless of DOM order or z-index alone
@@ -241,6 +241,28 @@ a:focus, button:focus, select:focus, input:focus { outline: 3px solid var(--focu
   text-decoration: none;
   color: var(--ink);
 }
+/* A7: the corner control. Sits immediately after the brand — top-left,
+   every page, hidden while the door is open (body.door-open rule below,
+   which is correct by construction: the box is what it opens).
+   Its LABEL is a lens disclosure, so it gets real text and not just a
+   glyph; at phone widths the prefix drops and the value carries it, with
+   the full sentence in aria-label. */
+.corner-lens {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.2rem 0.6rem;
+  background: var(--panel);
+}
+.corner-lens:hover, .corner-lens:focus { color: var(--ink); border-color: var(--accent); }
+.corner-lens-icon { display: inline-flex; align-items: center; }
+.corner-lens-value { color: var(--ink); font-weight: 600; }
+
 .site-nav { display: flex; gap: 1rem; }
 .site-nav a { text-decoration: none; color: var(--muted); padding: 0.25rem 0; border-bottom: 2px solid transparent; }
 .site-nav a.active, .site-nav a:hover { color: var(--ink); border-bottom-color: var(--accent); }
@@ -502,6 +524,69 @@ h3 { font-size: 1.05rem; }
    specificity: fade is the broader "not checked for you" state and takes
    visual precedence over the narrower gap-ink stroke in that one combo. */
 .location-pin.pin-faded { fill-opacity: 0.55; stroke: var(--line); stroke-opacity: 1; }
+/* RETIRED — hue is dropped from the map mark entirely. The rule that
+   stood here was `.location-pin.reader-mark`: the eligibility mark as a
+   band-coloured stroke widened to 1.75x the halo on the pin itself.
+   Walked in a browser, it measured 1.118:1 against light land on the
+   data_gap band, which was 10 of the 12 marked pins on both readers
+   walked — the site's most common honest answer wearing the one
+   treatment that means "ignore me". The contrast table was then run in
+   both themes, which the earlier palette work had declared out of scope,
+   and NO assignment of the existing band hues clears the 3:1 non-text
+   floor against land in both themes; only --ink does. The mark is now ink geometry beside the pin — see
+   .reader-badge below and makeReaderBadge() in js/map.js. Kept as a note
+   rather than deleted because the retired rule's own reasoning ("the
+   fill must stay readable on a marked pin") still governs the badge's
+   placement: it overlaps the pin by about a quarter and leaves three
+   quarters of the fit colour visible. */
+
+/* THE READER'S MARK — a badge beside the pin, in ink, with a glyph per
+   band. Presentation lives here rather than on the <symbol> because the tokens
+   are CSS custom properties and var() is not legal in an SVG presentation
+   attribute; it also means the theme toggle needs no repaint hook for
+   these — unlike every ramp-coloured pin on this map, nothing in the
+   badge is a baked hex.
+   The selectors reach INSIDE the <use> shadow tree, which is how an SVG
+   sprite is styled and is the reason map and key cannot drift: one
+   symbol, two placements, one rule. */
+.reader-badge { pointer-events: none; }
+.reader-badge-disc { fill: var(--panel); stroke: var(--ink); stroke-width: 1.25; }
+.reader-badge-glyph { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The key is a BAND ABOVE THE PLATE — normal flow, full content width,
+   first child of #map-root. It was an absolutely-positioned panel inside
+   the plate; measured on the rendered page it covered three pins and four
+   labels at 1280 and 1440, and no corner of the plate is clear enough to
+   hold it (the reasoning is in js/map.js's buildReaderMarkKey header).
+   In flow it can cover nothing, at any width, by construction.
+   The defect that moved it out of the page's tail in the first place was
+   measured with a ruler: map at y=564-1098, mark legend at y~1182, in a
+   900px viewport — a marked pin and its legend row could not be seen at
+   once. Above the plate that distance is a few pixels.
+   OPAQUE, not the 94% it carried inside the plate: that transparency
+   existed to read land through the panel, and there is no land under it
+   now. Materials are otherwise the zoom buttons' own (--panel, --ink, the
+   hand-checked ring's ink-at-0.55 idiom), because a second visual
+   vocabulary here is the "municipal overlay" the map surface is ruled
+   against. */
+.reader-mark-key {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+.reader-mark-key > summary { cursor: pointer; font-weight: 600; list-style-position: outside; }
+/* Rows run INLINE and wrap, because the band is full content width and a
+   column of four would make it needlessly tall. Each row may wrap inside
+   itself (max-width in em, so it tracks the type) rather than forcing one
+   row per line at wide viewports. */
+.reader-mark-key-rows { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem 1.25rem; }
+.reader-mark-key-row { display: flex; align-items: flex-start; gap: 0.4rem; line-height: 1.25; flex: 0 1 auto; max-width: 34em; }
+.reader-mark-key-swatch { flex: 0 0 auto; margin-top: 0.1rem; }
+.reader-mark-key-trailing { margin: 0.45rem 0 0; color: var(--muted); }
 /* Part 23.9: the hand-checked verification ring — pure geometry (stroke
    presence/absence), zero reliance on hue, so it survives any CVD
    simulation by construction and never collides with the fill/hatch/
@@ -604,7 +689,7 @@ h3 { font-size: 1.05rem; }
   max-width: 280px;
   z-index: 20;
   display: none;
-  /* 2026-07-16: tooltip text is set via textContent (map.js showTip()),
+  /* Tooltip text is set via textContent (map.js showTip()),
      so a raw "\n" in the string was previously collapsed to a space by
      the default `white-space: normal` — real newlines never actually
      rendered as line breaks anywhere they were used, not just in the new
@@ -661,6 +746,13 @@ h3 { font-size: 1.05rem; }
    border instead of the plain --line one, matching the gap voice used
    everywhere else on the site rather than a bare neutral swatch. */
 .legend-gap-demo { border-color: var(--gap-ink); }
+/* RETIRED with the below-map mark rows it swatched — one key for the
+   mark, in the plate, not two keys that can drift. The rule was
+   `.legend-mark-demo`, a 16px disc in the panel tone ringed
+   3px in the band colour. It went with its rows, not because it was
+   wrong, but because the thing it reproduced no longer exists: the mark
+   carries no hue at all now, and the key that explains it places the same
+   <symbol> the map draws. */
 
 /* v6 addendum R4: Ormen Lange — monochrome border-ink line-art, never a
    click/focus target (non-interactive by construction, see map.js's own
@@ -946,9 +1038,50 @@ body.door-open .site-topbar { visibility: hidden; }
   font: inherit;
 }
 .door-wing:hover, .door-wing:focus { border-color: var(--accent); }
+/* Door v2: ONE entry card, not a grid of three. auto-fit would stretch a
+   single card across the whole panel, which reads as a banner rather than
+   a thing to press; capping it keeps it a card with the persona row
+   legible beside and below it. */
+.door-wings-single { grid-template-columns: minmax(240px, 30em); justify-content: center; }
 .door-wing .door-portrait { width: 48px; height: 48px; }
 .door-wing-label { font-family: "Fraunces", serif; font-weight: 700; font-size: 1.05rem; }
 .door-wing-subline { font-size: 0.85rem; color: var(--muted); max-width: 26em; }
+
+/* Door v2: the three step controls, at EQUAL reading weight. "Skip this"
+   is a real answer, not an apology — a secondary control that looks like
+   a retreat is not an offer, and every step here is genuinely optional.
+   Same border/padding/radius as the primary; only the fill differs, and
+   only enough to say which one continues. */
+.door-step-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  align-items: center;
+}
+.door-step-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.door-step-primary:hover, .door-step-primary:focus { background: var(--accent); border-color: var(--ink); }
+.door-step-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.door-step-skip { background: var(--panel); }
+.door-step-body { margin-top: 0.75rem; }
+
+/* The perspective line — one element, every page, the bar's own slot.
+   Quiet by construction: it is orientation, not content, and it must not
+   compete with the page's own H1 above it or the map/table below it. The
+   second sentence recedes one further step; it carries scope, which a
+   reader needs available but not shouted. */
+.perspective-line {
+  margin: 0.75rem 0 0.2rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  max-width: 48em;
+}
+.perspective-line-meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  max-width: 48em;
+}
 
 /* The persona reference row (25.3) — same tiles, same size, as before;
    only the heading above them and their position (below the wings, not
@@ -967,7 +1100,7 @@ body.door-open .site-topbar { visibility: hidden; }
 .door-passport-more { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0; }
 .door-passport-footer { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.5rem; }
 
-/* Wing 3 interior — the welcome box (2026-09-04). Layout only: no new
+/* Wing 3 interior — the welcome box. Layout only: no new
    colours, no new type scale, no new spacing tokens. Every value below
    is an existing token (--muted, --line, --panel, --ink) or the same
    rem step the door's own screens already use. .door-wings itself needed
@@ -1064,7 +1197,7 @@ body.door-open .site-topbar { visibility: hidden; }
 .own-route-record { font-size: 0.85rem; color: var(--muted); margin: 0.3rem 0; }
 .own-route-record-heading { margin: 0 0 0.2rem !important; }
 .own-route-record ul { margin: 0; padding-left: 1.1rem; }
-/* The three per-row lines added 2026-09-04 — where a route leads, the age
+/* The three per-row lines — where a route leads, the age
    it sets, and how fresh the record is. Meta type, below the figure,
    because none of them is the answer to the question the reader asked:
    they are the reasons that answer isn't the whole story, and a reason
@@ -1105,7 +1238,7 @@ body.door-open .site-topbar { visibility: hidden; }
   font-size: 0.92rem;
 }
 .own-save { margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
-/* The way out of the result screen, added 2026-09-05. Same list shape as
+/* The way out of the result screen. Same list shape as
    .own-refusal-list so the two blocks on this screen read as siblings. */
 .own-exit { margin-top: 1.4rem; border-top: 1px solid var(--line); padding-top: 0.9rem; }
 .own-exit-list {
@@ -1117,7 +1250,7 @@ body.door-open .site-topbar { visibility: hidden; }
   gap: 0.3rem 1rem;
   font-size: 0.92rem;
 }
-/* Review finding, 2026-09-05: "Back to the door" has to be a <button> —
+/* Review finding: "Back to the door" has to be a <button> —
    it is an in-panel re-render, not a URL — but .door-link-btn is the
    muted 0.82rem tertiary idiom used for "Forget", and beside two plain
    anchors it read as the demoted option of three. These three are peers,
@@ -1488,6 +1621,12 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 @media (max-width: 700px) {
   .site-topbar { flex-direction: column; align-items: flex-start; }
   #theme-toggle { margin-left: 0; }
+  /* Part 34's phone-width measurement, applied: the bar already stacks to
+     one item per row below this breakpoint, and the corner control would
+     add a fourth row. The prefix drops and the value carries the meaning
+     ("you" / "Teo" / "nobody yet"), with the full sentence still in the
+     control's aria-label, so nothing is lost to a screen reader. */
+  .corner-lens-prefix { display: none; }
   /* Part 24.2's split pill: found by live-render check, not assumed --
      the row layout (two segments side by side) overflows a narrow
      viewport (measured 437px pill inside a 335px block at 375px). Stacks

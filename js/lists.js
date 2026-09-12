@@ -1,12 +1,15 @@
 import { loadStore, verdictHeadline, resolveVerdict } from "./data.js";
+import { applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readCountryNames, joinList, readerBasisIsAssumed } from "./reader-lens.js";
 import { scoreToColor, indexToColor, calibrateIndexBands, verdictVisual, bandVisual, RAMP_VALUE_ATTR, RAMP_KIND_ATTR } from "./colors.js";
 import {
-  applyStoredTheme, renderTopBar, renderPersonaSlot,
-  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
+  applyStoredTheme, renderTopBar,
+  renderFooter, getActivePersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, stateHeadline,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
+  READER_ID, hasReaderWeights, loadViewIndex, saveViewIndex, personaPossessiveLabel,
+  READER_BASIS_DECLARED_LINE,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 import { loadFxRates } from "./app-shared.js";
@@ -14,10 +17,15 @@ import { initCostComparison } from "./cost-comparison.js";
 
 applyStoredTheme();
 renderTopBar("lists");
-renderPersonaSlot(document.getElementById("persona-slot"), getActivePersona());
+// Door v2: the perspective line replaces the profile bar in the bar's own
+// slot, and it needs the store (it names the read set's countries from the
+// data), so it renders inside main() rather than synchronously here.
 main();
 
-let STATE = { sortKey: "fit", sortDir: "desc", country: "", purposeCriterion: null };
+// A8: the index the reader picked travels from the map and back. One
+// key, both pages — "Easiest visa" on the map no longer lands on blended
+// fit here.
+let STATE = { sortKey: "fit", sortDir: "desc", country: "", purposeCriterion: loadViewIndex() };
 
 // Purpose lists (v2 addendum §3): "Pick what matters most", built
 // entirely over already-shipped data (criteria.jsonl + scores.jsonl) —
@@ -72,9 +80,12 @@ async function main() {
   // them; loadFxRates() never rejects (every failure path inside it is
   // caught and swallowed), so this Promise.all can't itself throw.
   const [store] = await Promise.all([loadStore(), loadFxRates()]);
-  applyStoredCustomWeights(store);
+  // A4/A5: the reader's weights and the reader's verdict rows, layered on
+  // before anything renders — the same one call every page makes.
+  applyReaderLens(store);
   renderFooter(store);
   const persona = getActivePersona();
+  renderPerspectiveSlot(document.getElementById("persona-slot"), store, persona);
 
   const countrySelect = document.getElementById("country-filter");
   countrySelect.innerHTML =
@@ -160,6 +171,8 @@ function renderPurposeSelector(store, persona) {
   const setPurpose = (value) => {
     if (STATE.purposeCriterion === value) return;
     STATE.purposeCriterion = value;
+    // A8: remembered for the visit and shared with the map.
+    saveViewIndex(STATE.purposeCriterion);
     renderPurposeSelector(store, persona);
     render(store, persona);
   };
@@ -318,6 +331,55 @@ function personaCoverageLine(store, persona, rows) {
   return `No persona-specific read exists yet for ${displayName} — every place below uses the general figures.`;
 }
 
+// Door v2: the reader's own context line, in place of the persona
+// coverage sentence. THREE states, because the reader identity can carry
+// three genuinely different things, and one sentence covering all three
+// would be true of none of them.
+//
+// AUTHORED-CHOICE, flagged: the delta writes the perspective line above
+// the table and leaves this one. Each variant is assembled from sentences
+// already shipped on this page — the custom ranking line, the persona
+// coverage line's own group vocabulary — so no new claim is made, only a
+// new combination. The grey/unread sentence is the load-bearing one: a
+// reader scrolling to "Not checked yet" and finding sixteen countries in
+// it needs to know that is coverage, not judgement.
+function readerContextLine(store, rows) {
+  const weighted = hasReaderWeights();
+  const rankingClause = weighted
+    ? `Ranked by your own priorities — the same facts, weighted the way you told us matters (${CUSTOM_ESTIMATE_SUFFIX}).`
+    : "Ranked by the general Fit index — you haven't told the site what matters most to you, so nothing here is reweighted.";
+  if (!hasReaderVerdicts(store)) {
+    return rankingClause;
+  }
+  // The sentence this replaces opened "Your own read is checked for 12 of
+  // 38 researched places", and the standing rule forbids exactly that:
+  // no count, no ratio, no "16 of 21" anywhere. The coverage of the
+  // reader's read is named as scope, in the perspective line, by country
+  // name; it is not scored as a fraction anywhere. personaCoverage() is
+  // untouched and still serves the eight worked examples, whose own line
+  // is not under that rule.
+  //
+  // The count is STRUCK, not reworded. Four reasons, shortest first —
+  // "12 of 38" restates the country ratio one grain finer; a data_gap row
+  // counts as "checked" and lands in "Not checked yet", so the count and
+  // the group beneath it disagree and neither is wrong; the five NAMES
+  // tell a reader which, which is what they can act on; and a rule that
+  // gains an exception on its first day is not a rule.
+  //
+  // The names come from readCountryNames(store) through reader-lens's own
+  // joinList — the same list, joined the same way, as the perspective line
+  // eight inches above it on this page.
+  //
+  // NAMED, NOT DECIDED HERE: BAND_ORDER puts "Not checked yet" last, so a
+  // 4.5-fit place in an unread country sorts BELOW a hard-fail in a read
+  // one. On the map, a pin is never subtracted; whether the Lists
+  // analogue is that a row is never sunk below where its fit put it is
+  // still open, and a flat fit-ranked alternative is specified and
+  // waiting if it is wanted.
+  const readerFitPhrase = weighted ? "weighted by your priorities" : "the general figures";
+  return `${rankingClause} Your own income read is shown per row where this box has read the country — ${joinList(readCountryNames(store))} — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries this box hasn't read against your figures and the ones where the record doesn't reach an answer; neither is a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
+}
+
 function buildRows(store, persona) {
   return store.locations
     .filter((loc) => !STATE.country || loc.country_id === STATE.country)
@@ -341,15 +403,20 @@ function buildRows(store, persona) {
       // the page's own promise ("labeled per row") that this flag exists to
       // honor in the render below.
       let personaAdjusted = null;
-      if (persona === "custom") {
-        // v11 Part 21 / 8P: no fixture, no engine verdict, ever, for this
-        // identity (21.7's own scope boundary) — the fit value comes
-        // straight from the reader's own weight vector, personaAdjusted
-        // reads true (a real, computed reweighting, just not a fixture
-        // rescore), verdict/engineVerdict stay null.
-        const idx = store.personaIndex("custom", loc.location_id);
+      if (persona === READER_ID) {
+        // Door v2, A4: the reader's own row. The fit value comes from the
+        // reader's weight vector where one exists and from the general
+        // figures where it doesn't — personaIndex() already resolves that
+        // fallback. The VERDICT now comes from the same resolveVerdict()
+        // call a persona's does, because the reader's rows live in the
+        // same index (A5, one pipeline). Where the box has not read this
+        // country there is deliberately no row, and the row lands in "Not
+        // checked yet" with every other unread place — never filtered
+        // out, never given a score it hasn't earned.
+        const idx = store.personaIndex(READER_ID, loc.location_id);
         fitValue = idx ? idx.value : null;
-        personaAdjusted = true;
+        personaAdjusted = hasReaderWeights();
+        engineVerdict = resolveVerdict(store, READER_ID, loc);
       } else if (persona) {
         const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
         if (perLoc && perLoc.criteria.size > 0) {
@@ -423,8 +490,8 @@ function render(store, persona) {
     ? " Just visiting instead? Every place below also has its own short-stay and tourist-visa rules — open any location's page and look under Visa & residency."
     : "";
   document.getElementById("persona-context").textContent =
-    (persona === "custom"
-      ? `Ranked by your own priorities — the same facts, weighted the way you told us matters (${CUSTOM_ESTIMATE_SUFFIX}).`
+    (persona === READER_ID
+      ? readerContextLine(store, rows)
       : persona
       ? personaCoverageLine(store, persona, rows)
       : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.") + visitContextLine;
@@ -432,9 +499,13 @@ function render(store, persona) {
   const tbody = document.getElementById("rank-tbody");
   tbody.innerHTML = "";
 
-  // v11 Part 21: "custom" never bands by verdict (21.7 — no eligibility
-  // concept for this identity) — same flat, sorted table as no persona.
-  if (persona && persona !== "custom") {
+  // Door v2: the reader bands by verdict exactly like a persona — but
+  // only once their own verdict rows exist. A reader who gave only
+  // priorities or only a passport has no eligibility read at all, and a
+  // banded table would assert one; they keep the flat, sorted table the
+  // general view uses.
+  const bandThisView = persona && (persona !== READER_ID || hasReaderVerdicts(store));
+  if (bandThisView) {
     renderBanded(store, persona, rows, tbody);
   } else {
     rows.sort(compareRows);
@@ -598,7 +669,18 @@ function buildVerdictHtml(store, row, persona) {
     // carries that finer read for this specific case). verdictChipMarkup()
     // renders the plain single chip, byte-for-byte unchanged, when
     // companion_disclosure is null.
-    return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}`;
+    // The THIRD of the three surfaces this sentence is specified for
+    // (location page, map tooltip, Lists row): after the state headline,
+    // where the row shows its own reasoning directly. The words live
+    // verbatim in one constant.
+    // Reader-only by construction: readerBasisIsAssumed() answers about
+    // the routes the BOX read, and only the reader's rows are composed
+    // from those. The eight worked examples are untouched — the engine
+    // refuses on dependents for them, it does not assume.
+    const basisLine = persona === READER_ID && readerBasisIsAssumed(store, row.loc.country_id)
+      ? `<div class="verdict-prose">${escapeHtml(READER_BASIS_DECLARED_LINE)}</div>`
+      : "";
+    return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${basisLine}`;
   }
   return "";
 }
@@ -646,13 +728,17 @@ function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {})
   // uniformity the data doesn't have). Full meaning stated once, in
   // personaCoverageLine()'s own per-page sentence, below.
   const fallbackTag = row.personaAdjusted === false && !STATE.purposeCriterion
-    ? ` <span class="scope-tag" title="General figure — ${escapeHtml(persona.charAt(0).toUpperCase() + persona.slice(1))} hasn't been individually re-scored here yet.">(general)</span>`
+    ? ` <span class="scope-tag" title="General figure — ${escapeHtml(personaPossessiveLabel(persona))} own re-score hasn't reached here yet.">(general)</span>`
     : "";
   // 21.6 item 2: the disclosure suffix rides wherever the custom-weighted
   // number itself renders — here, not on the purpose-criterion view (that
   // column shows one raw, unweighted score, unrelated to the reader's own
   // weight vector).
-  const customTag = persona === "custom" && !STATE.purposeCriterion
+  // The suffix names the reader's own priorities, so it renders only where
+  // priorities exist. A reader who gave figures and no priorities sees the
+  // general index under their own lens, and a "(from your priorities)" tag
+  // beside it would be a false sentence about a number they never shaped.
+  const customTag = persona === READER_ID && hasReaderWeights() && !STATE.purposeCriterion
     ? ` <span class="scope-tag">(${CUSTOM_ESTIMATE_SUFFIX})</span>`
     : "";
   // While a purpose view is active, the column shows that criterion's own
@@ -665,7 +751,7 @@ function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {})
   // (scoreToColor) — two honest mappings, one stop set.
   const displayValue = STATE.purposeCriterion ? row.purposeScore : row.fitValue;
   const colorFor = STATE.purposeCriterion ? scoreToColor : indexToColor;
-  // 2026-08-12 live-toggle repaint fix: mark the raw value + which of the
+  // Live-toggle repaint fix: mark the raw value + which of the
   // two ramp functions produced it, so colors.js's repaintRampSwatches()
   // (called by app-shared.js's toggleTheme()) can recompute this swatch's
   // background after a live theme flip instead of leaving it stuck at
@@ -743,7 +829,7 @@ function buildBreakdown(store, row, persona) {
   // persona in prose — the same display-name convention every other call
   // site in this file already applies (personaCoverageLine, the verdict
   // item below), rather than rendering the raw lowercase URL-param slug.
-  const displayName = persona ? persona.charAt(0).toUpperCase() + persona.slice(1) : "";
+  const displayName = persona ? personaDisplayLabel(persona) : "";
 
   for (const crit of store.criteria) {
     const item = document.createElement("div");

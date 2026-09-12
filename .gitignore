@@ -3,13 +3,29 @@
 *.stackdump
 
 # Internal git hooks -- never cross the vault/public boundary.
-# Added 2026-09-01 as a purely defensive guard, per a review finding:
+# Added as a purely defensive guard, per a review finding:
 # .githooks/pre-push was sitting here untracked AND un-ignored, so any
 # `git add -A` would have swept it into the public repo. Measured contents:
 # an internal control name x3, the private vault's directory name x7,
 # internal schema vocabulary x15, and the maintainer's real first name x3 --
 # the last being the very thing the history purge exists to remove.
 # This entry closes the accidental-sweep path only. The separate question of
-# branch githooks-tracking-2026-09-01, which deliberately TRACKS these files,
-# is NOT settled by this line and is held for the publication-boundary gate.
+# whether those files should ever be tracked deliberately is NOT settled by
+# this line and is held for the publication-boundary review.
 .githooks/
+
+# Node dev tooling -- never publishable.
+# Added BEFORE the first `npm install` in this repo, because
+# until this line existed an install would have staged node_modules/ --
+# and, if the browser cache ever landed in-tree, a Chromium binary --
+# into the public repo. The site itself is backend-free and ships no
+# JavaScript dependencies: everything under node_modules/ is developer
+# tooling (see package.json) and none of it is served to a reader.
+node_modules/
+
+# Playwright's browser binaries live in the user cache
+# (~/Library/Caches/ms-playwright on macOS), NOT in this tree. These two
+# entries are defensive only, for the case where someone sets
+# PLAYWRIGHT_BROWSERS_PATH=0 and the download lands beside the code.
+.cache/ms-playwright/
+ms-playwright/

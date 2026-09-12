@@ -1,8 +1,8 @@
 # Self-hosted fonts
 
 `css/style.css`'s `@font-face` rules (v7, "The Explorer's Atlas") expect
-six files in this directory. **All six are present** (added 2026-07-12,
-same day as the build): static latin-subset WOFF2 instances downloaded
+six files in this directory. **All six are present**: static
+latin-subset WOFF2 instances downloaded
 from Google Fonts' own serving endpoints, named exactly as the CSS
 expects. Both families are SIL OFL-licensed; self-hosting the files
 (not a CDN `<link>`) is what law 7 asks for.

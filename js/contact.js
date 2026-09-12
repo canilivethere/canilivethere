@@ -1,5 +1,5 @@
 // CanILiveThere — the contact page (Part 27, copy deck C1-C9, register
-// pass 2026-07-21).
+// pass).
 //
 // Renders the approved copy deck verbatim: the privacy posture is the
 // reason to write in, stated before the address (27.3's own reading
@@ -10,8 +10,8 @@
 // (perspective-disclosure law), same reasoning corrections.js's own
 // comment already states for omitting a persona picker.
 //
-// C8 ("We read what arrives") ships: the mailbox is monitored, confirmed
-// 2026-07-21 — a claim about actual practice this build could never
+// C8 ("We read what arrives") ships: the mailbox is monitored, and that
+// was confirmed — a claim about actual practice this build could never
 // author on its own, so it's gated on that confirmation rather than
 // assumed from the ask that created the mailbox. Slotted between C5 and
 // C6, per the copy deck's own placement note.
@@ -24,7 +24,7 @@ applyStoredTheme();
 renderTopBar("contact");
 main();
 
-// Approved copy, embedded verbatim (register pass 2026-07-21, Unit 1.1).
+// Approved copy, embedded verbatim (register pass, Unit 1.1).
 const WHY_TEXT =
   "Everything you tell this site — your answers, your priorities, your " +
   "passport pick — stays in your browser. We never see any of it. " +

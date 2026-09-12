@@ -1,7 +1,7 @@
 // CanILiveThere — color logic for the map, lists, and score chips.
 //
 // Fit-index scale, both themes (Part 30, the colorblind-safe rewrite —
-// supersedes the 2026-07-17 interim red/brown revert this comment used
+// supersedes the interim red/brown revert this comment used
 // to document). Real, first-outside-reader
 // evidence drove this: a colorblind reader could not read the prior
 // green-to-red (light) / brown-to-gold (dark) ramps. This is a single
@@ -204,7 +204,7 @@ export function getScaleLegend() {
   }));
 }
 
-// Live-toggle repaint (2026-08-12 fix, a live-site audit finding):
+// Live-toggle repaint (fix from a live-site audit finding):
 // scoreToColor()/indexToColor() were only ever CALLED at render
 // time -- correct for a fresh load (isDarkTheme() reads the live
 // attribute), but every already-rendered swatch (SVG pin fill, HTML
@@ -276,8 +276,8 @@ export const ELIMINATED_FILL = "url(#hatch-eliminated)";
 // (ΔE 66-98) — that distinctness check still holds today, untouched by
 // Part 16. **Resolved, v8 R4:** aubergine vs. the ramp's own then-weakest
 // stop (red, #7a2213, since Part 16) separated at ΔE 54.1 — distinctness
-// held by measurement, hex unchanged. **Re-verified, Part 30
-// (2026-07-24):** the ramp itself changed under that Part (the
+// held by measurement, hex unchanged. **Re-verified, Part 30:**
+// the ramp itself changed under that Part (the
 // #7a2213 red this comment used to name is gone); Part 30.3's own
 // collision table re-checked eliminatedColor() against every stop of the
 // NEW orange-to-blue ramp, both themes, and every stop clears the 15-ΔE

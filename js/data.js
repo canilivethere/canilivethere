@@ -247,11 +247,11 @@ async function buildStore(basePath) {
   // for the export's own §8Q-ruled `scope` field). A `scope:
   // "country"` row carries `location_id: null` and is the ONE physical row
   // for every location in that country under this persona. UPDATED
-  // 2026-08-10 (the locverdicts build, Part 37): real scope="location"
+  // by the locverdicts build (Part 37): real scope="location"
   // rows now exist — 304 of 472, the engine's own
   // location-gate join (8AJ.3) composed against 8 personas x 38 locations
-  // — no longer the zero-rows-yet state this comment described through
-  // 2026-08-10. Indexing straight on `location_id` the old way would
+  // — no longer the zero-rows-yet state this comment used to describe.
+  // Indexing straight on `location_id` the old way would
   // collapse every country-scope row for a persona onto a single `null`
   // key; splitting into two maps and resolving through resolveVerdict()
   // below is the actual fix `8Q.5`'s "join by scope + join key, never

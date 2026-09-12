@@ -1,6 +1,6 @@
 // CanILiveThere — no-JS static fallback, per v7's own build scope: a
-// 2026-07-10 launch-night finding named that location.html was 651
-// bytes of nothing to any no-JS visitor.
+// launch-night finding named that location.html was 651 bytes of
+// nothing to any no-JS visitor.
 //
 // A real, if small, build step — this project's README used to say "no
 // build step" for the whole site; that stays true for RUNTIME (every
@@ -328,7 +328,7 @@ const SECTION_TITLES = {
   overview: "Overview", visa: "Visa & residency", property: "Property",
   cost: "Cost of living", community: "Community", redflags: "Red flags",
 };
-// Chapter order (2026-09-08): verdict, intro, visa, cost of living,
+// Chapter order: verdict, intro, visa, cost of living,
 // property, community, red flags, score breakdown, sources. Cost of
 // living now precedes property. Must stay identical to js/location.js's
 // own SECTION_ORDER/INTRO_SECTION so the prerendered and hydrated pages
@@ -350,6 +350,37 @@ function formatValue(fact) {
 // so the static fallback and the JS-hydrated page never disagree (one
 // source, not two authored copies of the same string).
 const { PORTRAITS, CHAPTER_INTROS } = await import("../js/portraits.js");
+// ONE STRING ON ALL 38, NOT TWO. The footer's list of what the
+// interactive version adds named "your own figures read against this
+// place" on all 38 pages; the box reads five countries, which is 12 of
+// them, so it was false on 26.
+//
+// An earlier shape split the sentence in two and picked by READ_SET —
+// true on every page, and the reason it goes anyway is this: the footer
+// is a
+// static snapshot's description of the INTERACTIVE version, not a promise
+// about this reader, so the test a replacement has to pass is "true on all
+// 38, with numbers, with priorities only, with a passport only, or with
+// nothing entered". One sentence that passes it beats two that each pass
+// half of it, and the READ_SET branch is retired with the string it
+// existed to guard. Nothing else in this file reads READ_SET, so the
+// import goes with it.
+//
+// Why it is true on 38 of 38: renderPerspectiveBlock() runs
+// unconditionally in js/location.js's render for every page and states
+// whose lens the page shows — the reader's, a persona's, or the no-lens
+// state, which under the perspective-disclosure law is itself a
+// perspective and says so. It promises a mechanism every page carries.
+//
+// Spelling: "re-coloring" is kept as shipped — American, like every other
+// string on the site; a one-string flip would put two conventions in one
+// footer.
+const FOOTER_EXTRAS =
+  "your own perspective on this place, live re-coloring, collapsible chapters";
+
+function interactiveExtras() {
+  return FOOTER_EXTRAS;
+}
 
 const outDir = join(ROOT, "l");
 mkdirSync(outDir, { recursive: true });
@@ -526,6 +557,16 @@ ${THEME_SCRIPT}
 <body data-loc-id="${escapeHtml(loc.location_id)}">
 <div class="site-topbar">
   <a class="brand" href="../index.html">CanILiveThere</a>
+  <!-- A no-JS reader gets a door, not a dead corner. The
+       same control js/app-shared.js renders after hydration, as a plain
+       link — which is all it ever is on a page other than the map. The
+       value reads "nobody yet" because a static page cannot know what is
+       in this browser's storage, and saying so is the perspective-
+       disclosure law's own no-lens clause, not a placeholder. -->
+  <a class="corner-lens" href="../index.html?reopen=1" aria-label="Who's asking: nobody yet — opens the box to change it">
+    <span class="corner-lens-prefix">Who's asking:</span>
+    <span class="corner-lens-value">nobody yet</span>
+  </a>
   <nav class="site-nav"><a href="../index.html">Map</a><a href="../lists.html">Lists</a></nav>
 </div>
 <main>
@@ -544,7 +585,7 @@ ${THEME_SCRIPT}
     ${nextBestHtml}
   </div>
 </main>
-<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p><p>Want something researched, or found something wrong? <a href="../contact.html">Write to us.</a></p></footer>
+<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="${escapeHtml(loc.location_id)}.html">reload with JavaScript enabled</a> for the full interactive version (${escapeHtml(interactiveExtras())}).</p><p>Want something researched, or found something wrong? <a href="../contact.html">Write to us.</a></p></footer>
 <script type="module" src="../js/location.js"></script>
 </body>
 </html>

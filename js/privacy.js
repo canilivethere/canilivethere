@@ -6,18 +6,18 @@
 // already states for omitting a persona picker: nothing here renders data
 // or makes a claim whose truth depends on a lens.
 //
-// Renders the approved copy deck verbatim (register pass 2026-07-21,
+// Renders the approved copy deck verbatim (register pass,
 // Doubt 6's own drafted default, ratified rather than restructured) — this
 // build authors zero words of its own. One deliberate omission, named
 // here rather than silently added: the deck's own placement ruling notes
 // a one-line pointer from "If you don't believe us" to the contact page
-// as a follow-up still owed by the deck's own author, not written for her
-// here — this section ships exactly as drafted, without that pointer,
+// as a follow-up still owed by the deck's own author, not written for
+// them here — this section ships exactly as drafted, without that pointer,
 // until that follow-up lands.
 //
 // A real staleness flag, not smoothed over: the "What stays on your
 // device" paragraph below is the deck's own verbatim text, drafted before
-// the door rework (2026-07-21, this same day) that retired the old
+// the door rework that retired the old
 // persistent "have you seen the welcome screen" flag in favor of a
 // per-visit session flag, and added a passport/nationality pick as a
 // fourth thing this site remembers in the browser — neither of which

@@ -1,13 +1,17 @@
 import { loadStore, sectionForFact, verdictHeadline, resolveVerdict, resolveNationalityTier } from "./data.js";
+import {
+  applyReaderLens, renderPerspectiveBlock, hasReaderVerdicts, readerBasisIsAssumed,
+} from "./reader-lens.js";
 import { scoreToColor, verdictVisual, bandVisual, eliminatedColor, RAMP_VALUE_ATTR, RAMP_KIND_ATTR } from "./colors.js";
 import {
-  applyStoredTheme, renderTopBar, renderPersonaBlock,
-  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
+  applyStoredTheme, renderTopBar,
+  renderFooter, getActivePersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
+  READER_ID, hasReaderWeights, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
   sentenceCaseRuleParagraph, locationGateProvenanceHtml, escapeParagraphs,
 } from "./app-shared.js";
@@ -28,7 +32,7 @@ const SECTION_TITLES = {
   community: "Community",
   redflags: "Red flags",
 };
-// Chapter order (2026-09-08): verdict, intro, visa, cost of living,
+// Chapter order: verdict, intro, visa, cost of living,
 // property, community, red flags, score breakdown, sources. Cost of
 // living now precedes property. Must stay identical to
 // tools/prerender-locations.mjs's own copy of these two constants so the
@@ -47,7 +51,11 @@ async function main() {
   // trip. loadFxRates() never rejects (every failure path inside it is
   // caught and swallowed), so this Promise.all can't itself throw.
   const [store] = await Promise.all([loadStore(), loadFxRates()]);
-  applyStoredCustomWeights(store);
+  // A4/A5: the reader's weights and their own verdict rows, layered on
+  // before anything renders — the same one call every page makes. This is
+  // what makes a prerendered location page open in the reader's own
+  // perspective after hydration, which is the whole of A4 on this surface.
+  applyReaderLens(store);
   renderFooter(store);
   const persona = getActivePersona();
 
@@ -83,10 +91,10 @@ async function main() {
   // anchor instead. This is the site-wide persona SWITCHER; buildVerdictBlock
   // below is a different, location-specific component (the "does this work
   // for me" read) — kept distinct on purpose, not merged.
-  renderPersonaBlock(persona, headerDiv.querySelector("h1"));
+  renderPerspectiveBlock(store, persona, headerDiv.querySelector("h1"));
 
-  // Top-to-bottom order (2026-09-11, superseding the 2026-09-08 list this
-  // comment used to carry) — verdict block, section nav, intro (portrait
+  // Top-to-bottom order, superseding the earlier list this comment used
+  // to carry — verdict block, section nav, intro (portrait
   // + the folded-in overview chapter), the remaining chapters
   // (collapsed), score breakdown (its own chapter), sources/
   // verify-yourself (chapters), RECENT CHANGE EVENTS, "Where now?". The
@@ -270,19 +278,86 @@ function buildVerdictBlock(store, loc, country, persona) {
     : "";
   const breakdownLinkGeneral = `<p class="fit-link-line"><a href="#sec-breakdown">See the general score breakdown</a></p>`;
 
-  if (persona === "custom") {
-    // v11 Part 21 / 8P: no verdict, ever, for this identity (21.7's own
-    // scope boundary — a weight vector reweights the general Fit index
-    // only) — same "no persona selected" honest-gap voice the site
-    // already ships for any view with no fixture and no engine input,
-    // reused verbatim, just fed the custom-weighted value and disclosed.
-    const idx = store.personaIndex("custom", loc.location_id);
-    const headline = buildFitHeadline(store, null, loc, country, idx ? idx.value : null);
-    div.innerHTML = `
-      <p class="verdict-headline">${escapeHtml(headline)} (${CUSTOM_ESTIMATE_SUFFIX})</p>
-      ${redFlagBadge}
-      ${breakdownLink}
-    `;
+  if (persona === READER_ID) {
+    // Door v2, A4: the reader's own verdict block. Three states, the same
+    // three the map pin and the Lists row resolve — decided by what the
+    // reader gave, never by a default.
+    const readerVerdict = resolveVerdict(store, READER_ID, loc);
+    const idx = store.personaIndex(READER_ID, loc.location_id);
+    const value = idx ? idx.value : null;
+    if (readerVerdict) {
+      const visual = bandVisual(readerVerdict.overall_band);
+      const stateText = stateHeadline(readerVerdict.overall_state);
+      // The same no-bare-no instead-line every other verdict branch on
+      // this page carries, on the same gate: two pointers to content
+      // already on this page, zero new facts.
+      const insteadLine = visual.eliminated
+        ? `<p class="fact-notes">Still open: <a href="#sec-visa">short-stay rules for visiting</a> are below, and <a href="#where-now">other places that scored well for you</a> are at the end of this page.</p>`
+        : "";
+      // Never shown for a data-gap band — that band already says "not
+      // enough to judge", so a tier badge there would imply a tier exists.
+      const tierBadge = readerVerdict.overall_band === "data_gap"
+        ? "" : verdictConfidenceBadge(readerVerdict.confidence_tier);
+      // The reader's row is computed once for every location in this
+      // country, not for this place specifically — the same disclosure a
+      // persona's country-scope row carries, in the same words.
+      const scopeNote = `<span class="scope-tag" title="Computed once for every ${escapeHtml(country.name)} location, not this place specifically">(countrywide read)</span>`;
+      // Where a route's per-person basis isn't on file, the read DECLARES
+      // the assumption instead of refusing on it — the box has no
+      // dependents field, so there is nothing for it to refuse with.
+      // readerBasisIsAssumed() is the condition, and this is the one
+      // surface the reader's verdict already speaks a full sentence on.
+      // Measured: no route row carries a basis field, so this renders on
+      // every reader verdict today — and stops on its own, row by row,
+      // once a real `bar_basis` field lands on the route rows.
+      const basisLine = readerBasisIsAssumed(store, loc.country_id)
+        ? `<p class="fact-notes">${escapeHtml(READER_BASIS_DECLARED_LINE)}</p>`
+        : "";
+      div.innerHTML = `
+        <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, null)}${tierBadge}${scopeNote}</p>
+        <p class="verdict-prose">${escapeHtml(READER_VERDICT_DISCLOSURE)}</p>
+        ${basisLine}
+        ${redFlagBadge}
+        ${renewalLifeExplainerLine()}
+        ${insteadLine}
+        ${breakdownLink}
+      `;
+    } else if (hasReaderVerdicts(store)) {
+      // One of the countries the box has not read. This replaces an
+      // earlier line that carried TWO false things for one real reader:
+      //
+      //   (a) "(general figures)" was appended to a headline built from
+      //       personaIndex(READER_ID, ...), which IS the reweighted value
+      //       whenever the reader gave priorities. A false label on a real
+      //       number, on all 26 unread-country pages. The suffix now
+      //       resolves exactly as the third branch below already resolves
+      //       it.
+      //   (b) "the general figures above apply unchanged" is wrong for
+      //       that same reader for the same reason.
+      //
+      // What survives untouched is the sentence's job: name the cause,
+      // never imply a judgement about the place.
+      const readSuffix = hasReaderWeights() ? CUSTOM_ESTIMATE_SUFFIX : "general figures";
+      const readSuffixPhrase = hasReaderWeights() ? "weighted by your priorities" : "the general figures";
+      div.innerHTML = `
+        <p class="verdict-headline">${escapeHtml(buildFitHeadline(store, null, loc, country, value))} (${escapeHtml(readSuffix)})</p>
+        <p class="verdict-prose">Not checked yet for you at this location — this box hasn't read this country's residence routes against your figures, so nothing here is an income read or a verdict. The Fit index above is ${escapeHtml(readSuffixPhrase)} and stands on its own.</p>
+        ${redFlagBadgeGeneral}
+        ${breakdownLinkGeneral}
+      `;
+    } else {
+      // The reader gave no figures (priorities and/or a passport only, or
+      // said "a visit"): no eligibility read exists for them anywhere, so
+      // the honest-gap voice the site already ships, fed the value that
+      // actually ranked this place. The suffix names the reader's own
+      // priorities and renders only where priorities exist.
+      const suffix = hasReaderWeights() ? ` (${CUSTOM_ESTIMATE_SUFFIX})` : " (general figures)";
+      div.innerHTML = `
+        <p class="verdict-headline">${escapeHtml(buildFitHeadline(store, null, loc, country, value))}${suffix}</p>
+        ${redFlagBadge}
+        ${breakdownLink}
+      `;
+    }
   } else if (persona) {
     const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
     const verdict = perLoc?.verdict;
@@ -851,7 +926,7 @@ function routeAsFact(r) {
   };
 }
 
-// Bug fix (2026-07-16): a route_key of shape `{country_id}:visit:{slug}`
+// Bug fix: a route_key of shape `{country_id}:visit:{slug}`
 // (the tourist/visitor-entry-category kind) is structurally forbidden
 // from ever carrying a 'threshold' role fact — so `r.threshold_label`/
 // `r.income_threshold` are NULL by design for every ':visit:' row, never
@@ -1368,7 +1443,13 @@ function buildNextBest(store, loc, persona) {
     .filter((c) => c.val >= 0)
     .sort((a, b) => b.val - a.val)
     .slice(0, 5);
-  const personaLabel = persona === "custom" ? ` matching your own priorities` : persona ? ` for ${persona.charAt(0).toUpperCase() + persona.slice(1)}` : "";
+  // The reader's own next-best list is ranked by whatever actually ranked
+  // it: their weights where they gave priorities, the general figures
+  // where they did not. Claiming "matching your own priorities" over a
+  // general ranking would be a false label on a real list.
+  const personaLabel = persona === READER_ID
+    ? (hasReaderWeights() ? ` matching your own priorities` : "")
+    : persona ? ` for ${personaDisplayLabel(persona)}` : "";
   div.innerHTML = `<h2>Where now?</h2><p>Ranked next-best alternatives${personaLabel}:</p>
     <ul>${candidates.map((c) => `<li><a href="${withPersona(siteUrl(`l/${c.l.location_id}.html`))}">
       ${escapeHtml(c.l.display_name)}</a> — ${c.val.toFixed(1)}/5</li>`).join("")}</ul>

@@ -5,7 +5,6 @@
 import { topBottomCriteria } from "./data.js";
 import { siteUrl } from "./site-root.js";
 import { eliminatedColor, repaintRampSwatches } from "./colors.js";
-import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
 export function escapeHtml(str) {
   if (str == null) return "";
@@ -244,8 +243,14 @@ export const OWN_NUMBERS_DURATION_BANDS = ["visit", "long_stay"];
 // hasAnySavedReaderState() below, which is a truthiness test: an empty
 // object is truthy, and would render the "Forget what I've saved here"
 // control for a reader with nothing saved.
+// Reads the VISIT copy first, then the durable one. Precedence, not a
+// merge: a reader who typed new figures this visit must not be answered
+// with the ones they kept last month. The validation below is unchanged
+// and runs on whichever copy won, so a bad value in either store fails
+// the same closed way it always did.
 export function loadOwnNumbers() {
-  const prefs = readReaderPreferences();
+  const session = readSessionPreferences();
+  const prefs = (session && session.own_numbers) ? session : readReaderPreferences();
   const v = prefs && prefs.own_numbers;
   if (!v || typeof v !== "object") return null;
   if (!Number.isFinite(v.amount) || v.amount <= 0) return null;
@@ -266,11 +271,87 @@ export function loadOwnNumbers() {
 // property_capital? }. created_at is preserved across an edit; updated_at
 // always reflects this write — the same shape custom_profile and
 // nationality already implement. Returns true/false rather than throwing.
+//
+// Door v2: this is now the DURABLE write only — the one
+// the reader turns on for themselves after they have seen the map. The
+// visit-scoped write is saveOwnNumbersForVisit() below. Splitting them is
+// what makes the amended privacy sentence ("for this visit … keeping them
+// for next time is a switch you turn on yourself") true rather than
+// aspirational: the sentence and the mechanism have to land together,
+// and they do.
 export function saveOwnNumbers(fields) {
   const now = new Date().toISOString();
   const existing = readReaderPreferences();
   const createdAt = existing?.own_numbers?.created_at || now;
   return writeReaderPreferenceKey("own_numbers", { ...fields, created_at: createdAt, updated_at: now });
+}
+
+// The visit-scoped carrier, and the default: same envelope shape, same
+// key name, same sub-object key, sessionStorage instead of localStorage.
+// The reader's figures have to survive a navigation to lists.html and l/*.html without a URL and without a
+// server; the durable save was opt-in and argued as such, and that
+// argument holds for KEEPING them and cannot hold for CARRYING them one
+// page across.
+//
+// SCOPED DELIBERATELY TO own_numbers, and this is a real, named
+// asymmetry: custom_profile, nationality and saved_perspective keep their
+// existing durable-on-save behaviour, because each already ships a gated
+// reader sentence that says "saved on this device" and moving them to a
+// visit store would make three shipped sentences false. The envelope now
+// lives in two stores for exactly one key, which is a two-vocabulary risk
+// of the class the box's own build notes flag; the read path below is the
+// one place that resolves it, so there is one merge rule, not one per
+// call site.
+const SESSION_PREFS_KEY = READER_PREFS_KEY;
+
+function readSessionPreferences() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.schema_version !== READER_PREFS_SCHEMA_VERSION) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeSessionPreferenceKey(key, value) {
+  try {
+    const existing = readSessionPreferences();
+    const payload = { ...(existing || {}), schema_version: READER_PREFS_SCHEMA_VERSION, [key]: value };
+    sessionStorage.setItem(SESSION_PREFS_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function saveOwnNumbersForVisit(fields) {
+  const now = new Date().toISOString();
+  const existing = readSessionPreferences();
+  const createdAt = existing?.own_numbers?.created_at || now;
+  return writeSessionPreferenceKey("own_numbers", { ...fields, created_at: createdAt, updated_at: now });
+}
+
+// ownNumbersAreVisitOnly() REMOVED, with the keep-switch fix that made
+// it dead. It answered "are the figures in play visit-only?" by comparing
+// the two stored copies field by field; the keep switch was its only
+// caller, and the switch now reads hasDurableOwnNumbers() instead. The
+// comparison it performed is also no longer a question the code can ask
+// twice and get two answers to: commitFlow() refreshes the durable copy
+// whenever one exists, so "a durable copy" and "a durable copy equal to
+// the figures in play" are now the same thing. A second zero-call-site
+// storage function is exactly the defect that was found here the first
+// time.
+
+// True when a DURABLE copy of the reader's figures exists — i.e. the
+// "Keep this on my device" switch has actually been used and not undone.
+// The keep switch's own checked state is this and nothing else, so the
+// tick mark cannot drift from what is on the device.
+export function hasDurableOwnNumbers() {
+  const prefs = readReaderPreferences();
+  return !!(prefs && prefs.own_numbers);
 }
 
 // Un-ticking an opt-in save has to actually un-save, or the control is a
@@ -279,6 +360,18 @@ export function saveOwnNumbers(fields) {
 // values), leaving every sibling key untouched — the same "remove the
 // whole key, never field surgery" discipline forgetReaderPreferences()
 // uses one level up.
+//
+// THE DURABLE COPY ONLY, and that is the whole point — corrected after
+// this function was found with zero call sites. It is now the untick handler (js/perspective-door.js
+// wireKeepSwitch), and it is the exact inverse of saveOwnNumbers(), which
+// is the durable write. It must not touch the visit-scoped copy: the
+// switch's own words promise one thing only — "Saving puts your figures
+// in this browser's storage so the box remembers them NEXT TIME" — while
+// the block's heading states the other as a separate fact ("Your figures
+// are here for this visit"). Unticking undoes the first promise, and
+// wiping the reader's map mid-visit is not something they asked for.
+// Erasing everything is a different control with a different label, and
+// forgetReaderPreferences() below is still the only thing that does it.
 export function clearOwnNumbers() {
   return writeReaderPreferenceKey("own_numbers", undefined);
 }
@@ -333,7 +426,7 @@ export function clearExplicitGeneral() {
 }
 
 // ---------------------------------------------------------------------
-// Door-answered session flag (§8AA.6, ruled 2026-07-21). The
+// Door-answered session flag (§8AA.6, ruled). The
 // always-meet-the-door rework
 // (§8AA.2/25.2) dropped the old door-seen permanent gate but never
 // replaced it with any visit-scoped "already answered" concept — every
@@ -366,7 +459,7 @@ export function markDoorAnswered() {
 // at all, at either of its two surfaces (the door's resume band, the
 // switcher block), so it's never a dead affordance for a reader with
 // nothing stored.
-// Extended 2026-09-04 for the welcome box, as ruled: a
+// Extended for the welcome box, as ruled: a
 // reader who saves ONLY their figures used to get `false` here, and a
 // stranger's income then sat in storage with no visible way to clear it
 // — the exact failure this function was written to prevent, arriving
@@ -393,7 +486,12 @@ export function hasAnySavedReaderState() {
 // (every current call site reloads the page).
 export function forgetReaderPreferences() {
   try { localStorage.removeItem(READER_PREFS_KEY); } catch (e) {}
+  // The visit-scoped envelope is reader data too, and it is the copy most
+  // likely to hold an income the reader just typed — removed by the same
+  // whole-key rule, never field surgery.
+  try { sessionStorage.removeItem(SESSION_PREFS_KEY); } catch (e) {}
   try { sessionStorage.removeItem(EXPLICIT_GENERAL_KEY); } catch (e) {}
+  try { sessionStorage.removeItem(VIEW_STATE_KEY); } catch (e) {}
   try { localStorage.removeItem("door-seen"); } catch (e) {}
 }
 
@@ -410,7 +508,7 @@ export function wireForgetControl(btn, { onDone } = {}) {
   btn.addEventListener("click", () => {
     if (!confirming) {
       confirming = true;
-      // Amended 2026-09-04 for the welcome box. This control now also
+      // Amended for the welcome box. This control now also
       // clears the reader's own income figures, and the old string — which
       // enumerated answers and passport — no longer named them. A confirm
       // dialogue that under-describes what it deletes is a false sentence
@@ -453,11 +551,139 @@ export function applyStoredCustomWeights(store) {
 // this precedence at all — §8AA.1's own hard boundary, "the door's
 // memory, never a render lens": only the door itself reads
 // saved_perspective, to pre-offer it, never to silently apply it.
+// Door v2: the reader identity now covers EVERY combination
+// the one process can produce, not only a built weight vector. Under one
+// box a reader may have given numbers, priorities, a passport or any mix,
+// and one identity has to carry all of it — the perspective line, not the
+// identity, is what says which. The token stays "custom" — the stored
+// envelope is deliberately left untouched; only the DISPLAY label moves, to "You" — see personaDisplayLabel() below.
+//
+// Precedence is unchanged in shape and in order: an explicit URL persona
+// still wins; an active explicit-general flag still returns null even with
+// everything saved; the reader identity is still the last fallback before
+// general.
+export function hasReaderInput() {
+  return !!(hasCustomProfile() || loadOwnNumbers() || loadNationality());
+}
+
+// Whether the reader's own weight vector exists. Gates every render of
+// CUSTOM_ESTIMATE_SUFFIX ("from your priorities"), which is a claim about
+// priorities the reader set and is false for a reader who gave only
+// figures or only a passport. The COUNT the old wording carried ("seven
+// answers") went with the all-seven gate it described, which this build
+// retired — but the gate this function IS does not change: no priorities, no suffix.
+export function hasReaderWeights() {
+  return hasCustomProfile();
+}
+
+// RESTORED — the persona lens now carries across lists, location and
+// l/*.
+//
+// THE DEFECT, REPRODUCED IN A BROWSER BEFORE IT WAS TOUCHED, because
+// "exists is not reaches" cuts both ways and a fix aimed at the wrong
+// cause reaches nothing either. Measured against the served working tree,
+// Playwright, one context, one reader:
+//   pick Teo on the door        -> URL index.html?persona=teo
+//                               -> "Shown for Teo — one of the site's
+//                                  eight worked examples, not you."
+//   click Lists in the nav      -> lists.html?persona=teo
+//                               -> "Shown for Teo" (the withPersona path
+//                                  worked all along)
+//   open lists.html directly    -> "Shown as-is — the general figures,
+//                                  nobody's situation in particular."
+//   open l/GT-antigua.html      -> the same general line
+// So the persona lens was carried by ONE thing only, the query string,
+// and every arrival that is not a click on this site's own nav — a typed
+// address, a bookmark, a new tab, a reload after an edit, a link from
+// anywhere — dropped it. The reader's OWN identity survived all four,
+// because it is carried in storage; the eight test personas were not.
+// Walked from the chair, the second path gives "the eight test personas
+// reach one page out of four", and the count is right for the way a
+// reader actually arrives.
+//
+// THE FIX IS THE CARRIER, NOT THE COPY. No string is authored or changed:
+// the perspective line already renders the persona branch correctly and
+// has all session — it was being handed `null` and saying so truthfully.
+// The perspective-disclosure law was not being broken by the sentence; it
+// was being satisfied by a sentence about a lens the reader thought they
+// had chosen. Both surfaces that ask "whose eyes is this?" —
+// perspectiveLineParts() and cornerLensValue() — resolve through this one
+// function, so one line reaches both on all four pages.
+//
+// WHAT IT SUPERSEDES, KEPT AND MARKED, NOT DELETED. The earlier
+// boundary, which this function's header still states above and which is
+// now narrowed rather than deleted: "A stored PERSONA choice
+// (saved_perspective) never enters this precedence at all — the door's
+// memory, never a render lens: only the door itself reads
+// saved_perspective, to pre-offer it, never to silently apply it." That
+// boundary was written for a build in which the door was the only thing
+// that could apply a persona, and under it the door DID apply one — by
+// navigating with ?persona=, perspective-door.js:522 and :542. The
+// restoration is later and it is the specific one. The narrowing is
+// exactly
+// one kind: only `kind === "persona"`, and only a persona the site still
+// ships. "custom" and "none" are untouched, so the reader's own box and
+// the explicit-general choice keep the precedence they already had.
+//
+// PRECEDENCE, AND WHY IT SITS HERE AND NOT ELSEWHERE IN THE CHAIN:
+//   1. an explicit ?persona= still wins, unchanged — an explicit signal
+//      beats stored state, this file's own standing precedent;
+//   2. an active explicit-general flag still returns null, unchanged — a
+//      live "show me the general figures" must outrank a stored persona
+//      for the same reason it already outranks a stored profile;
+//   3. THEN a saved persona, because it is the reader's last explicit
+//      choice AT THE DOOR, and because this is the precedence the URL
+//      path already gave them one click earlier — the storage arrival and
+//      the nav arrival now agree instead of contradicting each other;
+//   4. then the reader's own identity, unchanged.
+// Step 3 cannot strand a stale persona over a reader's own figures:
+// perspective-door.js:404 overwrites saved_perspective with kind "custom"
+// the moment the box is committed, and :440 with kind "none" on the
+// explicit-general path.
+//
+// NOT CHANGED, DELIBERATELY: withPersona() still reads the URL only, so
+// no link on this site starts carrying a persona it did not carry before,
+// and no personal field reaches a query string. The lens travels in
+// storage, which is where the reader's own data already travels.
 export function getActivePersona() {
   const urlPersona = getPersona();
   if (urlPersona) return urlPersona;
   if (isExplicitGeneral()) return null;
-  return hasCustomProfile() ? "custom" : null;
+  const saved = loadSavedPerspective();
+  if (saved && saved.kind === "persona" && VALID_PERSONAS.includes(saved.persona_id)) {
+    return saved.persona_id;
+  }
+  return hasReaderInput() ? "custom" : null;
+}
+
+// ---------------------------------------------------------------------
+// The index (view) the reader is looking at. Switching it must not
+// reset, and it has to travel between the map and the Lists. Two in-memory
+// variables used to hold it, one per page, so map -> Lists on "Easiest
+// visa" landed on blended fit. One key, both pages, both directions.
+//
+// sessionStorage and NOT the reader-preferences envelope: a chosen index
+// is not personal data — it says nothing about
+// the reader, only about what they last clicked — so it does not belong
+// in the envelope the forget control exists to clear. It is cleared by
+// forgetReaderPreferences() anyway, because a reader asking to be
+// forgotten should not come back to a view they do not remember choosing.
+// ---------------------------------------------------------------------
+const VIEW_STATE_KEY = "clt-view-index";
+
+export function loadViewIndex() {
+  try {
+    return sessionStorage.getItem(VIEW_STATE_KEY) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveViewIndex(id) {
+  try {
+    if (id) sessionStorage.setItem(VIEW_STATE_KEY, id);
+    else sessionStorage.removeItem(VIEW_STATE_KEY);
+  } catch (e) {}
 }
 
 // Display label for any persona id this site can render, including the
@@ -467,21 +693,49 @@ export function getActivePersona() {
 // produce at any of this site's several such call sites).
 export function personaDisplayLabel(id) {
   if (!id) return "General";
-  if (id === "custom") return "Your priorities";
+  // Door v2: the reader identity's display label
+  // is "you", never "Custom" and no longer "Your priorities" — which was
+  // true while priorities were the only thing this identity could carry
+  // and is false the moment it can also carry figures and a passport.
+  if (id === "custom") return READER_DISPLAY_LABEL;
   return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+// The reader identity's own two words, in one place so no surface invents
+// a third. Sentence-initial capitalisation is each call site's, the same
+// way it already is for a persona's first name.
+export const READER_ID = "custom";
+export const READER_DISPLAY_LABEL = "you";
+export const READER_POSSESSIVE_LABEL = "your own";
+
+// The possessive form for any identity this site can render — "Teo's",
+// "your own", or nothing at all for the general view. Exists because the
+// shipped call sites build a possessive by appending "'s" to a display
+// name, which gives "you's".
+export function personaPossessiveLabel(id) {
+  if (!id) return "";
+  if (id === READER_ID) return READER_POSSESSIVE_LABEL;
+  return `${id.charAt(0).toUpperCase() + id.slice(1)}'s`;
 }
 
 // The 21.6 item 2 disclosure suffix — appended wherever a custom-weighted
 // number renders (map tooltip, Lists column, location-page score readout),
 // the same idiom as the existing "(general figures)" suffix elsewhere on
-// this site. Wording finalized by the 2026-07-17 copy-voice pass,
+// this site. Wording finalized by the copy-voice pass,
 // replacing the earlier placeholder shape: names the provenance (which
 // answers produced it) rather than characterizing the estimate — a
 // stranger seeing it next to a score knows exactly how much weight to
 // give it. Same grammatical ride as "(general figures)". The load-bearing
 // decision is still the placement, next to the number itself, at every
 // call site.
-export const CUSTOM_ESTIMATE_SUFFIX = "from your seven answers";
+// "from your seven answers" was true while the questionnaire required
+// all seven; this build retired that gate, so a reader who answers one
+// question gets a real weight vector and a suffix claiming seven answers
+// they never gave. The replacement carries no count and is true of one
+// answer or seven. SIX render sites, measured: js/map.js 668, 1143, 2183;
+// js/lists.js 348, 720; js/location.js 342 — all six read this constant,
+// so the fix reaches all six.
+export const CUSTOM_ESTIMATE_SUFFIX = "from your priorities";
 
 // Preserve the persona (and, when given, other params) across internal
 // navigation — the brief's "shareable profile URLs" rule, MVP-scoped to a
@@ -552,8 +806,8 @@ export const SCALE_ANCHOR_STRING =
 // doctrine, cited not restated). Committed UI copy, same class as
 // BAND_LABEL/WEIGHT_CLASS_LABEL below.
 //
-// SEVEN cases, not six. This comment read "a closed 6-value enum" until
-// 2026-09-10 and was wrong: the enum has six NAMED values, but the field
+// SEVEN cases, not six. This comment once read "a closed 6-value enum"
+// and was wrong: the enum has six NAMED values, but the field
 // itself has a seventh legal value — `null` — which no key in this object
 // can hold. The verdict engine emits no state on a location-scope row
 // whose band was capped: when a LOCATION gate
@@ -562,15 +816,34 @@ export const SCALE_ANCHOR_STRING =
 // the location, so the engine emits none rather than a state it no longer
 // earns. That is deliberate fail-closed behaviour and is not a defect.
 // What WAS a defect, live for some time and found by a human reading the
-// site on 2026-09-10: every consumer looked the value up as
+// site: every consumer looked the value up as
 // `STATE_HEADLINE[state] || state`, so the `|| state` fallback surfaced the
 // raw null — an empty verdict sentence in the Lists table, the literal
-// string "null" on the map card. Measured the same day: 24 rows carry it,
+// string "null" on the map card. Measured: 24 rows carry it,
 // 6 personas x 13 locations, 13 `hard_fail` / 11 `uncertain_or_conditional`.
 // The seventh case therefore lives in STATE_HEADLINE_LOCATION_CAPPED below
 // and is reached through stateHeadline(), never by a bracket lookup — a
 // null key would only work by JS coercing it to the string "null", which is
 // exactly the kind of cleverness a later reader breaks by accident.
+// The one clause the three partial-read states below share. Declared BEFORE
+// STATE_HEADLINE because they concatenate it at module-evaluation time —
+// one constant, three sentences, so a later edit cannot fix two of them
+// and leave the third saying something else.
+//
+// The argument for why it is true in every mix, kept here because the
+// sentence is load-bearing and the reasoning is not obvious from the
+// words: a `data_gap` route IS by definition one the site could not read
+// against the reader's figures, so "some routes here couldn't be read"
+// names exactly the routes the composer excluded from the claim. It puts
+// the gap in the verdict voice with no count and no diagnosis of WHICH
+// route or why — that is the per-route reading, computed and not yet
+// rendered (B8).
+//
+// It opens with a space: it is appended to a finished sentence, never
+// rendered alone.
+const READER_PARTIAL_READ_CLAUSE =
+  " Some routes here couldn't be read against your figures at all, so this is a no on what was read — not on everything.";
+
 export const STATE_HEADLINE = {
   QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
   QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
@@ -578,6 +851,107 @@ export const STATE_HEADLINE = {
   FAILS_AMOUNT: "Doesn't clear the income bar this route sets.",
   DEAD_END_BLOCKING: "Confirmed dead end — this route doesn't lead where this profile needs it to.",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet for a real read.",
+  // ---------------------------------------------------------------------
+  // Door v2: the six states above were built for a COMPOSED
+  // verdict — every gate read, one answer. The reader's own rows are a
+  // partial read (income bars on residence routes, and nothing else yet),
+  // and none of the six has a sentence for that. So the reader's rows
+  // carry their own state tokens rather than borrowing one: a distinct key
+  // space means no consumer can render a persona's sentence over a
+  // reader's row, and every consumer's existing `stateHeadline(state)`
+  // lookup keeps working with no new branch.
+  //
+  // The texts are the specified ones, verbatim. Their
+  // band mapping is STATE_HEADLINE_BAND below, which they are also
+  // registered in, so the legend and the banding cannot disagree.
+  READER_ABOVE_BAR: "Above the bar this route sets — on income. The other gates weren't read for you.",
+  // AUTHORED JOIN, flagged rather than smuggled: §6.3 specifies "v1's own
+  // chip text, verbatim: 'Right at the line' + the v1 band sentence's
+  // first clause" and does not write the joined sentence. Both halves are
+  // transported word for word; only the ". " between them is mine.
+  READER_AT_LINE: "Right at the line. Where you're within about a tenth of a bar either way, the site says \u201cright at the line\u201d rather than yes or no — these figures are dated snapshots, and a rule can move by more than that.",
+  READER_ABOVE_CONDITIONAL: "Above the bar — but only with conditions this route sets in its own words.",
+  READER_BELOW_BAR: "Below the bar every route here sets — on income.",
+  READER_WRONG_TYPE: "Not this kind of income — none of the routes here take it as the qualifying kind.",
+  // A specified string, corrected against the rule it is written under.
+  // The sentence it replaces ("Not enough recorded to read this
+  // against your figures.") is false on one of the causes it covers: a
+  // route whose bar is recorded perfectly well, in a currency the reader
+  // did not enter, which this site declines to convert on principle. The
+  // standing test — "a refusal that misdiagnoses its own cause is a false
+  // statement, not a soft one" — applies to it.
+  //
+  // This is the SPECIFIED INTERIM, chosen by the one condition set on it: the
+  // cause-true variants need the deciding route's reason carried up to the
+  // country headline, and carrying it is logic, which this dispatch does
+  // not write. The interim is cause-NEUTRAL instead — it diagnoses
+  // nothing, so it misdiagnoses nothing. MEASURED on the shipped data
+  // (8x4x2x5 grid x five read countries, 1,600 country reads): 1,232 of
+  // them land here, and the currency wall is reachable in every one of the
+  // four currencies the box offers.
+  READER_NOT_ENOUGH: "The site couldn't read this against your figures — not enough recorded, or recorded in another currency.",
+  // A SEVENTH READER STATE, NOT IN THE SPEC — added because the spec's
+  // two hard_fail sentences both say "every", and MEASURED AGAINST THE
+  // LIVE DATA neither is always true. Probe over a 280-read
+  // grid of amounts x currencies x periods x income types: 28 country
+  // reads land with one route refusing the reader's KIND of income and
+  // another setting a bar above their FIGURE. "Below the bar every route
+  // here sets" is false on those 28, and so is "none of the routes here
+  // take it as the qualifying kind". Rather than ship a false sentence on
+  // a reachable state, or silently widen one of the specified ones, this
+  // case gets its own.
+  //
+  // AUTHORED-CHOICE, flagged for a register and voice pass.
+  // Its first clause is NOT new: "No residency route clears" is this
+  // site's own shipped, already-gated label (NO_RESIDENCY_ROUTE_CLEARS_LABEL
+  // below). Only the second clause, which names both causes so the reader
+  // knows which applies to which route, is mine.
+  READER_NONE_CLEARS: "No residency route clears here on income — some of these routes set a bar above your figure, and some don't take this kind of income.",
+
+  // ------------------------------------------------------------------
+  // THREE MORE, and the every-route defect they fix. The states above
+  // that say
+  // "every"/"none"/"no route" were composed from the REFUSALS ONLY: the
+  // filter that built them dropped every unread route before the claim
+  // was tested, so a country where one route refused and two could not be
+  // read printed a sentence about all three. Measured on the shipped
+  // data over the same 360-input grid (9 amounts x 4
+  // currencies x 2 periods x 5 income types) read against the five read
+  // countries = 1,800 country reads: 251 of them shipped a false
+  // sentence (89 "below the bar every route", 162 "none of the routes
+  // here take it"), on all five countries. A second grid measured 263
+  // on the same shape — the amount ladder differs, the income-type count
+  // is identical at 162 because that refusal never depends on the amount.
+  //
+  // The fix is not a wider sentence, it is a distinct state: a claim
+  // about every route may only be made where every route was read. These
+  // three carry the same three refusal shapes WITH at least one route
+  // that could not be read at all, so the sentence can say so.
+  //
+  // Each is a first sentence (the claim about what WAS read) plus one
+  // shared second clause, READER_PARTIAL_READ_CLAUSE below — one constant
+  // for the clause so the three cannot drift apart.
+  //
+  // TWO THINGS OF THIS BUILD'S OWN THAT THE FINAL STRINGS DELIBERATELY DO
+  // NOT RESTORE, and both are corrections, not preferences:
+  //   - "at least one other route" was a count beside a boundary, which
+  //     the no-count rule forbids flatly. The final wording says "some".
+  //   - "isn't recorded well enough to read" named ONE cause out of five
+  //     (absent field, silent source, non-single figure, another
+  //     currency, a bar that isn't income). The final wording says
+  //     "couldn't be read against your figures", true of all five.
+  //
+  // Surface: the reader's own verdict, wherever a reader state renders a
+  // sentence — the location page's verdict chip (js/location.js, reader
+  // branch), the map pin tooltip, the Lists row. State: the reader gave
+  // long-stay figures; this country is in the read set; every route that
+  // COULD be read refuses; at least one route could not be read at all.
+  READER_BELOW_SOME_UNREAD:
+    "Below the income bar on every route here the site could read." + READER_PARTIAL_READ_CLAUSE,
+  READER_WRONG_TYPE_SOME_UNREAD:
+    "Not this kind of income — no route here the site could read takes it as the qualifying kind." + READER_PARTIAL_READ_CLAUSE,
+  READER_NONE_CLEARS_SOME_UNREAD:
+    "No residency route the site could read here clears on income — some set a bar above your figure, and some don't take this kind of income." + READER_PARTIAL_READ_CLAUSE,
 };
 
 // The seventh case (see the long note on STATE_HEADLINE above): the state
@@ -617,7 +991,7 @@ export function stateHeadline(state) {
 //
 // The seventh case is DELIBERATELY ABSENT from this map and must stay
 // absent: it is the one state that does not belong to exactly one band.
-// Measured 2026-09-10 on the real derived/verdicts.jsonl — 13 of its 24
+// Measured on the real derived/verdicts.jsonl — 13 of its 24
 // rows are `hard_fail`, 11 are `uncertain_or_conditional`. Giving it an
 // entry here would hand it a single legend color and tell half those
 // readers the wrong direction. Whether the legend needs a seventh row at
@@ -630,7 +1004,95 @@ export const STATE_HEADLINE_BAND = {
   FAILS_AMOUNT: "hard_fail",
   DEAD_END_BLOCKING: "hard_fail",
   GAP_INSUFFICIENT_DATA: "data_gap",
+  // Door v2: the reader's six states, each in exactly one
+  // band, same as every engine state above. Registered here so the map
+  // legend, the Lists banding and the location chip all read one table.
+  READER_ABOVE_BAR: "clean",
+  READER_AT_LINE: "uncertain_or_conditional",
+  READER_ABOVE_CONDITIONAL: "uncertain_or_conditional",
+  READER_BELOW_BAR: "hard_fail",
+  READER_WRONG_TYPE: "hard_fail",
+  READER_NOT_ENOUGH: "data_gap",
+  READER_NONE_CLEARS: "hard_fail",
+  // The three partial-read states, banded uncertain_or_conditional so
+  // that the pin and Lists agree.
+  //
+  // SUPERSEDED, kept so the change is legible: this build banded them
+  // hard_fail and argued it — "the reader's hard_fail has never meant
+  // 'this country is closed to you'; the band answers roughly what kind
+  // and the sentence carries the exact scope". The counter-argument is
+  // one this build logged against itself, and it was reached from the
+  // other end while wording the sentences too: a hard_fail colour leans
+  // more certain than a sentence that says some routes were never read.
+  // The softer band wins.
+  //
+  // js/reader-lens.js's STATE_BAND holds the same three entries and is
+  // changed with this one — one meaning, two tables, never allowed to
+  // drift.
+  READER_BELOW_SOME_UNREAD: "uncertain_or_conditional",
+  READER_WRONG_TYPE_SOME_UNREAD: "uncertain_or_conditional",
+  READER_NONE_CLEARS_SOME_UNREAD: "uncertain_or_conditional",
 };
+
+// The ten short forms that put the band in the pin's own accessible
+// name. The constraint is "band in the aria-label", and it is met on the
+// LABEL rather than on an
+// aria-describedby, because the hit-area is role="link"/role="button" and
+// its label is what a screen reader announces on focus.
+//
+// WHY IT MATTERS MORE THAN IT LOOKS. Measured from the chair, hovering
+// answers on 2 of 12 marked pins: the other 10 sit in cluster knots, which give
+// no tooltip at all, and the sentence is 2 to 7 zoom clicks away
+// (Barcelona 2, Porto 3, Lisbon 4, Chania 5, Antigua and Atitlán 7). For
+// a screen-reader reader the knot's own label is the ONLY path to the
+// band, so every member's short form goes in it.
+//
+// It lives here, beside STATE_HEADLINE, and is asserted against
+// STATE_HEADLINE's own reader keys below — the same key set, so a state
+// without a short string is a build error, not a silent omission. No
+// number, no count, no "one of three": a short form compresses the headline's direction and never
+// re-states a figure.
+export const READER_STATE_SHORT = {
+  READER_ABOVE_BAR: "above the bar, on income",
+  READER_ABOVE_CONDITIONAL: "above the bar, with conditions",
+  READER_AT_LINE: "right at the line",
+  READER_BELOW_BAR: "below the income bar",
+  READER_WRONG_TYPE: "not this kind of income",
+  READER_NONE_CLEARS: "no route clears on income",
+  READER_NOT_ENOUGH: "couldn't be read against your figures",
+  READER_BELOW_SOME_UNREAD: "below the bar on the routes that could be read, some unread",
+  READER_WRONG_TYPE_SOME_UNREAD: "not this kind of income on the routes that could be read, some unread",
+  READER_NONE_CLEARS_SOME_UNREAD: "no readable route clears on income, some unread",
+};
+
+// The build error is a real throw rather than a warning: a missing short form would ship a pin whose accessible name
+// silently drops the band, which is the exact constraint this table
+// exists to satisfy, and a silent miss is indistinguishable from the
+// tooltip defect this table exists to route around. Both directions are
+// checked — a missing key and a key
+// for a state that no longer exists — because a stale entry is how a
+// table starts describing a vocabulary the site has moved off.
+{
+  const headlineReaderKeys = Object.keys(STATE_HEADLINE).filter((k) => k.startsWith("READER_"));
+  const shortKeys = Object.keys(READER_STATE_SHORT);
+  const missing = headlineReaderKeys.filter((k) => !(k in READER_STATE_SHORT));
+  const unknown = shortKeys.filter((k) => !(k in STATE_HEADLINE));
+  if (missing.length || unknown.length) {
+    throw new Error(
+      "READER_STATE_SHORT is out of step with STATE_HEADLINE — missing: "
+      + (missing.join(", ") || "none") + "; unknown: " + (unknown.join(", ") || "none")
+    );
+  }
+}
+
+// The solo form and the per-member form for a location the box never
+// read. One constant each, because the solo label and the
+// knot label have to say the same thing about the same absence.
+export const READER_LABEL_UNREAD = "Not read against your figures.";
+export const READER_LABEL_UNREAD_MEMBER = "not read against your figures";
+// The solo label's lead-in: "{place}, {country}. Your own income
+// read: {short}."
+export const READER_LABEL_READ_PREFIX = "Your own income read:";
 
 // v9 Part 8: the mandatory rule-derived-verdict disclosure. Two load-
 // bearing content requirements, both from this project's own residency-
@@ -642,6 +1104,31 @@ export const STATE_HEADLINE_BAND = {
 // Shipped as committed spec copy per this project's own precedent — one
 // canonical sentence, many future render homes, cited not restated, same
 // idiom as FIT_INDEX_DEFINITION/SCALE_ANCHOR_STRING above.
+// Door v2: the persona sentence reads "checked against
+// {Name}'s stated profile", which for the reader is both bad grammar and
+// an overclaim — the reader gave figures, not a profile, and what was
+// read against them is twenty income bars and nothing else. Sentences
+// three to five are the shipped sentence's own, verbatim; only the first
+// two change, and they narrow the claim rather than widening it.
+export const READER_VERDICT_DISCLOSURE =
+  "This read is computed from this site's documented visa and residency rules, checked against the figures you entered on this device — the income bars on the residence routes in five countries, nothing else yet. Not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.";
+
+// RULED COPY, quoted verbatim and not this build's to reword: where a
+// route's per-person basis isn't on file, the reader's verdict declares
+// the assumption rather than refusing on it. The engine refuses on this
+// input for a persona (zero dependent_adjustment facts for GT); the box
+// has no dependents field that could refuse, so it says what it did
+// instead.
+//
+// It renders beside the reader's verdict disclosure on the location page,
+// which is the one surface the reader's verdict already speaks a full
+// sentence on. The condition that fires it is readerBasisIsAssumed() in
+// js/reader-lens.js. One character is this build's: the sentence was
+// given mid-sentence ("treated as per person") and renders here as a
+// standalone line, so the t is capital.
+export const READER_BASIS_DECLARED_LINE =
+  "Treated as per person — this route's basis isn't on file.";
+
 export function verdictDisclosureSentence(displayName) {
   return `This read is computed from this project's own documented visa and residency rules, checked against ${displayName}'s stated profile — not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned here, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.`;
 }
@@ -730,7 +1217,7 @@ function toggleTheme() {
     document.documentElement.setAttribute("data-theme", "dark");
     localStorage.setItem(THEME_KEY, "dark");
   }
-  // 2026-08-12 fix (a live-site audit finding): the v4 addendum
+  // Fix (a live-site audit finding): the v4 addendum
   // originally excluded this on purpose (comment retired below, moved to
   // colors.js's own repaintRampSwatches() header) — CSS-variable-driven
   // chrome updates instantly, but already-rendered inline SVG pin fills /
@@ -746,10 +1233,79 @@ function toggleTheme() {
 // ---------------------------------------------------------------------
 // Header (v4 addendum R4): split into a top bar (brand/nav/theme toggle,
 // unchanged position — first thing on the page) and a persona block
-// (moved below each page's own H1/orientation — see renderPersonaSlot /
-// renderPersonaBlock below). Replaces the old single renderHeader(), which
+// (moved below each page's own H1/orientation, and replaced by the
+// perspective line — see js/reader-lens.js). Replaces the old single
+// renderHeader(), which
 // put the persona ask before the page said what it even does.
 // ---------------------------------------------------------------------
+// A plain, abstract "adjustable/build" glyph — a dial, not a photo and not
+// a silhouette. Moved here from perspective-door.js (which now imports it)
+// when the corner control needed the door's own icon: two hand-copied
+// copies of one glyph is how the door and the control start drawing
+// different pictures of the same thing. Inline SVG, no new asset, colours
+// inherit through currentColor.
+export const CUSTOM_TILE_ICON = `
+  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <line x1="12" y1="12" x2="12" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="12" y1="12" x2="16" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+  </svg>
+`;
+// The same glyph at topbar scale.
+const CORNER_LENS_ICON = CUSTOM_TILE_ICON.replace('width="28" height="28"', 'width="18" height="18"');
+
+// The control that reopens the full box. Not an inline
+// editor and not a summary of the reader's data — a door handle.
+//
+// Its LABEL is a lens disclosure, which the perspective-disclosure law
+// requires of a control whose text is a promise about what it changes:
+// it names whose eyes the page is currently showing, in the site's own
+// idiom ("tell the site who's asking"), so it introduces no noun a
+// stranger has not already met on the door.
+//
+// A real <a href> to index.html?reopen=1, always — so it works with no
+// JS, with a middle-click, and from the prerendered static bar. The map
+// page intercepts the click and summons the box in place instead (delta
+// §8.2); every other page navigates, which is the same thing one load
+// later, because the door is index.html-only by construction.
+export const REOPEN_FLAG = "reopen";
+const CORNER_LENS_PREFIX = "Who's asking:";
+const CORNER_LENS_NOBODY = "nobody yet";
+const CORNER_LENS_ARIA_SUFFIX = "— opens the box to change it";
+
+export function cornerLensValue() {
+  const persona = getActivePersona();
+  if (!persona) return CORNER_LENS_NOBODY;
+  return personaDisplayLabel(persona);
+}
+
+function cornerLensControlHtml() {
+  const value = cornerLensValue();
+  const full = `${CORNER_LENS_PREFIX} ${value}`;
+  return `
+    <a class="corner-lens" id="corner-lens" href="${siteUrl("index.html")}?${REOPEN_FLAG}=1"
+       aria-label="${escapeHtml(`${full} ${CORNER_LENS_ARIA_SUFFIX}`)}">
+      <span class="corner-lens-icon" aria-hidden="true">${CORNER_LENS_ICON}</span>
+      <span class="corner-lens-prefix">${escapeHtml(CORNER_LENS_PREFIX)}</span>
+      <span class="corner-lens-value">${escapeHtml(value)}</span>
+    </a>
+  `;
+}
+
+// Called by js/map.js only: the one page that carries the door. Turns the
+// link into an in-place summon, keeping the href intact so a middle-click
+// and a no-JS reader still get a working door.
+export function wireCornerLensInPlace(handler) {
+  const el = document.getElementById("corner-lens");
+  if (!el || typeof handler !== "function") return;
+  el.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    handler();
+  });
+}
+
 export function renderTopBar(activePage) {
   // Bug fix: prerendered location pages (tools/prerender-
   // locations.mjs) ship a real, static .site-topbar for no-JS visitors —
@@ -774,6 +1330,7 @@ export function renderTopBar(activePage) {
   // and under either a domain-root or project-site-subpath deployment.
   bar.innerHTML = `
     <a class="brand" href="${withPersona(siteUrl("index.html"))}">CanILiveThere</a>
+    ${cornerLensControlHtml()}
     <nav class="site-nav">
       <a href="${withPersona(siteUrl("index.html"))}" class="${activePage === "map" ? "active" : ""}">Map</a>
       <a href="${withPersona(siteUrl("lists.html"))}" class="${activePage === "lists" ? "active" : ""}">Lists</a>
@@ -795,184 +1352,32 @@ export function renderTopBar(activePage) {
   });
 }
 
-// The persona-block + disclaimer markup shared by both placement
-// mechanisms below — one template, not duplicated per page. "General"
-// option copy and the unselected-state blurb are the addendum's own R4
-// strings, verbatim; the selected-state blurb is unchanged from before
-// (still reads clearly, not a failure site — v2 addendum §6).
-function personaSlotInnerHtml() {
-  // v7 §7.1: 3 options -> 8, same mechanism (v1 §3.6's render-condition
-  // fix — the descriptor is always-visible option text, not gated behind
-  // selection), just more data through it. VALID_PERSONAS is this
-  // module's own order (the switcher-descriptors file's own order too).
-  const options = VALID_PERSONAS.map(
-    (id) => `<option value="${id}">${escapeHtml(PERSONA_LABELS[id])}</option>`
-  ).join("");
-  // v11 Part 21.9: a ninth, reserved switcher entry — "Your priorities" —
-  // appears only once a reader has actually built a custom weight vector.
-  // Deliberately NOT part of VALID_PERSONAS/the loop above (8P.2's own
-  // ruling: "custom" never flows through the URL-persona machinery those
-  // arrays feed) — a separate, conditional <option> instead, appended
-  // after the eight named ones per this Part's own ordering.
-  const customOption = hasCustomProfile()
-    ? `<option value="custom">Your priorities — your own weighted read from your quick answers</option>`
-    : "";
-  // "Edit your answers" (21.9): only rendered once a profile exists,
-  // reopens the door's own questionnaire (perspective-door.js), pre-filled
-  // — reuses that already-built, already-gated flow rather than a second
-  // one on this page.
-  const editControl = hasCustomProfile()
-    ? `<button type="button" class="btn-chip" id="edit-priorities-btn">Edit your answers</button>`
-    : "";
-  // 25.4 item 3 / C10: the permanent forget affordance, at the switcher's
-  // own copy of the two surfaces the ruling names (the door's own resume
-  // band carries the other). Gated on hasAnySavedReaderState() so it's
-  // never a dead control for a reader with nothing stored.
-  const forgetControl = hasAnySavedReaderState()
-    ? `<button type="button" class="btn-chip" id="forget-saved-btn">Forget what I've saved here</button>`
-    : "";
-  return `
-    <div class="persona-block">
-      <label for="persona-select">Pick the point of view closest to your own:</label>
-      <select id="persona-select">
-        <option value="">General — see every location's own score, unfiltered</option>
-        ${options}
-        ${customOption}
-      </select>
-      <p class="persona-blurb" id="persona-blurb"></p>
-      <p class="explicit-general-line" id="explicit-general-line"></p>
-      <p class="passport-lens-line" id="passport-lens-line"></p>
-      ${editControl}
-      ${forgetControl}
-    </div>
-    <details class="recede">
-      <summary>Information, not advice — read what this site is and isn't</summary>
-      <p class="disclaimer recede-body">
-        Every figure here carries a source, a last-checked date, and a
-        confidence tier — rules change; confirm anything that matters with
-        the relevant embassy, notary, or accountant before acting on it.
-      </p>
-    </details>
-  `;
-}
-
-function wirePersonaSlot(container, persona) {
-  const select = container.querySelector("#persona-select");
-  select.value = persona === "custom" ? "custom" : persona || "";
-  const blurb = container.querySelector("#persona-blurb");
-  // Default (nothing selected) is now a one-line pointer, not the old
-  // three-descriptor wall — the descriptors already live individually as
-  // the <select>'s own option text, not duplicated a second time (R4
-  // §4.2). Selected-persona state: v7 §7.1 drops the old three-only
-  // "Closest to you if:" appended clause (PERSONA_CLOSEST_IF) — it never
-  // existed for the five newly-widened personas, and the source
-  // descriptors already carry the "who this fits" framing inside the
-  // want/fear sentences, so a uniform single-descriptor blurb across all
-  // eight reads more consistently than three personas getting a second
-  // clause and five not. Flagged: this is a real, if small, content
-  // simplification of existing authored copy, not a silent change —
-  // named here and in the build record for ratification or correction,
-  // same as an earlier wording-alignment precedent on this same file.
-  if (persona === "custom") {
-    // The result-side repetition of the intro screen's honesty line
-    // (copy-voice pass, 2026-07-17): rides directly under the switcher
-    // on every page where the reader's own weighted read is active — the
-    // nearest always-present surface to the recomputed result itself.
-    blurb.textContent =
-      "Weighed from your seven answers — a rough read, not a verdict. The facts underneath haven't changed; only how much each one counts.";
-  } else if (persona) {
-    blurb.textContent = PERSONA_LABELS[persona] || "";
-  } else {
-    blurb.textContent =
-      "Every score below is shown as-is — pick a name above to see it adjusted for someone in their situation instead.";
-  }
-  // §8AA.2's mandatory middle-state disclosure (C11): renders whenever the
-  // explicit-general flag is up AND a saved build actually exists to be
-  // set aside — the copy names "your saved priorities" specifically, so
-  // this gates on hasCustomProfile() literally, not on any other saved
-  // dimension (nationality/a saved persona choice don't fit this string's
-  // own wording — a narrower reading than "any saved state," flagged in
-  // the build report as a real, if small, interpretive call).
-  const generalLine = container.querySelector("#explicit-general-line");
-  const showGeneralLine = isExplicitGeneral() && hasCustomProfile();
-  generalLine.textContent = showGeneralLine
-    ? "Shown unfiltered — your saved priorities are set aside for now, not deleted."
-    : "";
-  generalLine.hidden = !showGeneralLine;
-  // §15/§8Z's passport-lens strip line, applied here per 25.6's own
-  // instruction: the switcher block names the saved passport on EVERY
-  // page, independent of persona/general state — a passport isn't a
-  // render lens the way a persona is (§8AA.1), so this renders regardless
-  // of what `persona` resolved to above.
-  const passportLine = container.querySelector("#passport-lens-line");
-  const savedNationality = loadNationality();
-  const nationalityName = savedNationality ? ISO_COUNTRY_NAMES[savedNationality.code] : null;
-  passportLine.textContent = nationalityName ? `Passport lens: ${nationalityName}` : "";
-  passportLine.hidden = !nationalityName;
-  select.addEventListener("change", () => {
-    const params = new URLSearchParams(location.search);
-    // "custom" is never a URL value (8P.2's own ruling keeps it out of
-    // VALID_PERSONAS/getPersona() entirely) — selecting it just clears any
-    // ?persona= override, same action as selecting "General."
-    if (select.value && select.value !== "custom") {
-      // §8AA.2: activating any persona IS leaving the general view.
-      clearExplicitGeneral();
-      params.set("persona", select.value);
-    } else if (select.value === "custom") {
-      clearExplicitGeneral();
-      params.delete("persona");
-    } else {
-      // General selected. td12's actual fix: only meaningful (and only
-      // set) when a stored custom profile exists to override — otherwise
-      // there's nothing for getActivePersona()'s precedence to set aside,
-      // and setting the flag anyway would be a no-op write for no reason.
-      if (hasCustomProfile()) setExplicitGeneral();
-      params.delete("persona");
-    }
-    const qs = params.toString();
-    location.search = qs ? `?${qs}` : "";
-  });
-  const editBtn = container.querySelector("#edit-priorities-btn");
-  if (editBtn) {
-    editBtn.addEventListener("click", () => {
-      // Reopens the door's own questionnaire, pre-filled — index.html-only
-      // by construction (perspective-door.js is only ever imported by
-      // js/map.js), so this always navigates there regardless of which
-      // page the switcher is on today.
-      location.href = `${siteUrl("index.html")}?edit-priorities=1`;
-    });
-  }
-  const forgetBtn = container.querySelector("#forget-saved-btn");
-  if (forgetBtn) {
-    wireForgetControl(forgetBtn, {
-      onDone: () => { location.href = location.pathname + location.hash; },
-    });
-  }
-}
-
-// index.html / lists.html: a static `<div id="persona-slot"></div>`
-// already sits in each page's own HTML, positioned after the H1 — this
-// fills it in place, matching the existing #map-legend/#purpose-lists
-// static-placeholder convention (R4 §4.2) rather than DOM-traversal
-// insertion.
-export function renderPersonaSlot(el, persona) {
-  el.innerHTML = personaSlotInnerHtml();
-  wirePersonaSlot(el, persona);
-}
-
-// location.html: no static H1 exists at parse time (it's built inside
-// location.js's own render, from the location's data) — so no static
-// placeholder id is possible here. Caller passes the just-created <h1>
-// element as the insertion anchor; this builds the block fresh and
-// inserts it immediately after that anchor (R4 §4.3's one named
-// exception to the drop-in-copy shape the other two pages share).
-export function renderPersonaBlock(persona, anchorEl) {
-  const wrap = document.createElement("div");
-  wrap.id = "persona-slot";
-  wrap.innerHTML = personaSlotInnerHtml();
-  anchorEl.insertAdjacentElement("afterend", wrap);
-  wirePersonaSlot(wrap, persona);
-}
+// Door v2: the persona block is GONE from every page —
+// its label (the one that asked a reader to pick whichever of eight
+// strangers they most resembled), its <select>,
+// the blurb, the explicit-general line, the passport-lens line, "Edit
+// your answers" and "Forget what I've saved here". Each of the seven had
+// a named destination before it was removed, and the destinations are the
+// point: the choosing moves into the box (the eight tiles and the escape
+// hatch), the disclosures move into the perspective line (js/reader-lens.js),
+// "Edit your answers" becomes the corner control above, and the forget
+// control moves to the footer's privacy line below — site-wide, one step
+// from anywhere, which is what a stranger who has just typed their income
+// on a location page actually needs.
+//
+// The one thing in the old block that was never part of the bar, and
+// therefore stays exactly where it was: the "Information, not advice"
+// disclaimer. It is legal protection, not a lens control.
+export const DISCLAIMER_DETAILS_HTML = `
+  <details class="recede">
+    <summary>Information, not advice — read what this site is and isn't</summary>
+    <p class="disclaimer recede-body">
+      Every figure here carries a source, a last-checked date, and a
+      confidence tier — rules change; confirm anything that matters with
+      the relevant embassy, notary, or accountant before acting on it.
+    </p>
+  </details>
+`;
 
 export function renderFooter(store) {
   // Same duplication class as renderTopBar()'s own fix above, found
@@ -998,11 +1403,29 @@ export function renderFooter(store) {
     </p>
     <p><a href="${withPersona(siteUrl("corrections.html"))}">Corrections &amp; changes</a> — every dated update, including what we got wrong.</p>
     <p><a href="${withPersona(siteUrl("principles.html"))}">How we work</a> — the rules we hold ourselves to, and how to check us on them.</p>
-    <p><a href="${withPersona(siteUrl("privacy.html"))}">What this site does with your browser</a> — what leaves it, what stays, and why the pages are this light.</p>
+    <p><a href="${withPersona(siteUrl("privacy.html"))}">What this site does with your browser</a> — what leaves it, what stays, and why the pages are this light.${
+      hasAnySavedReaderState()
+        ? ` <button type="button" class="btn-chip" id="forget-saved-btn">Forget what I've saved here</button>`
+        : ""
+    }</p>
     <p>Want something researched, or found something wrong? <a href="${withPersona(siteUrl("contact.html"))}">Write to us.</a></p>
     <p>Anonymous, cookieless visit counts by Cloudflare help us see what's useful.</p>
   `;
   document.body.appendChild(footer);
+
+  // The forget control's new, site-wide home. It sat in the
+  // persona block, which is going, and in the door's resume band, which is
+  // index.html-only — so a stranger on a location page who had just given
+  // the site their income had no one-step way to take it back. It belongs
+  // beside the footer's own "stays on your own device" sentence, which is
+  // the sentence it acts on. Gated on hasAnySavedReaderState() exactly as
+  // before, so it is never a dead control.
+  const forgetBtn = footer.querySelector("#forget-saved-btn");
+  if (forgetBtn) {
+    wireForgetControl(forgetBtn, {
+      onDone: () => { location.href = location.pathname + location.hash; },
+    });
+  }
 }
 
 // Comma-group digit runs of 5+ so large figures ("500000 THB") read as
@@ -1079,7 +1502,7 @@ export function splitFactSentences(text) {
   return result.filter(Boolean);
 }
 
-// --- Live FX reference-currency stopgap (2026-07-14) ---
+// --- Live FX reference-currency stopgap ---
 // A reader's own nationality/currency isn't captured anywhere on the site
 // yet (that's tomorrow's real build); until then, this appends a USD
 // approximation to bare-local-currency figures so "500,000 THB" doesn't
@@ -1233,7 +1656,7 @@ export function formatValue(fact, { suppressGapText = false } = {}) {
   if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) {
     out = `${raw} ${fact.unit}`;
   }
-  // Bug fix (2026-07-15, caught by a real-data dry run, not just a read of
+  // Bug fix (caught by a real-data dry run, not just a read of
   // the code): detectBareCurrency() only inspected fact.unit for an
   // existing manual approximation, but at least one real fact on file
   // (ID:bpjs-kesehatan-monthly-cost-where-eligible) carries its own
@@ -1375,7 +1798,7 @@ export function verdictConfidenceBadge(tier) {
   return `<span class="badge ${cls}" title="Sourcing confidence for the route(s) behind this verdict">${escapeHtml(label)}</span>`;
 }
 
-// Perspective-disclosure law (2026-07-17) applied to the two table
+// Perspective-disclosure law applied to the two table
 // surfaces (the Lists banded view and a location page's own verdict
 // block) that render a persona's verdict text. A hand-checked fixture
 // (today: Wenda/Carmen, only at the handful of locations each actually
@@ -1536,7 +1959,7 @@ export function formatUsdRange(low, high) {
 // The not-assessed sentence choice was originally this render's own
 // inference from `householdSize` alone (the public export drops the
 // engine's free-text `reason`, so the real cause never reached this
-// render). Fixed 2026-08-11: the data now carries `not_assessed_cause`
+// render). Fixed: the data now carries `not_assessed_cause`
 // ("no_fact" | "fx_blocked" | "household_only") straight from the
 // engine's own real not-assessed branches, so this reads the real cause
 // instead of guessing. The household-specific sentence fires ONLY for the
@@ -1559,8 +1982,8 @@ function costGatePhrase(rt, householdSize) {
     case "fails":
       return `Cost: doesn't clear — documented range ${range}${confClause}, even at the low end.`;
     case "not_assessed": {
-      // THE PER-HOUSEHOLD-ONLY CAUSE (added 2026-09-11, on a ruling of the
-      // same day). `"household_only"` says usable monthly cost figures DO
+      // THE PER-HOUSEHOLD-ONLY CAUSE (added on a ruling).
+      // `"household_only"` says usable monthly cost figures DO
       // exist at this location, but every one of them declares a per-
       // household denominator, so there is no single-person band to
       // report. On that path both sentences below are false: a figure
@@ -1672,7 +2095,7 @@ const HOMESCHOOL_STATUS_LABEL = {
 // never part of a "clears" sentence (the copy deck's own note, §5).
 const HOMESCHOOL_OPEN_VALUES = new Set(["legal-unregulated", "legal-with-registration", "restricted-case-by-case"]);
 // Divergence-flag caveat, per attested value (the copy deck's own §5).
-// Two of the three are sourced (real 2026-08-10 data / the ratified
+// Two of the three are sourced (real data / the ratified
 // national-grain schema rule); "Confirmed-matches" was the deck's own
 // flagged, unconfirmed guess — this build independently confirms it as a
 // real, already-shipped value (divergenceBadge() below, same file, ships
@@ -1953,7 +2376,8 @@ function foldForSearch(str) {
 }
 
 // container: an empty element already in the DOM (a static placeholder
-// slot, same idiom as renderPersonaSlot's own #persona-slot). handlers:
+// slot, same idiom as the #persona-slot the perspective line fills).
+// handlers:
 // { onSelectLocation(loc), onSelectCountry(country) } — the caller's own
 // surface-specific "go there" behavior (26.5/26.6); this function never
 // navigates or re-renders anything outside the box it just built.

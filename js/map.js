@@ -1,12 +1,21 @@
 import { loadStore, verdictHeadline, sectionForFact, resolveVerdict } from "./data.js";
 import { scoreToColor, indexToColor, calibrateIndexBands, indexBandDisclosure, getScaleLegend, verdictVisual, bandVisual, eliminatedColor, isGapValue, pendingColor, DOG_LENS_COLOR, RAMP_VALUE_ATTR, RAMP_KIND_ATTR } from "./colors.js";
 import {
-  applyStoredTheme, renderTopBar, renderPersonaSlot,
-  renderFooter, getActivePersona, applyStoredCustomWeights, withPersona, escapeHtml,
+  applyStoredTheme, renderTopBar,
+  renderFooter, getActivePersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   formatNumbersInText, splitFactSentences, stateHeadline, STATE_HEADLINE_BAND,
   CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX, initLocationSearch,
+  READER_ID, personaDisplayLabel, hasReaderWeights,
+  loadViewIndex, saveViewIndex, wireCornerLensInPlace,
+  READER_BASIS_DECLARED_LINE,
+  READER_STATE_SHORT, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
+  READER_LABEL_READ_PREFIX,
 } from "./app-shared.js";
+import {
+  applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readerPinPaint,
+  readerBasisIsAssumed,
+} from "./reader-lens.js";
 
 // Plain-text equivalent of app-shared.js's verdictConfidenceBadge(), for
 // the hover tooltip specifically (showTip() sets .textContent, which
@@ -33,6 +42,85 @@ const PIN_HALO = 2;
 // site, same idiom as PIN_RADIUS/PIN_HALO above).
 const HAND_CHECKED_RING_GAP = 3;
 const HAND_CHECKED_RING_STROKE_PX = 1.5;
+
+// =====================================================================
+// THE READER'S MARK. Four constraints govern it: >=3:1 against land, a
+// shape and not only a hue, a legend beside the map, and the band in the
+// aria-label.
+//
+// WHAT IT REPLACES, kept so the change is legible: `.reader-mark`, a
+// band-coloured stroke widened to 1.75x the halo, drawn on the pin
+// itself. Walked in a browser — the first time this site was read as a
+// rendered page rather than as source — it failed twice over. Measured
+// in both themes against the shipped hexes, then re-verified:
+//   LIGHT land #d6cdb8: gap 1.118  cond 1.893  clean 3.412  hard 10.927
+//   DARK  land #4a4234: gap 1.415  cond 3.310  clean 1.522  hard  1.825
+//   --ink:              light 10.896                        dark  8.854
+// Three of four band colours fail the 3:1 non-text floor against dark
+// land and two fail against light land. NO ASSIGNMENT OF THE EXISTING
+// BAND HUES CLEARS 3:1 IN BOTH THEMES; only ink does. So the first
+// constraint (contrast) and the second (a shape, not only a hue) are not
+// two constraints pulling apart — they are one constraint reached from
+// two directions, and the mark's carrier is INK GEOMETRY.
+//
+// THE SECOND FAILURE, and it is the one that decides the draw order: the
+// invisible cream was GAP_BG_LIGHT — the data_gap mark, "the site
+// couldn't read this" — on 10 of 12 marked pins, and those same 10 sit
+// in cluster knots that give NO TOOLTIP AT ALL. The sentence was 2 to 7
+// zoom clicks away while the mark stayed fully visible and meant nothing.
+// That is why badges are drawn AFTER every pin (a neighbour's pin can
+// never cover one) and why the glyph has to carry the band without a
+// hover.
+//
+// THE BADGE OVERLAPS the pin's edge rather than sitting inside it. That
+// is a deviation from "a mark ON the pin", taken deliberately: ink inside
+// the pin sits on five ramp stops and measures 2.38-3.61 across them —
+// under the floor on two stops in each theme. Beside is the only place
+// the first constraint can be met without minting a new hex.
+// HUE IS DROPPED from the map mark ENTIRELY. Lists chips and page chips
+// keep band colour (they sit on paper, not land);
+// the map mark carries none. One legible device beats two channels that
+// disagree by theme.
+const BADGE_RADIUS_PX = 6;        // 12px disc — a 7px glyph reads at 1x DPR, and a knot of three stays legible
+const BADGE_OFFSET_PX = 7;        // upper-right (+7, -7): overlaps the 7px pin by ~3px, leaving ~3/4 of the fit fill visible
+const BADGE_BOX = BADGE_RADIUS_PX * 2;
+// The disc's own radius inside the 12-unit symbol box, set so the 1.25
+// border's OUTER edge lands exactly on 12px: 6 - 1.25/2.
+const BADGE_DISC_R = BADGE_RADIUS_PX - 0.625;
+
+// Band -> glyph. Geometry and luminance only, never hue:
+// the tri-state-checkbox set (tick, bar) plus the two glyphs every reader
+// already owns (cross, question mark). Each pair differs by vertex count
+// AND stroke direction, so they stay distinct under any CVD simulation
+// and at 7px.
+//
+// The paths are authored in a 10x10 box at stroke 1.6 with round caps and
+// joins; they are placed inside the 12x12 badge box by translate(1,1),
+// which centres the authoring box in the disc. The stroke is therefore
+// 1.6 SCREEN px wherever the badge is drawn at 12 screen px, at any zoom.
+//
+// THE MOST COMMON HONEST ANSWER GETS A POSITIVE GLYPH ON PURPOSE. The
+// finding that prompted it: "couldn't read this" wore the quietest
+// treatment on the map. A "?" is a shape that asks to be read.
+const BADGE_GLYPHS = {
+  clean: { id: "reader-badge-clean", d: "M2.5 5.6 L4.6 7.6 L7.8 3.2" },
+  uncertain_or_conditional: { id: "reader-badge-uncertain", d: "M2.6 5 L7.4 5" },
+  hard_fail: { id: "reader-badge-hardfail", d: "M3 3 L7 7 M7 3 L3 7" },
+  data_gap: { id: "reader-badge-gap", d: "M3.5 3.9 A1.6 1.6 0 1 1 5.9 5.3 C5.2 5.7 5 6.1 5 6.7 M5 8.4 L5 8.5" },
+};
+
+// One <symbol> per glyph, defined once in the map's <defs> and placed
+// with <use> — by the map AND by the key below, so the two cannot drift
+// into drawing different pictures of the same thing. Fill and stroke come
+// from CSS classes rather than presentation attributes, because the
+// tokens are CSS custom properties (--panel, --ink) and var() is not
+// legal in a presentation attribute; the theme toggle therefore needs no
+// repaint hook here, unlike every ramp-coloured element on this map.
+const READER_BADGE_SYMBOLS = Object.values(BADGE_GLYPHS).map(({ id, d }) => `
+    <symbol id="${id}" viewBox="0 0 ${BADGE_BOX} ${BADGE_BOX}">
+      <circle class="reader-badge-disc" cx="${BADGE_RADIUS_PX}" cy="${BADGE_RADIUS_PX}" r="${BADGE_DISC_R}" />
+      <path class="reader-badge-glyph" transform="translate(1,1)" d="${d}" />
+    </symbol>`).join("");
 
 // v10 Part 13: real-world km -> world-viewBox units, for terrain sizing
 // only (pins/hit-areas never use this — they hold constant SCREEN size via
@@ -73,11 +161,47 @@ const LABEL_LINE_HEIGHT_PX = LABEL_FONT_SIZE_PX * 1.3;
 
 applyStoredTheme();
 renderTopBar("map");
-renderPersonaSlot(document.getElementById("persona-slot"), getActivePersona());
+// Door v2: the perspective line needs the store (it names the read set's
+// countries from the data, never from a string typed here), so it is
+// rendered inside main() rather than synchronously at module load the way
+// the profile bar was. Same element, same position.
+//
+// The door still summons at module load, before the store resolves — its
+// first paint never depended on the store and must not start doing so.
+// What it now carries is a commit callback: "See the world" closes the
+// box in place and this re-renders the map underneath, so the reward is a
+// reveal and not a reload. A reload paints the old map for a frame; a
+// reveal does not.
+let mapCtx = null; // { store, lenses } — set by main() once, read by the door
+
+function refreshAfterBoxCommit() {
+  if (!mapCtx) {
+    // The reader finished the box before the store resolved. Rare, and a
+    // plain reload is the honest degrade — it re-reads their figures from
+    // storage on the way in, and the door does not re-summon because
+    // every completion path marks it answered.
+    location.href = location.pathname + location.hash;
+    return;
+  }
+  applyReaderLens(mapCtx.store);
+  const persona = getActivePersona();
+  renderTopBar("map");
+  wireCornerLensInPlace(() => door.open());
+  renderPerspectiveSlot(document.getElementById("persona-slot"), mapCtx.store, persona);
+  renderPurposeSelector(mapCtx.store, mapCtx.lenses);
+  renderMap(mapCtx.store, mapCtx.lenses);
+  // NOT wireMapInteractions() — deliberately. It binds to #map-root,
+  // which renderMap() empties but never replaces, so a second call would
+  // double-bind every wheel, drag, pinch and key listener on the map:
+  // one wheel notch would zoom twice. This is the same reason setLens()
+  // re-renders without re-wiring, and it is why the door's commit path
+  // re-renders rather than re-initialising.
+}
+
 // v7 Part 10: index.html-only by construction (this is the one page that
-// imports this module) — decides on its own whether to show, this call
-// site doesn't branch on anything.
-initPerspectiveDoor();
+// imports this module).
+const door = initPerspectiveDoor({ onCommit: refreshAfterBoxCommit });
+wireCornerLensInPlace(() => door.open());
 main();
 
 // ---------------------------------------------------------------------
@@ -111,7 +235,13 @@ function criterionLens(store, criterionId, label) {
       const row = store.scoresByLocation.get(locationId)?.get(criterionId);
       return row && row.status === "scored" && row.score != null ? row.score : null;
     },
-    explainerText: `Pins colored by ${displayLabel} alone, general figures — this view ignores any persona pick above.`,
+    // Door v2: this used to end "— this view ignores any
+    // persona pick above", which named a bar that no longer exists AND
+    // said the quiet part wrong: under the reader's own lens it is the
+    // READER being switched away from. The identity-specific half is
+    // appended at render time (renderPurposeSelector below), because a
+    // lens object is built once and the identity can change without it.
+    explainerText: `Pins colored by ${displayLabel} alone, general figures.`,
   };
 }
 
@@ -158,7 +288,7 @@ function dogImportFactsLens(store) {
       return rows.length ? rows.map((f) => ({ label: f.fact_label, text: formatNumbersInText(String(f.value_raw)) })) : null;
     },
     explainerText:
-      "Unscored on purpose — these are the import rules on file, not a grade. Blue pins have researched rules; hover to read them. This view ignores any persona pick above.",
+      "Unscored on purpose — these are the import rules on file, not a grade. Blue pins have researched rules; hover to read them.",
   };
 }
 
@@ -169,7 +299,7 @@ function dogImportFactsLens(store) {
 // not one of Part 13's four named purpose lenses, but it's already a
 // working, criterion-backed lens with no reason to drop it. The dog-
 // import lens (v8 Part 6) stays a fourth member of this SAME array
-// (Part 28.3, 2026-07-21: demoted from its own chip to the "More…"
+// (Part 28.3: demoted from its own chip to the "More…"
 // dropdown, load-bearing build note) — it must stay registered here,
 // where resolveLens() finds it by id; removing it from this array
 // entirely would make resolveLens() fall through to its own
@@ -200,7 +330,10 @@ function resolveLens(store, lenses, lensId) {
 // persistence anywhere below) — "state resets on load, not persisted"
 // is satisfied by construction, not a separate reset step.
 // ---------------------------------------------------------------------
-let STATE = { lensId: null, viewBox: null };
+// The index the reader picked survives a box round-trip and travels to
+// the Lists and back. loadViewIndex() is sessionStorage, written on every
+// switch below — not personal data, not the reader-preferences envelope.
+let STATE = { lensId: loadViewIndex(), viewBox: null };
 
 // Craft latitude, named per the spec's own permission (same class as the
 // grain filter's own untested-on-paper parameters) — zoom-step factor,
@@ -210,7 +343,7 @@ const ZOOM_STEP = 1.4; // one discrete +/- button click or +/- keypress
 // Deliberately much smaller than ZOOM_STEP: a wheel/trackpad gesture fires
 // many events per scroll (a trackpad can send dozens for one swipe), so
 // reusing ZOOM_STEP here compounded into runaway zoom (1.4^10 = ~29x from
-// a single fast scroll) — flagged live, 2026-07-14, "you have to work to
+// a single fast scroll) — flagged live: "you have to work to
 // zoom hard." This is the per-event factor, not a one-action step.
 const WHEEL_ZOOM_STEP = 1.03;
 const MAX_SCALE = 20;
@@ -296,7 +429,7 @@ function applyZoom(store, lenses, factor, focal) {
   renderMap(store, lenses);
 }
 
-// Bug fix, 2026-07-16: wireMapInteractions()'s wheel and touchmove
+// Bug fix: wireMapInteractions()'s wheel and touchmove
 // (2-finger pinch) handlers used to call applyZoom() — a full synchronous
 // renderMap() (DOM teardown/rebuild of every country path, pin, hit-circle,
 // and label, plus a forced-layout getBoundingClientRect() call) — on EVERY
@@ -489,10 +622,15 @@ function coincidenceNudgePx(locationId) {
 
 async function main() {
   const store = await loadStore();
-  applyStoredCustomWeights(store);
+  // The reader's weights AND the reader's verdict rows, layered
+  // onto the built store before anything renders. One call, one position —
+  // the same position applyStoredCustomWeights() held, which it now wraps.
+  applyReaderLens(store);
   renderFooter(store);
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
   const lenses = buildFeaturedLenses(store);
+  mapCtx = { store, lenses };
+  renderPerspectiveSlot(document.getElementById("persona-slot"), store, getActivePersona());
   renderPurposeSelector(store, lenses);
   renderMap(store, lenses);
   wireMapInteractions(store, lenses);
@@ -577,6 +715,9 @@ function renderPurposeSelector(store, lenses) {
   const setLens = (value) => {
     if (STATE.lensId === (value || null)) return;
     STATE.lensId = value || null;
+    // Remembered for the visit and shared with the Lists, so map ->
+    // Lists on "Easiest visa" no longer lands on blended fit.
+    saveViewIndex(STATE.lensId);
     renderPurposeSelector(store, lenses);
     renderMap(store, lenses);
   };
@@ -597,13 +738,24 @@ function renderPurposeSelector(store, lenses) {
     // state; every other state (fixture-bearing persona, or no persona at
     // all) keeps the existing line unchanged.
     const persona = getActivePersona();
-    if (persona === "custom") {
-      // v11 Part 21: a reader-built weight vector reweights the general
-      // Fit index only — no eligibility read, ever (21.7's own scope
-      // boundary) — so this gets its own line rather than falling into
-      // the no-fixture-persona branch below, which would wrongly claim
-      // a rule-derived eligibility check that never runs for this identity.
-      explainerEl.textContent = `Pins colored by your own weighted Fit index (${CUSTOM_ESTIMATE_SUFFIX}).`;
+    if (persona === READER_ID) {
+      // Door v2: three reader states, because the reader identity now
+      // carries three genuinely different things and each colours the map
+      // differently. AUTHORED-CHOICE — the spec covers the LENS explainer
+      // and leaves the blended one, so this is composed from the shipped
+      // persona and custom lines, which is why they read alike.
+      if (hasReaderVerdicts(store)) {
+        // Two variants on hasReaderWeights(), because under
+        // the overlay the FILL is the thing the first clause describes and
+        // the fill is weighted or general depending on this exact test.
+        explainerEl.textContent = hasReaderWeights()
+          ? READER_EXPLAINER_VERDICTS_WEIGHTED
+          : READER_EXPLAINER_VERDICTS_GENERAL;
+      } else if (hasReaderWeights()) {
+        explainerEl.textContent = `Pins colored by your own weighted Fit index (${CUSTOM_ESTIMATE_SUFFIX}).`;
+      } else {
+        explainerEl.textContent = READER_EXPLAINER_PASSPORT_ONLY;
+      }
     } else if (persona && !store.fixturesByPersona.has(persona)) {
       // v9 Part 6.3: retired, not softened — full 8x38 verdict-engine
       // coverage means there is no "we haven't looked" case left for these
@@ -626,10 +778,39 @@ function renderPurposeSelector(store, lenses) {
       explainerEl.textContent = "Pins colored by the blended Fit index (or your persona's verdict, if one's picked above).";
     }
   } else {
+    // The promise stops lying. A criterion lens colours
+    // by a general per-criterion score and folds no verdict into that
+    // colour — for a persona or for the reader. The old sentence named
+    // the bar that is gone; these name the identity the view is NOT
+    // answering, and where the answer does live.
     const lens = resolveLens(store, lenses, STATE.lensId);
-    explainerEl.textContent = lens ? lens.explainerText : "";
+    const persona = getActivePersona();
+    let suffix = "";
+    if (persona === READER_ID) {
+      suffix = " — your verdict isn't folded into this view yet; the blended view carries it.";
+    } else if (persona) {
+      suffix = ` — ${personaDisplayLabel(persona)}'s verdict isn't folded into this view yet; the blended view carries it.`;
+    }
+    explainerEl.textContent = lens ? `${lens.explainerText}${suffix}` : "";
   }
 }
+
+// BOTH VARIANTS, landed verbatim from the spec. They were written for
+// the overlay and were untrue of the earlier fill-replacement build —
+// "every pin is colored by the Fit index" was false on the 2 or 3 the box
+// had answered, and "the mark on a pin" described a device nothing drew.
+// The overlay is what ships; both sentences are now true of what renders, which is why the placeholder they replace is
+// gone rather than reworded.
+//
+// The variants split on hasReaderWeights() because the FILL is the thing
+// the first clause names, and the fill is the reader's weighted index or
+// the general one on exactly that test.
+const READER_EXPLAINER_VERDICTS_WEIGHTED =
+  "Every pin is colored by the Fit index, weighted by your priorities — how well the place fits what you said matters. The mark on a pin is your own income read, and only the countries this box has read carry one; hover a pin and it says which.";
+const READER_EXPLAINER_VERDICTS_GENERAL =
+  "Every pin is colored by the general Fit index — place quality, not eligibility. The mark on a pin is your own income read, and only the countries this box has read carry one; hover a pin and it says which.";
+const READER_EXPLAINER_PASSPORT_ONLY =
+  "Pins colored by the general Fit index. Your saved passport changes the entry rules on each place's own page, not these colors.";
 
 // v9 Part 1: the two-click pin flow. Top-level (not nested inside
 // renderMap()) since wireMapInteractions() -- wired ONCE, not per render,
@@ -774,6 +955,7 @@ function renderMap(store, lenses) {
     <pattern id="map-grain" patternUnits="userSpaceOnUse" width="140" height="140">
       <image href="${grainImageHref()}" x="0" y="0" width="140" height="140" />
     </pattern>
+    ${READER_BADGE_SYMBOLS}
   `;
   svg.appendChild(defs);
 
@@ -837,6 +1019,22 @@ function renderMap(store, lenses) {
     // five no-fixture personas (they have no hand fixture anywhere, so
     // this stays false for them by construction, not a special case).
     let fill, tooltip, eliminated = false, gap = false, faded = false, handChecked = false;
+    // THE OVERLAY: a SECOND channel on the pin,
+    // independent of `fill`. Null on every pin in every other branch of
+    // this function — only the reader's own lens paints a mark, and only
+    // where the box read that country. It is deliberately not folded into
+    // `fill` or `eliminated`: the whole point of the overlay is that the
+    // eligibility read sits BESIDE the quality colour instead of replacing
+    // it, and two meanings sharing one variable is how that gets undone.
+    //
+    // CHANGED: the channel carries the BAND, not a colour. `markColor` is retired from this file and from
+    // readerPinPaint()'s contract — the mark has no hue at all now, in
+    // either theme, and a colour variable left lying around is how a hue
+    // creeps back onto a device that is meant to have none. The state
+    // rides alongside it because the pin's accessible name needs the
+    // state's own short form, which the band alone cannot give.
+    let markBand = null;
+    let readerState = null;
     // Part 30.8 (score-driven pin draw order): set
     // alongside `fill` in every branch below. `isRampColored` is true only
     // when the FINAL rendered fill is a scoreToColor()/indexToColor() call
@@ -871,7 +1069,7 @@ function renderMap(store, lenses) {
         const facts = activeLens.factsForLocation(loc.location_id);
         if (facts) {
           fill = DOG_LENS_COLOR;
-          // 2026-07-16 readability fix: a fact's own value_raw is often
+          // Readability fix: a fact's own value_raw is often
           // several distinct clauses run together in one dense sentence
           // (real content, bad presentation) —
           // splitFactSentences() breaks it onto real lines at sentence/
@@ -1007,24 +1205,120 @@ function renderMap(store, lenses) {
         const generalHeadline = buildFitHeadline(store, null, loc, country, underlyingValue);
         tooltip = `${generalHeadline}\nFit index: ${underlyingValue != null ? underlyingValue.toFixed(1) + "/5" : "not yet scored"} (general figures)\n${loc.display_name}, ${country.name} — not checked yet for this persona.`;
       }
-    } else if (persona === "custom") {
-      // v11 Part 21 / 8P: a reader-built weight vector never renders a
-      // visa/eligibility verdict (21.7's own scope boundary) — this pin's
-      // color/tooltip come from the exact same generalIndex()-shaped
-      // computation every other pin uses, just weighted by the reader's
-      // own answers instead of the site's fixed weight classes. No
-      // fixture, no engine verdict, ever, for this identity — eliminated/
-      // gap/faded all stay at their default (false) the same way the
-      // no-persona branch below leaves them.
-      const idx = store.personaIndex("custom", loc.location_id);
-      const value = idx ? idx.value : null;
-      fill = indexToColor(value);
-      gap = isGapValue(value);
-      isRampColored = true; // never a verdict for this identity (21.7's own scope boundary), always the ramp
-      rampKind = "index";
-      rampValue = value;
-      const headline = buildFitHeadline(store, null, loc, country, value);
-      tooltip = `${headline}\nFit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${CUSTOM_ESTIMATE_SUFFIX})`;
+    } else if (persona === READER_ID) {
+      // Door v2. THE RULE, superseding the grey this branch once shipped
+      // for the 26: the reader's map keeps the quality layer for all 38
+      // (fit index from their priorities) and overlays eligibility only
+      // where the box read the route. Entering numbers never subtracts a
+      // pin. Resolved as an overlay — fit fill on all 38, eligibility as
+      // a mark on the pin.
+      //
+      // TWO LAYERS, and they no longer contend for one channel.
+      //   QUALITY — the fit index, reweighted by the reader's own
+      //   priorities where they gave any, general where they did not. It
+      //   is the FILL, on every one of the 38 locations, every time, and
+      //   nothing overlays it. (Measured: all 38 carry at
+      //   least one score in derived/scores.jsonl, zero unscored — the
+      //   layer has data everywhere, so "all 38" is not aspirational.)
+      //   ELIGIBILITY — the reader's own read, carried as a MARK beside
+      //   the fill, wherever the box read that country; the mark's colour
+      //   comes from the SAME bandVisual() call a persona's pin takes and
+      //   its sentence from the same stateHeadline() — one pipeline.
+      //   readerVerdictHasAnswer() no longer decides any colour here; it
+      //   decides only which question the WORDS lead with.
+      //
+      // THE TEST: entering numbers never subtracts a pin.
+      // Under the overlay the build now passes a STRICTER form of it,
+      // measured rather than argued: entering numbers changes 0 of 38
+      // fills. Every location keeps the exact colour it had before a
+      // number was typed — the 26 the box never reads, and the 12 it
+      // does, which is the half the fill-replacement build failed.
+      // The no-verdict-for-unread-countries rule is scoped and survives
+      // — it governs the ELIGIBILITY layer (no verdict for the countries
+      // the box hasn't read, and there is none below), not the
+      // priorities-based quality index.
+      // The paint decision itself is readerPinPaint() in
+      // js/reader-lens.js — one call, no branch of its own here, because
+      // the ruling has to be runnable and not merely readable. What stays
+      // here is the tooltip, which is this file's job.
+      const paint = readerPinPaint(store, loc);
+      const readerVerdict = paint.verdict;
+      const weighted = hasReaderWeights();
+      const value = paint.value;
+      const indexSuffix = weighted ? CUSTOM_ESTIMATE_SUFFIX : "general figures";
+      const qualityLine = `Fit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${indexSuffix})`;
+      fill = paint.fill;
+      gap = paint.gap;
+      eliminated = paint.eliminated;
+      isRampColored = paint.isRampColored;
+      rampKind = paint.rampKind;
+      rampValue = paint.rampValue;
+      markBand = paint.markBand;
+      readerState = paint.state;
+      // THE TOOLTIP BRANCHES ON `read`, NOT ON "REACHED AN ANSWER" — the
+      // overlay reaching the words as well as the paint. Under it a
+      // data_gap read carries a MARK (in the gap colour), so it is a pin
+      // the reader can see the box acted on, which is why it folds into
+      // the verdict-present tooltip: stateHeadline(READER_NOT_ENOUGH) is a real
+      // sentence about a real read ("The site couldn't read this against
+      // your figures…"), not an absence. This is the branch that used to
+      // carry an unplaced-copy placeholder: it needed one only while the
+      // pin was silent about the read, and it is not anymore.
+      if (paint.read) {
+        const stateText = stateHeadline(readerVerdict.overall_state);
+        // The same no-bare-no instead-line every other verdict branch in
+        // this file carries — now on `bandEliminated`, because the pin's
+        // own `eliminated` is false on every reader pin by construction
+        // (the hatch would erase the fit fill). The COPY rule is
+        // unchanged; only the flag it reads moved, and it reads the same
+        // bandVisual() value it always did.
+        const insteadLine = paint.bandEliminated
+          ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
+          : "";
+        const confSuffix = verdictConfidenceSuffix(readerVerdict.confidence_tier, readerVerdict.overall_band);
+        // The SECOND of the three surfaces this sentence is specified
+        // for: its own line after the headline line. The doubt against it
+        // is recorded rather than quietly resolved — this makes a compact
+        // surface four lines deep, and if it crowds, this is the copy of
+        // the sentence to drop, not the location page's.
+        const basisLine = readerBasisIsAssumed(store, loc.country_id)
+          ? `\n${READER_BASIS_DECLARED_LINE}`
+          : "";
+        // The first tooltip, landed from the spec: "The pin's color is
+        // the Fit index, {value}/5 ({indexSuffix}) — place quality, a
+        // different question from eligibility." The only thing
+        // substituted into it is the value expression, which has to carry
+        // a null ("not yet scored") the specified literal has no form for
+        // and which is this file's own already-shipped phrase for it. The sentence
+        // now names the colour as the FILL, which is the whole difference
+        // the overlay makes here: under fill-replacement this line was
+        // describing a colour the reader was not looking at.
+        const qualitySentence = `The pin's color is the Fit index, ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${indexSuffix}) — place quality, a different question from eligibility.`;
+        tooltip = `${loc.display_name}, ${country.name} — your own read: ${stateText}${confSuffix}${basisLine}\n${qualitySentence}${insteadLine}`;
+      } else {
+        // The box did NOT read this country. One state only now — the
+        // read-but-no-answer case moved to the branch above, where the
+        // mark it carries is described. The quality layer stands,
+        // unchanged from what it was before any number was typed.
+        const headline = buildFitHeadline(store, null, loc, country, value);
+        // The SECOND tooltip, landed verbatim from its second sentence
+        // onward. Its specified first line reads "{place}, {country} — Fit
+        // index {value}/5 ({indexSuffix})"; the two lines already above
+        // this one say exactly that and say it null-safely, so they stay
+        // and the sentence lands as the line it was written to be. It also
+        // closes an older defect by construction: the sentence it replaces
+        // said "no color is shown" on a pin that is painted, and this one
+        // names the colour it is.
+        //
+        // Where the reader gave no figures at all, no eligibility claim is
+        // made or denied — the line simply is not there, and that is the
+        // no-lens state disclosing itself by silence rather than by a
+        // sentence about a read that never happened.
+        const eligibilityLine = hasReaderVerdicts(store)
+          ? `\nThis box hasn't read ${country.name} against your figures, so there's no income read for you here — the color is the place's Fit index, not a verdict. Open this place's page for the general figures.`
+          : "";
+        tooltip = `${headline}\n${qualityLine}${eligibilityLine}`;
+      }
     } else if (persona) {
       // v9 Part 6: the five personas with zero hand fixtures anywhere now
       // get a real, rule-derived read from the verdict-coverage engine
@@ -1087,7 +1381,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState });
   }
 
   const wrap = document.createElement("div");
@@ -1163,7 +1457,7 @@ function renderMap(store, lenses) {
     circle.setAttribute("cx", entry.cx);
     circle.setAttribute("cy", entry.cy);
     // Part 9 item 3: constant on-screen size, not constant map-unit size.
-    // 2026-07-15 fix: the original idiom (PIN_RADIUS divided by a
+    // Fix: the original idiom (PIN_RADIUS divided by a
     // zoom-only "scale" ratio) only holds
     // "constant" for a fixed container width — it silently shrinks on a
     // narrower viewport, because that ratio never accounts for how many
@@ -1185,7 +1479,17 @@ function renderMap(store, lenses) {
       + (entry.gap ? " gap" : "")
       + (entry.faded ? " pin-faded" : ""));
     if (!entry.eliminated) circle.setAttribute("fill", entry.fill);
-    // 2026-08-12 live-toggle repaint fix: only a real ramp consumer gets
+    // RETIRED — kept as a note, not as code, because
+    // the reason it went is the finding: the eligibility mark used to be
+    // a band-coloured stroke widened on this circle (`.reader-mark`,
+    // `--mark-color`), and it measured 1.118:1 against light land on the
+    // most common answer of all. The mark is now a separate ink badge
+    // beside the pin (makeReaderBadge below), so THE PIN ITSELF IS
+    // UNTOUCHED by the reader's read: same fill on all 38, same halo,
+    // same radius, whether the box read that country or not. The test —
+    // "entering numbers never subtracts a pin" — now holds on the stroke
+    // as well as the fill.
+    // Live-toggle repaint fix: only a real ramp consumer gets
     // marked (never an `eliminated` pin, whose fill is never applied
     // above anyway, and never a bandVisual()/verdictVisual() consumer —
     // that's the separate, unfixed verdict-color family, see colors.js's
@@ -1222,6 +1526,117 @@ function renderMap(store, lenses) {
     ring.setAttribute("class", "hand-checked-ring");
     ring.setAttribute("aria-hidden", "true");
     return ring;
+  }
+
+  // THE READER'S MARK, drawn. Returns null for every pin
+  // that carries no band, which is every pin outside the reader's lens
+  // and every country the box did not read, so most pins pay no markup at
+  // all (the same contract makeHandCheckedRing() above already keeps).
+  //
+  // Sized in WORLD units off pxPerWorldUnit, exactly as PIN_RADIUS and
+  // PIN_HALO already are, so the badge is a constant 12 CSS px at every
+  // zoom and on every device width — and because the symbol's own viewBox
+  // is 12 units wide, its 1.25 border and 1.6 glyph stroke land as 1.25
+  // and 1.6 CSS px with no vector-effect trickery.
+  //
+  // Never a pointer target and never a second thing for a screen reader
+  // to find: pointer-events:none (in CSS, with the rest of the badge's
+  // presentation) and aria-hidden here. The hit-area's own label carries
+  // the band in words — the badge carries it in geometry.
+  // Every badge this render produces, held back and placed in one pass
+  // after the group loop — the draw-order rule, and the single line that
+  // makes the band reachable on the 10 knotted pins without a hover the
+  // knot never offers. Appending each badge beside its own pin
+  // would put a later pin on top of an earlier pin's badge, which inside
+  // a knot is the common case, not the edge case. Held as ENTRIES rather
+  // than as elements because the placement pass below needs to see every
+  // badge at once (see placeReaderBadges).
+  const readerBadgeEntries = [];
+  function collectReaderBadge(entry) {
+    if (entry.markBand && BADGE_GLYPHS[entry.markBand]) readerBadgeEntries.push(entry);
+  }
+
+  // THE SPEC'S OWN NAMED RISK, MEASURED FIRING AND FIXED HERE. It was
+  // named with its own remedy: if badges collide, the fix is a per-knot
+  // badge angle — alternate upper-right / upper-left — which is geometry
+  // the build owns.
+  //
+  // IT FAILED. Rendered at 1x DPR in a 900px viewport with a reader at
+  // €2,500/month passive (all four bands on screen at once), badges on
+  // knotted pins overlapped each other and one glyph was partly covered
+  // by a neighbour's disc — on Portugal's three, on Crete's two and on
+  // Guatemala's two. Draw order keeps every badge above every PIN; it
+  // does nothing about a badge above a badge, which is the case a knot
+  // makes ordinary.
+  //
+  // THE RULE, and it is two lines because a knot is not one shape:
+  //   1. Upper-right is the default and stays the default — the badge
+  //      shape readers already parse, and the only side measured.
+  //   2. A badge that would overlap one already placed tries upper-LEFT,
+  //      and takes it only if that overlaps nothing. Otherwise it keeps
+  //      upper-right: a predictable position beats a scattered one, and a
+  //      knot dense enough to defeat both sides is a knot the reader
+  //      resolves by zooming, which this map already offers three ways.
+  // Placement order is by location_id, NOT by draw order, so a badge does
+  // not move because a fit score changed: the same knot resolves the same
+  // way on every render and between renders.
+  function placeReaderBadges() {
+    const size = BADGE_BOX / pxPerWorldUnit;
+    const dx = BADGE_OFFSET_PX / pxPerWorldUnit;
+    const placed = [];
+    const overlaps = (a, b) => Math.abs(a.x - b.x) < size && Math.abs(a.y - b.y) < size;
+    const ordered = [...readerBadgeEntries].sort((a, b) =>
+      a.loc.location_id < b.loc.location_id ? -1 : a.loc.location_id > b.loc.location_id ? 1 : 0);
+    const els = [];
+    for (const entry of ordered) {
+      const y = entry.cy - dx - size / 2;
+      const right = { x: entry.cx + dx - size / 2, y, side: "right" };
+      const left = { x: entry.cx - dx - size / 2, y, side: "left" };
+      let box = right;
+      if (placed.some((p) => overlaps(right, p)) && !placed.some((p) => overlaps(left, p))) box = left;
+      placed.push(box);
+      const glyph = BADGE_GLYPHS[entry.markBand];
+      const use = document.createElementNS(svgNS, "use");
+      use.setAttribute("href", `#${glyph.id}`);
+      use.setAttribute("x", box.x.toFixed(4));
+      use.setAttribute("y", box.y.toFixed(4));
+      use.setAttribute("width", size.toFixed(4));
+      use.setAttribute("height", size.toFixed(4));
+      use.setAttribute("class", "reader-badge");
+      use.setAttribute("aria-hidden", "true");
+      use.dataset.band = entry.markBand;
+      use.dataset.loc = entry.loc.location_id;
+      use.dataset.side = box.side;
+      els.push(use);
+    }
+    return els;
+  }
+
+  // THE BAND IN THE ARIA-LABEL — the fourth constraint.
+  // Under the reader's lens with verdicts ONLY; every other lens's labels
+  // are untouched, byte for byte. This is the one gate, read once per
+  // render rather than per pin, so a solo label and a knot label can
+  // never disagree about whether the reader has a read at all.
+  const readerLabelling = persona === READER_ID && hasReaderVerdicts(store);
+  // The state's own short form, or null where the box never read that
+  // country. READER_STATE_SHORT is asserted against STATE_HEADLINE's
+  // reader keys at module load (app-shared.js), so a lookup that comes
+  // back undefined here is impossible rather than merely unlikely.
+  const readerShort = (entry) => (entry.readerState ? READER_STATE_SHORT[entry.readerState] : null);
+  // Both forms of the pin label.
+  function soloAriaLabel(entry) {
+    const base = `${entry.loc.display_name}, ${entry.country.name}`;
+    if (!readerLabelling) return base;
+    const short = readerShort(entry);
+    return short
+      ? `${base}. ${READER_LABEL_READ_PREFIX} ${short}.`
+      : `${base}. ${READER_LABEL_UNREAD}`;
+  }
+  // §4.2 — one member's name, with its own read in parentheses. This is
+  // how a screen-reader user reaches the band on the 10 pins hover cannot.
+  function knotMemberName(entry) {
+    if (!readerLabelling) return entry.loc.display_name;
+    return `${entry.loc.display_name} (${readerShort(entry) || READER_LABEL_UNREAD_MEMBER})`;
   }
 
   // Shared by both the solo hit-circle and the knot's own shared hit-shape
@@ -1291,12 +1706,13 @@ function renderMap(store, lenses) {
       svg.appendChild(visualPin);
       const ring = makeHandCheckedRing(entry);
       if (ring) svg.appendChild(ring);
+      collectReaderBadge(entry);
 
       const hit = document.createElementNS(svgNS, "circle");
       hit.setAttribute("cx", entry.cx);
       hit.setAttribute("cy", entry.cy);
       // pxPerWorldUnit (not the old zoom-only "scale" ratio, since retired
-      // from this file — see makeVisualPin()'s own 2026-07-15 fix note)
+      // from this file — see makeVisualPin()'s own fix note)
       // is the CURRENT render's own true screen-px-per-world-unit ratio,
       // already device-width-aware and recomputed every render, so
       // dividing by it gives a genuinely constant ~HIT_RADIUS_PX CSS
@@ -1309,7 +1725,7 @@ function renderMap(store, lenses) {
       hit.setAttribute("class", "pin-hit-area");
       hit.setAttribute("tabindex", "0");
       hit.setAttribute("role", "link");
-      hit.setAttribute("aria-label", `${entry.loc.display_name}, ${entry.country.name}`);
+      hit.setAttribute("aria-label", soloAriaLabel(entry));
       hit.setAttribute("aria-expanded", "false");
       // Part 26.5: the location search's own post-select lookup needs a
       // solo pin's hit-area findable by location_id — the visible circle
@@ -1455,6 +1871,11 @@ function renderMap(store, lenses) {
         visualPins.push(pin);
         const ring = makeHandCheckedRing(drawEntry);
         if (ring) svg.appendChild(ring);
+        // Every knot member is already a real pin at its
+        // own true position, so each gets its own badge — drawn from the
+        // NUDGED entry so the badge follows the pin it belongs to when
+        // coincidence resolution moves it. Held for the after-loop pass.
+        collectReaderBadge(drawEntry);
       }
 
       // Ruling 3: one shared invisible hit-shape wrapping the group's real
@@ -1474,7 +1895,7 @@ function renderMap(store, lenses) {
       hit.setAttribute("class", "pin-hit-area");
       hit.setAttribute("tabindex", "0");
       hit.setAttribute("role", "button");
-      const names = group.map((p) => p.loc.display_name).join(", ");
+      const names = group.map(knotMemberName).join(", ");
       // v11 Part 20.2: the label's own "and separate
       // them" claim only renders when this knot's own resolving zoom will
       // actually leave every member mutually solo (knotWillFullySeparate(),
@@ -1501,8 +1922,120 @@ function renderMap(store, lenses) {
     }
   }
 
+  // THE DRAW-ORDER RULE, executed: every badge of this render, appended
+  // after every visual pin of this render. SVG has no z-index — the last
+  // element appended wins any overlap — so this one loop is what
+  // guarantees a neighbour's pin can never cover a badge, which inside a
+  // knot is the ordinary case and is exactly the reading that otherwise
+  // costs 2 to 7 zoom clicks.
+  //
+  // DEVIATION FROM THE LITERAL WORDING, NAMED: the spec says "before
+  // hit-areas", and these land after them, because the hit-areas are
+  // appended inside the group loop and pulling them out would rework the
+  // wiring of every pin on the map for no effect a reader can find. The
+  // badges are pointer-events:none and aria-hidden, so a badge over a
+  // transparent hit-circle changes neither what is clickable nor what a
+  // screen reader hears; what that order was FOR — no pin over a badge —
+  // is delivered strictly more strongly here than by the literal one.
+  for (const badge of placeReaderBadges()) svg.appendChild(badge);
+
+  // The key is a BAND ABOVE THE PLATE, inserted before .map-wrap inside
+  // #map-root — see the long note on buildReaderMarkKey(). Built here, at
+  // the end of the render, because readerLabelling and the badge set are
+  // only known once the pins are drawn; inserted before the wrap rather
+  // than appended to it, so it occupies its own space instead of taking
+  // space from the map. Rendered only where marks exist to explain.
+  if (readerLabelling) root.insertBefore(buildReaderMarkKey(), wrap);
+
   renderLegend(document.getElementById("map-legend"), persona, activeLens, store);
   renderJudgmentNote(document.getElementById("map-judgment-note"));
+}
+
+// =====================================================================
+// THE KEY BESIDE THE MAP, INSIDE THE PLATE, NEVER BELOW IT
+//
+// THE DEFECT, MEASURED WITH A RULER: the map sits at y=564-1098 and
+// the mark legend at y~1182 in a 900px viewport, so a reader could never
+// see a marked pin and its legend row at the same time. No amount of
+// wording fixes that; the key has to move.
+//
+// IT IS A BAND ABOVE THE PLATE, NOT A PANEL INSIDE IT. First child of
+// #map-root, before .map-wrap, in normal flow — DOM, not SVG, so it never
+// pans, scales or zooms with the map, and it occupies its own space
+// rather than taking any from the map.
+//
+// WHY IT LEFT THE PLATE, and this is the whole reason: an absolutely
+// positioned in-plate key COVERS PINS. It was placed bottom-left on the
+// reasoning that WORLD_VIEWBOX's bottom-left corner is open Pacific —
+// but the home view is not WORLD_VIEWBOX. It is
+// computeViewBoxForLocations(), a padded crop around the 38, whose
+// bottom-left corner sits at Patagonian latitude with the Andes about
+// 230px in. Measured on the rendered page, a 240x299 panel at 94%
+// opacity in a 534px plate covered three pins (CO-medellin,
+// CO-santamarta, EC-cuenca) and four labels at 1280 and 1440; collapsed
+// at 700 it still covered AR-buenosaires.
+//
+// AND NO CORNER FIXES IT. Measured at 1179 wide: top-left covers 13 pins
+// including both marked Guatemala pins and their badges, top-right
+// covers 5 including three marked Thai pins, bottom-right covers 4 and
+// sits on .zoom-controls. The largest clear rectangle in the bottom-left
+// corner is 232x180, too small for these rows at their real wording, and
+// below 700px the only state that covers nothing is a collapsed "Key".
+// A key the reader must close to see the pin it explains is a pin
+// subtracted from the eye at the moment the key is read.
+//
+// WHY ABOVE AND NOT BELOW: the below-map legend's defect was DISTANCE,
+// not direction — it sat after the Fit ramp and its anchor string, about
+// 500px from the nearest marked pin. Above, the reader meets the
+// vocabulary before the marks, and 7 of the 12 marked pins (Portugal x3,
+// Spain x2, Crete x2) sit in the plate's top ~115px, roughly one glance
+// from the band.
+//
+// COVERAGE IS 0 PINS, 0 BADGES, 0 LABELS AT EVERY WIDTH BY CONSTRUCTION:
+// nothing here is absolutely positioned, so nothing can overlap the map.
+//
+// THE ROWS ARE KEYED BY BAND, NOT BY STATE, and that is the structural
+// half of the fix rather than a tidy-up. The retired key had seven
+// state-keyed rows, and the re-band left three states — the partial-read
+// ones — wearing a mark that stood under no row at all. A
+// band-keyed key cannot have that gap: every state STATE_BAND can emit
+// sits under exactly one row, and each label is written to be true of
+// every state in its band. The tooltip still carries each state's own
+// sentence; the key compresses, the tooltip diagnoses.
+const READER_MARK_KEY_TITLE = "Mark on a pin — your own income read:";
+const READER_MARK_ROWS = [
+  { band: "clean", label: "Above the bar, on income" },
+  { band: "uncertain_or_conditional", label: "Not settled — right at the line, above with conditions, or a no on only the routes the site could read" },
+  { band: "hard_fail", label: "Doesn't clear on income — below the bar, or not this kind of income" },
+  { band: "data_gap", label: "Couldn't be read — not enough recorded, or the bar is in another currency" },
+];
+// The trailing line, no swatch: the absence is a state too, and the
+// perspective-disclosure law makes it one the key has to name.
+const READER_MARK_KEY_TRAILING = "No mark: this box hasn't read that country against your figures.";
+
+function buildReaderMarkKey() {
+  const details = document.createElement("details");
+  details.className = "reader-mark-key";
+  details.id = "reader-mark-key";
+  // OPEN AT EVERY WIDTH. Co-visible by default is the constraint, and a
+  // key that starts closed on a narrow screen is the same defect in
+  // miniature: present in the DOM, reaching nobody. The reader can still
+  // fold it — a fold moves the plate up by the band's height and changes
+  // nothing else, because the band is in normal flow. No matchMedia and
+  // no resize listener: there is no width at which the default differs,
+  // so there is no state a rotation could strand.
+  details.open = true;
+  const rows = READER_MARK_ROWS.map(({ band, label }) => `
+      <li class="reader-mark-key-row">
+        <svg class="reader-mark-key-swatch" viewBox="0 0 ${BADGE_BOX} ${BADGE_BOX}" width="${BADGE_BOX}" height="${BADGE_BOX}" aria-hidden="true" focusable="false"><use href="#${BADGE_GLYPHS[band].id}"></use></svg>
+        <span>${escapeHtml(label)}</span>
+      </li>`).join("");
+  details.innerHTML = `
+    <summary>${escapeHtml(READER_MARK_KEY_TITLE)}</summary>
+    <ul class="reader-mark-key-rows">${rows}</ul>
+    <p class="reader-mark-key-trailing">${escapeHtml(READER_MARK_KEY_TRAILING)}</p>
+  `;
+  return details;
 }
 
 // Zoom controls (Part 9 item 1): fixed bottom-right of #map-root, one of
@@ -1542,13 +2075,13 @@ function wireMapInteractions(store, lenses) {
     const svgEl = root.querySelector("svg");
     if (!svgEl) return;
     const focal = clientToWorld(svgEl, e.clientX, e.clientY, boxCenter(STATE.viewBox || homeViewBox(store)));
-    // Throttled path (2026-07-16 fix): a fast scroll/trackpad gesture fires
+    // Throttled path (fix): a fast scroll/trackpad gesture fires
     // dozens-to-hundreds of these in under a second — see applyZoomThrottled()'s
     // own header comment for the reproduced freeze this replaces.
     applyZoomThrottled(store, lenses, e.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, focal);
   }, { passive: false });
 
-  // Entry point 2b: click-and-drag panning — flagged live, 2026-07-14,
+  // Entry point 2b: click-and-drag panning — flagged live:
   // "we can't move around on a zoomed-in map." There was previously no
   // way to pan except the arrow keys. Tracked in plain screen-pixel
   // fractions against the viewBox captured at drag-start (not the live
@@ -1637,7 +2170,7 @@ function wireMapInteractions(store, lenses) {
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       const focal = clientToWorld(svgEl, midX, midY, boxCenter(pinchStartBox));
       STATE.viewBox = pinchStartBox; // pivot from the gesture's own start each move, not the last frame
-      // Throttled path (2026-07-16 fix, same reason as the wheel handler
+      // Throttled path (fix, same reason as the wheel handler
       // above): a real 2-finger pinch fires touchmove just as rapidly as a
       // wheel gesture does. Safe with the pivot-from-start line above since
       // computeZoomState() still runs synchronously on every raw event —
@@ -1817,7 +2350,7 @@ function computeMapViewBox(store) {
   return computeViewBoxForLocations(store.locations);
 }
 
-// v6 addendum R4 / 2026-07-13 placeholder: the site's first pure
+// v6 addendum R4 placeholder: the site's first pure
 // ornament slot — asserting no fact, citing no source, carrying no
 // confidence tier (exempt from the why/instead render contract by
 // construction). The original line-art longship attempt is retired by
@@ -1861,7 +2394,7 @@ function renderOrmenLange(svg, svgNS) {
 // shared vocabulary every persona's legend uses (renderVerdictKey(),
 // below) -- no longer split across two differently-worded legend blocks.
 //
-// NO SEVENTH ROW HERE, deliberately (2026-09-10). This object is a COLOR
+// NO SEVENTH ROW HERE, deliberately. This object is a COLOR
 // key -- renderVerdictKey() below reads STATE_HEADLINE_BAND[state] to pick
 // each row's swatch -- and the seventh verdict state (the location-capped
 // null; see STATE_HEADLINE's own note in app-shared.js) is precisely the
@@ -1882,6 +2415,88 @@ const STATE_CHIP_LABEL = {
   DEAD_END_BLOCKING: "Confirmed dead end",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet",
 };
+
+// Door v2: the reader's legend, REBUILT FOR THE OVERLAY.
+//
+// WHAT IT REPLACES, kept so the change is legible: a three-row key of
+// BANDS, written for the fill-replacement build, whose rows described the
+// colour a read pin was PAINTED. Under the overlay no pin is painted a
+// band colour at all — the fill is the Fit ramp on all 38 — so a
+// band-coloured fill key would describe colours the pins do not paint,
+// which is this file's own Part 15.5 defect exactly.
+//
+// THE SHAPE, as specified: the Fit ramp and its anchor line come FIRST,
+// because the ramp is what the fills mean now; the mark key follows,
+// titled for what a mark is rather than what a colour is; the trailing
+// sentence carries the two layers in one line. The rows are keyed by STATE, one
+// label each, which is the same shape the shipped persona legend
+// (renderVerdictKey below) already uses and swatches the same way —
+// STATE_HEADLINE_BAND[state] -> bandVisual().color — so the reader's key
+// and the personas' key are one construction, not two.
+//
+// THE SWATCH IS A RING, NOT A FILLED BLOCK, and not the hatch. Both
+// follow from the overlay rather than from taste: the mark is a stroke on
+// a pin whose fill is the reader's fit colour, so a filled swatch would
+// claim the pin is painted that colour, and the hatch is a FILL (see
+// readerPinPaint's own note) and is not drawn on any reader pin.
+//
+// THE SEVEN STATE-KEYED MARK ROWS ARE RETIRED, and the gap this comment
+// used to name is closed by the retirement rather than by filling it.
+// KEPT SO THE CHANGE IS LEGIBLE, because the gap was real: the key's
+// state table was written before the three partial-read states were
+// re-banded, which left READER_BELOW_SOME_UNREAD,
+// READER_WRONG_TYPE_SOME_UNREAD and READER_NONE_CLEARS_SOME_UNREAD
+// wearing a mark that stood under no row.
+// The seven rows were:
+//   READER_ABOVE_BAR          "Above the bar, on income"
+//   READER_ABOVE_CONDITIONAL  "Above the bar, with conditions"
+//   READER_AT_LINE            "Right at the line"
+//   READER_BELOW_BAR          "Below the income bar"
+//   READER_WRONG_TYPE         "Not this kind of income"
+//   READER_NONE_CLEARS        "No route clears on income"
+//   READER_NOT_ENOUGH         "Not enough recorded to read against your figures"
+// plus the title "What a mark on a pin means for you:".
+//
+// THE FIX IS STRUCTURAL, NOT A SEVENTH-AND-EIGHTH ROW: the mark is per
+// BAND, so the key is keyed by band (READER_MARK_ROWS, above, beside the
+// key that now renders it), and a band-keyed key cannot have that gap
+// again. The last row also retires a second defect of its own — "Not
+// enough recorded to read against your figures" was the misdiagnosed
+// cause, corrected in the headline in app-shared.js and left standing
+// here, so the key and the tooltip disagreed about the cause set. The band row that replaces it carries the
+// headline's own cause set.
+//
+// ONE KEY, IN THE PLATE. Not two keys that can drift, and not a key a
+// reader cannot see at the same time as the thing it explains.
+// The legend's trailing sentence, with one substitution landed: "the
+// mark" -> "the mark at a pin's top-right", once, in the first clause,
+// because the mark is no longer a stroke ON the pin and a sentence that
+// says otherwise sends the eye to the wrong pixels. ONE constant, ONE
+// remaining substitution: "fits your priorities" / "fits, on the general
+// figures".
+const READER_LEGEND_NOTE_TEMPLATE =
+  "The color is how well the place {fitClause}; the mark at a pin's top-right is whether its residence routes take your income, read against income bars and nothing else yet. Pins with no mark are in countries this box hasn't read against your figures — their color is still the place's Fit index, and none of it is a verdict.";
+const READER_LEGEND_FIT_CLAUSE_WEIGHTED = "fits your priorities";
+const READER_LEGEND_FIT_CLAUSE_GENERAL = "fits, on the general figures";
+
+function renderReaderVerdictKey(scaleHtml, weighted) {
+  // The ramp's own title is the SHIPPED one this same reader sees in the
+  // no-verdicts state two branches below — reused rather than rewritten,
+  // so entering numbers does not change what the fill legend calls
+  // itself, which is the legend-side reading of "entering numbers never
+  // subtracts a pin".
+  const rampTitle = weighted
+    ? `Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)})`
+    : "Pin color — general Fit index";
+  const note = READER_LEGEND_NOTE_TEMPLATE.replace(
+    "{fitClause}",
+    weighted ? READER_LEGEND_FIT_CLAUSE_WEIGHTED : READER_LEGEND_FIT_CLAUSE_GENERAL
+  );
+  return `<div class="legend-scale">${rampTitle}: ${scaleHtml}</div>`
+    + `<span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>`
+    + `<span>${escapeHtml(note)}</span>`
+    + bandDisclosureHtml();
+}
 
 // Part 23.9: one shared verdict-meaning key — replaces the duplicated
 // swatch-building logic the hasFixtures branch and the five-no-fixture
@@ -1930,7 +2545,7 @@ function renderLegend(el, persona, activeLens, store) {
   // it would mislabel the unrelated honey-gold ramp) is retired; a
   // meaning label has no hue to mismatch, so it now renders in both
   // themes for free (see getScaleLegend()'s own comment).
-  // 2026-08-12 live-toggle repaint fix: each stop marked with the exact
+  // Live-toggle repaint fix: each stop marked with the exact
   // integer value getScaleLegend() derived its color from (equal to
   // scoreToColor(s.value) by construction — both index stops[v-1] off the
   // same currentScaleStops()) — "score" kind, RAMP_VALUE_ATTR/
@@ -1968,13 +2583,22 @@ function renderLegend(el, persona, activeLens, store) {
     return;
   }
 
-  if (persona === "custom") {
-    // v11 Part 21: same general ramp as the no-persona case below, just
-    // titled and disclosed as the reader's own weighted read — never a
-    // verdict-band legend (21.7's own scope boundary: no eligibility
-    // concept exists for this identity).
+  if (persona === READER_ID) {
+    // Door v2: the reader's legend follows the reader's pins, which is
+    // the whole reason this branch exists rather than one generic one —
+    // a legend that describes colours the pins are not painting is the
+    // defect Part 15.5 was written to fix, and the reader identity can
+    // now paint two completely different channels.
+    const weighted = hasReaderWeights();
+    if (hasReaderVerdicts(store)) {
+      el.innerHTML = renderReaderVerdictKey(scaleHtml, weighted);
+      return;
+    }
+    const title = weighted
+      ? `Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)})`
+      : "Pin color — general Fit index";
     el.innerHTML = `
-      <div class="legend-scale">Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)}): ${scaleHtml}</div>
+      <div class="legend-scale">${title}: ${scaleHtml}</div>
       <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
       ${bandDisclosureHtml()}
     `;

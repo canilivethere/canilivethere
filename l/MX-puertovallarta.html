@@ -21,6 +21,16 @@
 <body data-loc-id="MX-puertovallarta">
 <div class="site-topbar">
   <a class="brand" href="../index.html">CanILiveThere</a>
+  <!-- A no-JS reader gets a door, not a dead corner. The
+       same control js/app-shared.js renders after hydration, as a plain
+       link — which is all it ever is on a page other than the map. The
+       value reads "nobody yet" because a static page cannot know what is
+       in this browser's storage, and saying so is the perspective-
+       disclosure law's own no-lens clause, not a placeholder. -->
+  <a class="corner-lens" href="../index.html?reopen=1" aria-label="Who's asking: nobody yet — opens the box to change it">
+    <span class="corner-lens-prefix">Who's asking:</span>
+    <span class="corner-lens-value">nobody yet</span>
+  </a>
   <nav class="site-nav"><a href="../index.html">Map</a><a href="../lists.html">Lists</a></nav>
 </div>
 <main>
@@ -351,7 +361,7 @@
     <p><a href="../lists.html">Back to the full list</a> · <a href="../index.html">Back to the map</a></p></div>
   </div>
 </main>
-<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="MX-puertovallarta.html">reload with JavaScript enabled</a> for the full interactive version (persona switching, live re-coloring, collapsible chapters).</p><p>Want something researched, or found something wrong? <a href="../contact.html">Write to us.</a></p></footer>
+<footer class="site-footer"><p>CanILiveThere is a research tool, not legal or immigration advice. This page is a static snapshot for search engines and no-JS browsers — <a href="MX-puertovallarta.html">reload with JavaScript enabled</a> for the full interactive version (your own perspective on this place, live re-coloring, collapsible chapters).</p><p>Want something researched, or found something wrong? <a href="../contact.html">Write to us.</a></p></footer>
 <script type="module" src="../js/location.js"></script>
 </body>
 </html>

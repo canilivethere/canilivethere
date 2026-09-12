@@ -50,7 +50,7 @@ const CATEGORY_TITLE = {
 // verbatim, zero prose authored here. Each carries exactly the claims
 // 39.8 fixes for its slot.
 // ---------------------------------------------------------------------
-// C1 — perspective/basis disclosure (law, 2026-07-17). Three fixed
+// C1 — perspective/basis disclosure (law). Three fixed
 // claims: (1) general figures, persona-independent (worded to read
 // true in the no-lens state too); (2) USD is a display conversion,
 // approximate, not the sourced figure; (3) sort basis named. Rendered

@@ -677,7 +677,7 @@ function buildVerdictHtml(store, row, persona) {
     // the routes the BOX read, and only the reader's rows are composed
     // from those. The eight worked examples are untouched — the engine
     // refuses on dependents for them, it does not assume.
-    const basisLine = persona === READER_ID && readerBasisIsAssumed(store, row.loc.country_id)
+    const basisLine = persona === READER_ID && readerBasisIsAssumed(store, row.loc)
       ? `<div class="verdict-prose">${escapeHtml(READER_BASIS_DECLARED_LINE)}</div>`
       : "";
     return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${basisLine}`;

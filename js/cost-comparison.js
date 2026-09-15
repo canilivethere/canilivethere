@@ -33,7 +33,7 @@ import { fetchJsonl } from "./data.js";
 import { siteUrl } from "./site-root.js";
 import {
   escapeHtml, formatValue, confidenceBadge, sourceLine,
-  usdNumeric, fxRatesLoaded, withPersona,
+  usdNumeric, fxRatesLoaded, withPersona, loadOwnNumbers,
 } from "./app-shared.js";
 
 // Category title registry. "Rent — 2-bedroom apartment" is Part 39.2's
@@ -88,6 +88,17 @@ const COPY_C4_FX_BLOCKED =
 // axis carries the price. The scope sentence points at the per-row
 // notes (segment / season / wider-than-the-place anchors, §8AP's
 // mandatory disclosures) without restating them.
+// THE BEFORE-TAX LINE, RULED AND LANDED VERBATIM. Not reworded, not
+// merged into the footnote above, and not softened: it is the one thing
+// the cost read cannot work out and has to say so about.
+//
+// GATED ON THE READER HAVING A FIGURE, for one reason — "Your figure"
+// needs a referent. On the general, no-figures view the panel says
+// plainly that rent doesn't care who's asking, and a sentence about a
+// figure nobody entered would be the panel talking about something that
+// is not on the screen.
+const COPY_C6_BEFORE_TAX =
+  "Your figure is before tax; what you'd keep depends on where you'd be taxed, which this site doesn't work out.";
 const COPY_C5_FOOTNOTE =
   "Every figure here is a sourced fact with its own date and confidence badge; the dollar figures are approximations at today's rate. Bar color carries no meaning, and a longer bar means a wider low-to-high range, not a costlier place. Where a figure covers one neighborhood, one season, or an area wider than the place itself, the note under its row says so. A place missing from the chart is a research gap, not a verdict.";
 
@@ -302,6 +313,9 @@ export function renderCostComparisonPanel(store, rows, container) {
     html += `<ul class="cost-gap-list">` +
       gaps.map((g) => gapItemHtml(store, g)).join("") +
       `</ul>`;
+  }
+  if (loadOwnNumbers()) {
+    html += `<p class="cost-footnote cost-before-tax">${escapeHtml(COPY_C6_BEFORE_TAX)}</p>`;
   }
   html += `<p class="cost-footnote">${escapeHtml(COPY_C5_FOOTNOTE)}</p>`;
 

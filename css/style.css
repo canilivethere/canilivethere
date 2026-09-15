@@ -454,14 +454,35 @@ h3 { font-size: 1.05rem; }
 .principle-closing { font-size: 0.8rem; color: var(--muted); }
 
 /* ---------- map surface ---------- */
-.map-wrap { position: relative; width: 100%; }
-/* v8 Part 2: the map plate now takes the same pasted-plate contract every
-   other card on this site uses (v7 §1.5.2) — 3px corner radius (cut-paper,
-   not phone-app; was 6px) and the warm oxblood-family shadow, alongside
-   its own already-present --line border. Closes the last surface that
-   still spoke the old cool-blue product language, now that R1/R6 have
-   handled the other two (country fills, water tone). */
-#worldmap { width: 100%; height: auto; background: var(--map-water); border: 1px solid var(--line); border-radius: 3px; box-shadow: 0 1px 4px rgba(140, 47, 27, 0.08); }
+/* THE PLATE IDENTITY LIVES ON THE WRAP, NOT ON THE SVG. The reader's mark
+   key is now .map-wrap's first child, in normal flow, and it has to be
+   INSIDE the plate's frame rather than on a second card above it — so the
+   border, radius, background and shadow that made the SVG look like a
+   pasted plate move up one element and the key, the hairline and the
+   projection read as one card. v8 Part 2's contract is unchanged in
+   substance: same 3px cut-paper radius, same --line border, same warm
+   oxblood-family shadow; only which element carries them moved.
+   NO `overflow: hidden` HERE, and it is named because it is the obvious
+   tidy-up: .pin-label-tooltip and .pin-teaser are absolute children of
+   this wrap and legitimately extend past the plate's edge. Clipping would
+   silently cut two shipped surfaces. The SVG's own bottom-corner radius
+   below is the fix that does not clip anything. */
+.map-wrap {
+  position: relative; width: 100%;
+  background: var(--map-water);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(140, 47, 27, 0.08);
+}
+/* `display: block` is load-bearing, not tidiness. Without it the SVG is an
+   inline element, its line box carries descender space, and the plate
+   measured ~7px taller than the map inside it — a phantom gap under the
+   projection that nobody specified. Measured: .map-wrap 533.6 against an
+   SVG of 526.6 before, exact after.
+   The bottom two corners are rounded here because the wrap now owns the
+   top two and the SVG's own water would otherwise square off the bottom
+   of the card. */
+#worldmap { width: 100%; height: auto; display: block; background: var(--map-water); border: 0; border-radius: 0 0 3px 3px; box-shadow: none; }
 /* v2 addendum §4.2: pins draw the eye first regardless of paint order —
    country outlines (v8 R1: uniform fill, never a computed value) sit
    underneath as flatter, quieter background context. */
@@ -553,32 +574,45 @@ h3 { font-size: 1.05rem; }
 .reader-badge-disc { fill: var(--panel); stroke: var(--ink); stroke-width: 1.25; }
 .reader-badge-glyph { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
-/* The key is a BAND ABOVE THE PLATE — normal flow, full content width,
-   first child of #map-root. It was an absolutely-positioned panel inside
-   the plate; measured on the rendered page it covered three pins and four
-   labels at 1280 and 1440, and no corner of the plate is clear enough to
-   hold it (the reasoning is in js/map.js's buildReaderMarkKey header).
-   In flow it can cover nothing, at any width, by construction.
-   The defect that moved it out of the page's tail in the first place was
-   measured with a ruler: map at y=564-1098, mark legend at y~1182, in a
-   900px viewport — a marked pin and its legend row could not be seen at
-   once. Above the plate that distance is a few pixels.
-   OPAQUE, not the 94% it carried inside the plate: that transparency
-   existed to read land through the panel, and there is no land under it
-   now. Materials are otherwise the zoom buttons' own (--panel, --ink, the
-   hand-checked ring's ink-at-0.55 idiom), because a second visual
-   vocabulary here is the "municipal overlay" the map surface is ruled
-   against. */
+/* THE KEY IS A RESERVED BAND INSIDE THE PLATE — normal flow, first child
+   of .map-wrap, sitting on the map's own water with the projection
+   starting at its last hairline and no gap between them.
+   Three placements were tried and two failed, which is why this one is
+   spelled out rather than assumed:
+   (1) an absolutely-positioned panel inside the plate covered three pins
+       and four labels at 1280 and 1440 — measured on the rendered page;
+   (2) a band ABOVE the plate covered nothing, but it was a second card
+       with page between it and the map, and on a phone it wrapped 696px
+       of explanation around 166px of map;
+   (3) this one: reserved space inside the frame. It can cover nothing at
+       any width, at any zoom, AFTER ANY DRAG — which is the property the
+       overlay never had, because a position argued against "empty ocean"
+       has a half-second shelf life on a map the reader can pan.
+   TOP of the plate, not bottom: measured, the nearest marked pin sits
+   89.7px below a top strip and 293.2px above a bottom one at 1280, and 7
+   of the 12 marked pins live in the plate's top band.
+   TRANSPARENT, not the --panel it carried above the plate: the water IS
+   the background now, and a second opaque surface printed on the map is
+   the "municipal overlay" this map is ruled against. One hairline
+   separates the two, at the retired panel border's own ink-at-55% —
+   --line itself measures 1.34:1 on water in dark theme and would be
+   invisible on the very surface it divides. */
 .reader-mark-key {
-  margin: 0 0 0.5rem;
+  margin: 0;
   padding: 0.5rem 0.65rem;
-  background: var(--panel);
-  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
-  border-radius: 3px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
+  border-radius: 0;
   font-size: 0.8rem;
   color: var(--ink);
 }
-.reader-mark-key > summary { cursor: pointer; font-weight: 600; list-style-position: outside; }
+/* `inside`, and no rect measurement can catch why: a list marker has no
+   box of its own, so the disclosure triangle was being drawn ~16px left
+   of the summary's content box — 4.6px OUTSIDE the plate's left border
+   once the key became the plate's own top band, clipped in light theme
+   and floating on the page background in dark. Found by eye. */
+.reader-mark-key > summary { cursor: pointer; font-weight: 600; list-style-position: inside; }
 /* Rows run INLINE and wrap, because the band is full content width and a
    column of four would make it needlessly tall. Each row may wrap inside
    itself (max-width in em, so it tracks the type) rather than forcing one
@@ -908,6 +942,11 @@ body.door-open .site-topbar { visibility: hidden; }
 .door-portrait-icon { color: var(--muted); }
 .door-name { font-family: "Fraunces", serif; font-weight: 700; font-size: 1rem; }
 .door-descriptor { font-size: 0.8rem; color: var(--muted); }
+/* The reference band on a tile — a measured stand-in beside a persona's
+   own recorded figure, never instead of it. Set apart by a rule and a
+   step down in size so it cannot be read as part of the descriptor
+   sentence above it, which is the one way this line could do harm. */
+.door-tile-band { font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.4rem; margin-top: 0.1rem; }
 
 /* v11 Part 21.4: the questionnaire's own two sub-screens, swapped into
    .door-panel's own content in place of the tile grid — same panel, same

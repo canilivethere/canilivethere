@@ -1035,6 +1035,18 @@ function renderMap(store, lenses) {
     // state's own short form, which the band alone cannot give.
     let markBand = null;
     let readerState = null;
+    // THE PRESENCE FILTER'S OWN INPUTS — the persona legend lists a state
+    // iff a pin on THIS render carries it. Two
+    // fields, not one, because a pin can carry its reading in either of
+    // the two vocabularies this map paints from:
+    //   verdictState  - the engine's `overall_state`, the key
+    //                   STATE_CHIP_LABEL is indexed by.
+    //   verdictKind   - verdictVisual()'s own kind, for the hand-fixture
+    //                   pins on Wenda/Carmen, which carry no engine state
+    //                   at all. Recorded so the filter can never drop the
+    //                   only row explaining a colour a fixture pin paints.
+    let verdictState = null;
+    let verdictKind = null;
     // Part 30.8 (score-driven pin draw order): set
     // alongside `fill` in every branch below. `isRampColored` is true only
     // when the FINAL rendered fill is a scoreToColor()/indexToColor() call
@@ -1171,6 +1183,7 @@ function renderMap(store, lenses) {
         const vHeadline = verdictHeadline(verdict.expected);
         const visual = verdictVisual(vHeadline);
         isRampColored = false; // a verdictVisual() consumer either way (eliminated hatch ignores `fill`; the else branch overwrites it)
+        verdictKind = visual.kind;
         if (visual.kind === "eliminated") { eliminated = true; }
         else { fill = visual.color; }
         const indexLabel = `Fit index shown: ${underlyingValue != null ? underlyingValue.toFixed(1) : "n/a"}/5`;
@@ -1185,6 +1198,7 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note, not a ramp pin
+        verdictState = engineVerdict.overall_state;
         const stateText = stateHeadline(engineVerdict.overall_state);
         // Same instead-line as the `if (verdict)`
         // branch just above, extended to this engine-only case.
@@ -1281,7 +1295,7 @@ function renderMap(store, lenses) {
         // is recorded rather than quietly resolved — this makes a compact
         // surface four lines deep, and if it crowds, this is the copy of
         // the sentence to drop, not the location page's.
-        const basisLine = readerBasisIsAssumed(store, loc.country_id)
+        const basisLine = readerBasisIsAssumed(store, loc)
           ? `\n${READER_BASIS_DECLARED_LINE}`
           : "";
         // The first tooltip, landed from the spec: "The pin's color is
@@ -1339,6 +1353,7 @@ function renderMap(store, lenses) {
         gap = visual.gap;
         eliminated = visual.eliminated;
         isRampColored = false; // a bandVisual() consumer -- 30.8's own scope note
+        verdictState = verdict.overall_state;
         const stateText = stateHeadline(verdict.overall_state);
         // Same instead-line as the Wenda/Carmen and
         // Waldo engine branches above — the five-no-fixture-persona case
@@ -1381,7 +1396,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState, verdictState, verdictKind });
   }
 
   const wrap = document.createElement("div");
@@ -1556,6 +1571,28 @@ function renderMap(store, lenses) {
     if (entry.markBand && BADGE_GLYPHS[entry.markBand]) readerBadgeEntries.push(entry);
   }
 
+  // The painted set, collected at the same two draw sites as the badges
+  // above and for the same reason: this is the only place that knows which
+  // pins a render actually put on the map. A knot draws at most RENDER_CAP
+  // of its members, so reading the verdict file instead would describe a
+  // map that was not drawn.
+  const paintedStates = new Set();
+  const paintedKinds = new Set();
+  // Whether a hand-checked RING is actually drawn on this render, which is
+  // a different question from whether this persona has fixture ROWS.
+  // Measured: five personas carry fixture rows, render the sentence
+  // explaining what a ring means, and draw ZERO rings — the sentence
+  // describes a mark that is not on their map. The ring is drawn by
+  // makeHandCheckedRing() iff entry.handChecked, so this is the same
+  // signal the drawing uses, collected at the same two draw sites as the
+  // badges and the painted states above.
+  let ringDrawn = false;
+  function collectPaintedVerdict(entry) {
+    if (entry.verdictState) paintedStates.add(entry.verdictState);
+    if (entry.verdictKind) paintedKinds.add(entry.verdictKind);
+    if (entry.handChecked) ringDrawn = true;
+  }
+
   // THE SPEC'S OWN NAMED RISK, MEASURED FIRING AND FIXED HERE. It was
   // named with its own remedy: if badges collide, the fix is a per-knot
   // badge angle — alternate upper-right / upper-left — which is geometry
@@ -1707,6 +1744,7 @@ function renderMap(store, lenses) {
       const ring = makeHandCheckedRing(entry);
       if (ring) svg.appendChild(ring);
       collectReaderBadge(entry);
+      collectPaintedVerdict(entry);
 
       const hit = document.createElementNS(svgNS, "circle");
       hit.setAttribute("cx", entry.cx);
@@ -1771,11 +1809,42 @@ function renderMap(store, lenses) {
       // which comes from clusterPins()'s own union-find and isn't stable
       // across renders) so the same members render, in the same order, on
       // every repaint; draw at most RENDER_CAP of them as real circles.
-      const sortedGroup = [...group].sort((a, b) => {
+      const byLocationId = (a, b) => {
         const ai = a.loc.location_id, bi = b.loc.location_id;
         return ai < bi ? -1 : ai > bi ? 1 : 0;
-      });
-      const rendered = sortedGroup.slice(0, RENDER_CAP);
+      };
+      const sortedGroup = [...group].sort(byLocationId);
+      // A MARKED MEMBER IS NEVER THE ONE THE CAP DROPS, and this is a real
+      // defect fix, not a preference.
+      //
+      // MEASURED: at <=390px the Mediterranean/Iberia band collapses into
+      // ONE knot of 14 members. RENDER_CAP is 12, the truncation was by
+      // location_id alone, and the two members past the cut were
+      // PT-lisbon and PT-porto — both of which the reader's box HAD read
+      // and marked. The map drew 34 pins and 10 badges where the desktop
+      // drew 38 and 12; the knot's own aria-label went on naming all 14.
+      // So the key's promise — a mark sits on a pin — was false on a
+      // phone, for the two places a reader is most likely to care about,
+      // silently and at every render.
+      //
+      // It was reported as marks lost on the door's close path. It is not
+      // that: the count is identical before and after a full box round
+      // trip at every width (verified), and identical below 390 in both
+      // states. The trigger is width, and the mechanism is this cap.
+      //
+      // The cap stays — it exists so a dense knot does not become a blob —
+      // and the order it cuts in changes: members carrying a reader mark
+      // are kept first, the rest fill the remainder by location_id, and
+      // the selected set is then re-sorted by location_id so draw order
+      // is unchanged in character. Deterministic and repeat-stable for a
+      // given reader state. Unmarked members past the cap are still named
+      // in the knot's aria-label and still reachable by zoom, exactly as
+      // before; that was already the cap's accepted cost.
+      const isMarked = (e) => !!(e.markBand && BADGE_GLYPHS[e.markBand]);
+      const rendered = (sortedGroup.length <= RENDER_CAP
+        ? sortedGroup
+        : [...sortedGroup.filter(isMarked), ...sortedGroup.filter((e) => !isMarked(e))].slice(0, RENDER_CAP)
+      ).sort(byLocationId);
 
       // Ruling 2: near-exact coincidence (true on-screen distance under
       // COINCIDENCE_PX_THRESHOLD) gets a small, deterministic, capped
@@ -1876,6 +1945,7 @@ function renderMap(store, lenses) {
         // NUDGED entry so the badge follows the pin it belongs to when
         // coincidence resolution moves it. Held for the after-loop pass.
         collectReaderBadge(drawEntry);
+        collectPaintedVerdict(drawEntry);
       }
 
       // Ruling 3: one shared invisible hit-shape wrapping the group's real
@@ -1895,7 +1965,31 @@ function renderMap(store, lenses) {
       hit.setAttribute("class", "pin-hit-area");
       hit.setAttribute("tabindex", "0");
       hit.setAttribute("role", "button");
-      const names = group.map(knotMemberName).join(", ");
+      // THE SEPARATOR IS "; ", IN BOTH BRANCHES — a live defect, not a
+      // preference. Three display names CONTAIN ", " (Asheville, NC ·
+      // Chattanooga, TN · Rincón, Puerto Rico), so joining with ", "
+      // made the Americas knot announce itself as SEVENTEEN places for
+      // fourteen. In the reader's lens it is worse by construction:
+      // knotMemberName() appends the state's short form in parentheses and
+      // five of the ten READER_STATE_SHORT strings carry a comma of their
+      // own. A semicolon is standard English for a list whose items
+      // contain commas, and it is a pause in speech rather than a
+      // character read aloud — which matters, because this label's only
+      // reader is a screen-reader reader (§4.5: the knot has no tooltip).
+      const KNOT_SEPARATOR = "; ";
+      // Ordered off a FRESH copy of `group`, and neither off `rendered` nor
+      // off `sortedGroup`. Both of those are unsafe here and it is not
+      // obvious from reading them: where a knot does not truncate,
+      // `rendered` IS `sortedGroup` (the same array object, not a copy),
+      // and the ramp-sort above reorders it in place by fit value. Reading
+      // the names off either one made a knot announce its members in a
+      // different order whenever a score changed — measured on the
+      // reader's lens, where every pin is ramp-coloured. `group` is never
+      // mutated, so a copy of it sorts the same way on every render.
+      const drawnIds = new Set(rendered.map((e) => e.loc.location_id));
+      const orderedMembers = [...group].sort(byLocationId);
+      const shown = orderedMembers.filter((e) => drawnIds.has(e.loc.location_id));
+      const notShown = orderedMembers.filter((e) => !drawnIds.has(e.loc.location_id));
       // v11 Part 20.2: the label's own "and separate
       // them" claim only renders when this knot's own resolving zoom will
       // actually leave every member mutually solo (knotWillFullySeparate(),
@@ -1903,9 +1997,24 @@ function renderMap(store, lenses) {
       // instead, so the label never promises a separation the click won't
       // deliver. Same member names either way; only the closing promise
       // changes.
+      //
+      // AND IT STILL PROMISES NOTHING ABOUT THE UNDRAWN ONES. Activating
+      // re-fits the view to every member and the cap then applies again to
+      // whatever knots remain, so "zooming shows the rest" is not
+      // guaranteed by construction and is not claimed (§4.4).
       const separates = knotWillFullySeparate(group, containerWidthPx);
       const promise = separates ? "Activate to zoom in and separate them." : "Activate to zoom in for a closer look.";
-      hit.setAttribute("aria-label", `${group.length} locations close together: ${names}. ${promise}`);
+      // THE COUNT AND THE SHORTFALL LAND IN THE FIRST SIX WORDS, before a
+      // twelve-name list, not after it: a caveat behind twelve names is a
+      // caveat most listeners never reach. The names of the undrawn members
+      // then close the disclosure, so "some are missing" is never left as
+      // an unresolvable claim. {M} is rendered.length — the count actually
+      // appended to the SVG — and NOT RENDER_CAP, so if the drawing rules
+      // change the label follows the drawing rather than the constant.
+      const knotLabel = notShown.length === 0
+        ? `${group.length} locations close together: ${shown.map(knotMemberName).join(KNOT_SEPARATOR)}. ${promise}`
+        : `${group.length} locations close together, ${shown.length} of them shown here: ${shown.map(knotMemberName).join(KNOT_SEPARATOR)}. Not shown here: ${notShown.map(knotMemberName).join(KNOT_SEPARATOR)}. ${promise}`;
+      hit.setAttribute("aria-label", knotLabel);
       const zoomToCluster = () => {
         STATE.viewBox = parseViewBox(computeViewBoxForLocations(group.map((p) => p.loc)));
         renderMap(store, lenses);
@@ -1939,15 +2048,28 @@ function renderMap(store, lenses) {
   // is delivered strictly more strongly here than by the literal one.
   for (const badge of placeReaderBadges()) svg.appendChild(badge);
 
-  // The key is a BAND ABOVE THE PLATE, inserted before .map-wrap inside
-  // #map-root — see the long note on buildReaderMarkKey(). Built here, at
-  // the end of the render, because readerLabelling and the badge set are
-  // only known once the pins are drawn; inserted before the wrap rather
-  // than appended to it, so it occupies its own space instead of taking
-  // space from the map. Rendered only where marks exist to explain.
-  if (readerLabelling) root.insertBefore(buildReaderMarkKey(), wrap);
+  // THE KEY IS A RESERVED BAND INSIDE THE PLATE — .map-wrap's first
+  // child, in normal flow, immediately above the projection with no gap.
+  // The plate's border, radius, background and shadow live on .map-wrap
+  // (css/style.css), so the key and the map are one card and the key is
+  // printed on the map's own surface rather than on a second card above
+  // it. THE INSERTION IS THE CHANGE. Moving the CSS without moving this
+  // node leaves the key outside the plate it is now styled to sit
+  // inside, and every measured height is then wrong.
+  //
+  // Built here, at the end of the render, because readerLabelling and
+  // the badge set are only known once the pins are drawn — which is also
+  // what lets the key list the bands this render actually PAINTED rather
+  // than all four it could paint. readerBadgeEntries is the drawn set,
+  // so there is no second source of truth to drift: a band is in the key
+  // if and only if a badge carrying it is on the map.
+  if (readerLabelling) {
+    const bandsPresent = new Set(readerBadgeEntries.map((e) => e.markBand));
+    const key = buildReaderMarkKey(bandsPresent);
+    if (key) wrap.insertBefore(key, wrap.firstChild);
+  }
 
-  renderLegend(document.getElementById("map-legend"), persona, activeLens, store);
+  renderLegend(document.getElementById("map-legend"), persona, activeLens, store, { states: paintedStates, kinds: paintedKinds, ringDrawn });
   renderJudgmentNote(document.getElementById("map-judgment-note"));
 }
 
@@ -2013,7 +2135,31 @@ const READER_MARK_ROWS = [
 // perspective-disclosure law makes it one the key has to name.
 const READER_MARK_KEY_TRAILING = "No mark: this box hasn't read that country against your figures.";
 
-function buildReaderMarkKey() {
+// bandsPresent: a Set of the mark bands this render actually drew. The
+// key prints one row per band PRESENT, in READER_MARK_ROWS' fixed order,
+// and nothing else — a decoder for the map in front of this reader, not
+// a catalogue of every verdict the engine can reach. A reader whose map
+// carries two kinds of mark was being handed four rows, two of them
+// explaining symbols that appear nowhere on his map; on a phone that
+// cost ~90px of vertical space to say nothing.
+//
+// THIS IS A RULE, NOT A HARDCODE OF "TWO ROWS". The day the currency
+// read lands and countries start banding uncertain_or_conditional, that
+// row starts printing with no edit here.
+//
+// NOT SUPPRESSION, and the objection is worth stating rather than
+// ducking: a key listing only "Above the bar" and "Couldn't be read"
+// stops telling the reader that a "Doesn't clear" mark exists. No
+// downside is ever hidden — a failing place still draws its mark and its
+// row appears with it — but the key no longer doubles as a vocabulary
+// list. The tooltip carries each state's own sentence either way.
+//
+// Returns null when the set is empty: a title promising marks above a
+// map with none is worse than silence, and the colour legend already
+// states the no-mark rule in its own words.
+function buildReaderMarkKey(bandsPresent) {
+  const rowsForRender = READER_MARK_ROWS.filter((r) => bandsPresent && bandsPresent.has(r.band));
+  if (!rowsForRender.length) return null;
   const details = document.createElement("details");
   details.className = "reader-mark-key";
   details.id = "reader-mark-key";
@@ -2025,7 +2171,7 @@ function buildReaderMarkKey() {
   // no resize listener: there is no width at which the default differs,
   // so there is no state a rotation could strand.
   details.open = true;
-  const rows = READER_MARK_ROWS.map(({ band, label }) => `
+  const rows = rowsForRender.map(({ band, label }) => `
       <li class="reader-mark-key-row">
         <svg class="reader-mark-key-swatch" viewBox="0 0 ${BADGE_BOX} ${BADGE_BOX}" width="${BADGE_BOX}" height="${BADGE_BOX}" aria-hidden="true" focusable="false"><use href="#${BADGE_GLYPHS[band].id}"></use></svg>
         <span>${escapeHtml(label)}</span>
@@ -2398,9 +2544,14 @@ function renderOrmenLange(svg, svgNS) {
 // key -- renderVerdictKey() below reads STATE_HEADLINE_BAND[state] to pick
 // each row's swatch -- and the seventh verdict state (the location-capped
 // null; see STATE_HEADLINE's own note in app-shared.js) is precisely the
-// one state with no single band: 13 of its 24 real rows are hard_fail, 11
-// uncertain_or_conditional. A row here would have to claim one color and
-// would mislead the other half. The `includePending` row below is NOT a
+// one state with no single band: its real rows land in `hard_fail` AND in
+// `uncertain_or_conditional`, non-empty on both sides. No ratio is written
+// out here, deliberately — both halves move on every re-export (the pair
+// this comment used to carry had already gone stale, by different amounts
+// in the shipped export and in the source one), and it is the
+// two-sidedness and not any particular split that makes a single swatch
+// false. A row here would have to claim one color and would mislead the
+// readers on the other side. The `includePending` row below is NOT a
 // precedent for adding one -- pending has its own real color
 // (pendingColor()); this case has two. Pins carrying it are already
 // painted correctly by bandVisual(overall_band), and their sentence is
@@ -2414,6 +2565,19 @@ const STATE_CHIP_LABEL = {
   FAILS_AMOUNT: "Doesn't clear the income bar",
   DEAD_END_BLOCKING: "Confirmed dead end",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet",
+  // The engine's four new states. Each is already registered in
+  // STATE_HEADLINE and STATE_HEADLINE_BAND (app-shared.js), so the row
+  // below and the pin above it read one band table.
+  //
+  // Two departures from the six labels above, named rather than smoothed
+  // over: an em dash where the second clause is a REASON rather than a
+  // qualifier, and 42-45 characters against the 35-character ceiling the
+  // six set. Both follow from one argument — a label that drops a state's
+  // distinguishing caveat is a shorter label for a different state.
+  PARTIAL_READ_NO_CLEAR: "Doesn't clear, and some routes weren't read",
+  UNCERTAIN_BAR_BASIS: "Not decided \u2014 after-tax bar, before-tax figure",
+  NEAR_LINE_AMOUNT: "Right at the line",
+  UNCERTAIN_FX_UNAVAILABLE: "Not decided \u2014 no exchange rate to compare on",
 };
 
 // Door v2: the reader's legend, REBUILT FOR THE OVERLAY.
@@ -2478,6 +2642,18 @@ const READER_LEGEND_NOTE_TEMPLATE =
   "The color is how well the place {fitClause}; the mark at a pin's top-right is whether its residence routes take your income, read against income bars and nothing else yet. Pins with no mark are in countries this box hasn't read against your figures — their color is still the place's Fit index, and none of it is a verdict.";
 const READER_LEGEND_FIT_CLAUSE_WEIGHTED = "fits your priorities";
 const READER_LEGEND_FIT_CLAUSE_GENERAL = "fits, on the general figures";
+// The two recede summaries. UI copy about the site's own display, not a
+// claim about any place. Each names what is behind it, so the summary is a
+// real answer to "what am I opening" and not a "more" affordance.
+const RING_RECEDE_SUMMARY = "What a ring around a pin means";
+const WALDO_RECEDE_SUMMARY = "What this color compares, and where his visa read lives";
+// The one new string this change adds, and it is UI copy about the site's
+// own display, not a claim about any place. Its first clause is the
+// site's own shipped phrasing (the legend note above closes with "none of
+// it is a verdict"); its second names what is behind the fold, so a
+// reader knows what they are choosing not to open.
+const READER_LEGEND_RECEDE_SUMMARY =
+  "The colour is not a verdict — what it compares, and what a mark adds";
 
 function renderReaderVerdictKey(scaleHtml, weighted) {
   // The ramp's own title is the SHIPPED one this same reader sees in the
@@ -2492,10 +2668,33 @@ function renderReaderVerdictKey(scaleHtml, weighted) {
     "{fitClause}",
     weighted ? READER_LEGEND_FIT_CLAUSE_WEIGHTED : READER_LEGEND_FIT_CLAUSE_GENERAL
   );
-  return `<div class="legend-scale">${rampTitle}: ${scaleHtml}</div>`
-    + `<span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>`
-    + `<span>${escapeHtml(note)}</span>`
-    + bandDisclosureHtml();
+  // THE PHONE BAR. At 390 this legend measured 464.2px against a map card
+  // of 300.5 — the map was not the tallest thing on its own page, it was
+  // explanation wrapped around a map. The fix moves NO WORDS: at <=700px
+  // the two long prose children go behind the page's own existing
+  // details.recede mechanism (already shipping twice on this page, above
+  // and below the map), byte-identical, one tap away, under a summary
+  // that states the limit rather than saying "More".
+  //
+  // THE RAMP AND THE 5-ANCHOR STAY VISIBLE, deliberately: the five step
+  // labels are relative words, and SCALE_ANCHOR_STRING is the one
+  // sentence that stops "Strongest fit" reading as "good enough".
+  // Receding it too was measured and would have bought another ~77px by
+  // making a misreading more likely. Above 700 nothing changes for
+  // anyone: the same children render in the same order, unfolded.
+  const alwaysVisible = `<div class="legend-scale">${rampTitle}: ${scaleHtml}</div>`
+    + `<span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>`;
+  const prose = `<span>${escapeHtml(note)}</span>` + bandDisclosureHtml();
+  // Render-time decision, no matchMedia and no resize listener: a reader
+  // who resizes across the breakpoint keeps whatever state they had,
+  // which is benign in both directions because the prose is one tap away
+  // either way. Named rather than handled.
+  const openAttr = (typeof window !== "undefined" && window.innerWidth > 700) ? " open" : "";
+  return alwaysVisible
+    + `<details class="recede legend-recede"${openAttr}>`
+    + `<summary>${escapeHtml(READER_LEGEND_RECEDE_SUMMARY)}</summary>`
+    + `<div class="recede-body">${prose}</div>`
+    + `</details>`;
 }
 
 // Part 23.9: one shared verdict-meaning key — replaces the duplicated
@@ -2512,8 +2711,107 @@ function renderReaderVerdictKey(scaleHtml, weighted) {
 // (fixture-bearing personas, the only place `verdictVisual()`'s own
 // "pending"/"unverified" kind can ever fire; confirmed live against real
 // fixture data, 3 rows).
-function renderVerdictKey(displayName, includePending) {
-  const items = Object.entries(STATE_CHIP_LABEL).map(([state, label]) => {
+//
+// THE PRESENCE FILTER. Before it,
+// this function iterated the whole STATE_CHIP_LABEL table, so every
+// persona's legend listed every state the table could name whether or not
+// that persona's map painted it. With six rows that was merely untrue;
+// with ten it is also the tallest thing on a phone page (measured at 390:
+// 200.3px of legend against a 159.7px map plate, going to 320.2px
+// unfiltered). A legend that explains colours this map does not paint is a
+// legend about a different map.
+//
+// THE RULE: a row renders iff a pin on THIS render carries its state. It
+// is the same construction buildReaderMarkKey() already ships fifteen
+// lines below for the reader's own key ("a band is in the key iff a badge
+// carrying it is on the map") — the same idea, applied to the older of the
+// two keys, not a new one.
+//
+// THE SECOND CLAUSE BELOW IS AN INTERIM, and it is recorded as one so the
+// next reader does not have to rediscover why it is shaped this way.
+//
+// MEASURED in the browser, on the real painted sets: Wenda's
+// and Carmen's maps are MIXED. Some of their pins come from the engine and
+// carry an `overall_state`; the rest come from hand fixtures and are
+// painted by verdictVisual(), which returns a KIND, not a state. Wenda at
+// 1280 paints three states (UNCERTAIN_TYPE, FAILS_AMOUNT,
+// GAP_INSUFFICIENT_DATA) and four kinds (nearmiss, clear, eliminated,
+// pending). So the spec's rule, read literally, would drop the rows that
+// explain her green pins and her amber near-miss pins — colours that ARE
+// on her map.
+//
+// But a kind resolves to a BAND, and a band holds several rows. Admitting
+// every row of a painted band put Wenda's and Carmen's legends at ELEVEN
+// rows — 427.4px at 390 against a 159.7px plate, worse than the 307.5px
+// they ship today and a direct failure of the spec's own height check —
+// because one amber fixture pin pulled in all five uncertain-family rows,
+// four of which name readings her map does not contain.
+//
+// THE INTERIM, and it makes no legend taller than the one shipping today:
+//   - the four states added last render ONLY where a pin on this render
+//     actually carries them — the rule above, unweakened;
+//   - the six older states also survive when a stateless
+//     pin painted their band, so a hand-fixture pin's colour is never left
+//     without a row to explain it.
+// On the six no-fixture personas the second clause never fires at all
+// (measured: zero kinds painted). On Wenda and Carmen it is what keeps the
+// six pre-existing rows, and their legend is byte-identical to the one
+// they ship today.
+//
+// WHAT IS HELD, NOT DECIDED: what a hand-fixture persona's legend should
+// actually be. Their pins speak verdictVisual()'s vocabulary ("Clears",
+// "Near-miss", "Misses", "Unverified") and the legend speaks the engine's;
+// the two have never been reconciled and reconciling them is the
+// band-grouped rebuild the spec names as the real next move and
+// deliberately does not specify. Not this build's to answer.
+//
+// A PAINTED STATE WITH NO LABEL IS A BUILD ERROR, REPORTED, NOT SILENTLY
+// DROPPED (the spec's own words). It warns to the console and renders
+// nothing, because the alternative — rendering the raw token as its own
+// label — is the exact defect this table exists to prevent.
+//
+// `painted` is optional. Called without it (nothing does today) the whole
+// table renders, i.e. the pre-filter behaviour.
+const VERDICT_KIND_BAND = {
+  clear: "clean",
+  typetrap: "uncertain_or_conditional",
+  nearmiss: "uncertain_or_conditional",
+  eliminated: "hard_fail",
+};
+// The four states added last, after the six above them. A row for one of
+// these renders only when a pin on this render carries that exact state —
+// never on the band fallback. See the interim note on renderVerdictKey().
+const LATEST_ADDED_STATES = new Set([
+  "PARTIAL_READ_NO_CLEAR",
+  "UNCERTAIN_BAR_BASIS",
+  "NEAR_LINE_AMOUNT",
+  "UNCERTAIN_FX_UNAVAILABLE",
+]);
+function renderVerdictKey(displayName, includePending, painted) {
+  const statesPainted = painted && painted.states;
+  const bandsFromStatelessPins = new Set();
+  if (painted && painted.kinds) {
+    for (const kind of painted.kinds) {
+      const band = VERDICT_KIND_BAND[kind];
+      if (band) bandsFromStatelessPins.add(band);
+    }
+  }
+  if (statesPainted) {
+    for (const state of statesPainted) {
+      if (!STATE_CHIP_LABEL[state]) {
+        console.warn(
+          "renderVerdictKey: a pin on this render carries a verdict state with no legend label — " +
+          "the legend cannot explain its colour:", state, "(persona:", displayName + ")"
+        );
+      }
+    }
+  }
+  const items = Object.entries(STATE_CHIP_LABEL).filter(([state]) => {
+    if (!statesPainted) return true;
+    if (statesPainted.has(state)) return true;
+    if (LATEST_ADDED_STATES.has(state)) return false;
+    return bandsFromStatelessPins.has(STATE_HEADLINE_BAND[state]);
+  }).map(([state, label]) => {
     const band = STATE_HEADLINE_BAND[state];
     if (band === "hard_fail") {
       return `<span class="legend-item"><span class="legend-hatch-demo"></span> ${escapeHtml(label)}</span>`;
@@ -2525,17 +2823,49 @@ function renderVerdictKey(displayName, includePending) {
   if (includePending) {
     items.push(`<span class="legend-item"><span class="legend-swatch" style="background:${pendingColor()}"></span> Hand-checked, verdict not yet confirmed</span>`);
   }
-  const ringLine = includePending
-    ? `<span>A ring around a pin means we hand-checked that answer for ${escapeHtml(displayName)}. No ring means the rule-derived read.</span>`
-    : "";
-  return `<div class="legend-scale">What each pin color means for ${escapeHtml(displayName)}: ${items.join("")}</div>${ringLine}`;
+  // THE RING SENTENCE IS ABSENT WHERE NO RING IS DRAWN — not receded,
+  // absent. It was gated on `includePending`, i.e. "does this persona have
+  // fixture ROWS", which is a coarser question than "is a ring on this
+  // map". Measured at 1280: adira, marek, marguerite, noa and teo each
+  // draw 0 rings and each rendered this sentence; Wenda and Carmen draw 24
+  // apiece. A sentence explaining a mark the reader cannot find is false,
+  // and receding a false sentence only makes it quieter, so the gate is
+  // now the same signal the ring itself is drawn from.
+  //
+  // Absent at EVERY width, not only at <=700: the sentence is no more true
+  // on a desktop than on a phone. This is why the five personas' 1280
+  // legends get shorter here rather than staying unchanged.
+  const ringDrawn = painted ? !!painted.ringDrawn : true;
+  const ringText = `A ring around a pin means we hand-checked that answer for ${escapeHtml(displayName)}. No ring means the rule-derived read.`;
+  // AND WHERE IT IS TRUE, IT RECEDES AT <=700 ONLY. The branch is on the
+  // ELEMENT, not on the `open` attribute: an open <details> carries a
+  // summary line a bare <span> does not, so reusing the shipped
+  // `<details open>` idiom at all widths lengthens every desktop legend
+  // instead of shortening anything. Above 700 the span renders verbatim,
+  // same string, same position.
+  const narrow = typeof window !== "undefined" && window.innerWidth <= 700;
+  const ringLine = !(includePending && ringDrawn)
+    ? ""
+    : narrow
+      ? `<details class="recede legend-recede">`
+        + `<summary>${escapeHtml(RING_RECEDE_SUMMARY)}</summary>`
+        + `<div class="recede-body">${ringText}</div>`
+        + `</details>`
+      : `<span>${ringText}</span>`;
+  // "What each pin color means" claimed a colour resolves to a meaning,
+  // and it does not: two rows already shared the
+  // amber swatch before the four new rows landed and up to four share it
+  // after, so
+  // the old heading was plainly false. This one still introduces
+  // swatch-and-label rows and still states whose lens the legend shows.
+  return `<div class="legend-scale">What the pins say for ${escapeHtml(displayName)}: ${items.join("")}</div>${ringLine}`;
 }
 
 // v8 R7: the legend becomes mode-aware — three mutually exclusive shapes,
 // never overlaid on each other, so the colors on screen and the words
 // explaining them always agree about what mode is showing. Exact strings
 // are ruled UI copy, transported verbatim, not paraphrased here.
-function renderLegend(el, persona, activeLens, store) {
+function renderLegend(el, persona, activeLens, store, painted) {
   // Re-read the theme-appropriate ramp/colors at render time (not cached),
   // so this legend is always correct for the current light/dark mode.
   //
@@ -2617,10 +2947,36 @@ function renderLegend(el, persona, activeLens, store) {
       // at the top of this function and reused here, not reinvented). Peeled
       // into his own branch so the legend never again describes colors his
       // pins don't paint.
+      // AT <=700 THE PROSE RECEDES AND THE KEY DOES NOT. This is the
+      // tallest legend on the site at 390 and no filter or label change has
+      // ever been able to reach it, because it carries no verdict rows to
+      // filter — it is a ramp, five step labels and two sentences.
+      //
+      // SCALE_ANCHOR_STRING STAYS VISIBLE, deliberately, and it is split out
+      // of the span it was concatenated into rather than reworded: the five
+      // step labels are relative words, and the anchor is the one sentence
+      // that stops "Strongest fit" reading as "good enough". Receding it too
+      // would buy more pixels by making a misreading more likely — the same
+      // call, for the same reason, that the reader's own key above already
+      // made. The visa sentence and the calibration disclosure are the two
+      // that can wait behind a summary.
+      //
+      // Above 700 this renders exactly as it always has, concatenation
+      // included, and the branch is on the ELEMENT for the reason given at
+      // the ring sentence: an open <details> is TALLER than the span it
+      // replaces, so reusing that idiom at all widths regresses desktop.
+      const waldoVisaLine = "Where we've also checked his visa/residency path, that separate read shows in the tooltip and on his page — place quality and eligibility never share one pin color.";
+      const waldoNarrow = typeof window !== "undefined" && window.innerWidth <= 700;
+      const waldoProse = waldoNarrow
+        ? `<span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>`
+          + `<details class="recede legend-recede">`
+          + `<summary>${escapeHtml(WALDO_RECEDE_SUMMARY)}</summary>`
+          + `<div class="recede-body"><span>${escapeHtml(waldoVisaLine)}</span>${bandDisclosureHtml()}</div>`
+          + `</details>`
+        : `<span>${escapeHtml(SCALE_ANCHOR_STRING)} ${escapeHtml(waldoVisaLine)}</span>${bandDisclosureHtml()}`;
       el.innerHTML = `
         <div class="legend-scale">Pin color — Waldo's Fit index, rescored where we have real data for him: ${scaleHtml}</div>
-        <span>${escapeHtml(SCALE_ANCHOR_STRING)} Where we've also checked his visa/residency path, that separate read shows in the tooltip and on his page — place quality and eligibility never share one pin color.</span>
-        ${bandDisclosureHtml()}
+        ${waldoProse}
       `;
       return;
     }
@@ -2636,7 +2992,7 @@ function renderLegend(el, persona, activeLens, store) {
     // branches now call the one shared key; only whether the honest
     // seventh "pending" row is reachable differs.
     const hasFixtures = store.fixturesByPersona.has(persona);
-    el.innerHTML = renderVerdictKey(displayName, hasFixtures);
+    el.innerHTML = renderVerdictKey(displayName, hasFixtures, painted);
     return;
   }
 

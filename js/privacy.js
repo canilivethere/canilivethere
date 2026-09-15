@@ -15,15 +15,12 @@
 // them here — this section ships exactly as drafted, without that pointer,
 // until that follow-up lands.
 //
-// A real staleness flag, not smoothed over: the "What stays on your
-// device" paragraph below is the deck's own verbatim text, drafted before
-// the door rework that retired the old
-// persistent "have you seen the welcome screen" flag in favor of a
-// per-visit session flag, and added a passport/nationality pick as a
-// fourth thing this site remembers in the browser — neither of which
-// this paragraph's specific wording reflects. Not fixed here (this build
-// authors zero copy of its own); logged as a follow-up fix for the copy
-// owner instead.
+// The staleness flag that sat here is closed: STAYS_PARAS below was
+// rewritten against the shipped storage functions, clause by clause, and
+// replaces the single paragraph that was
+// false three ways (it claimed local storage for a default reader who gets
+// none, named a welcome-screen flag this build no longer writes, and named
+// neither the figures nor the passport at all).
 
 import { loadStore } from "./data.js";
 import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml } from "./app-shared.js";
@@ -72,13 +69,23 @@ const LEAVES_CLOSING =
   "sign up for — there's no database on our end with your name in it, " +
   "because there's no “our end” collecting names at all.";
 
-const STAYS_TEXT =
-  "A few things you tell this site get remembered, and they never " +
-  "leave your browser: a dark-mode preference, whether you've already " +
-  "seen the welcome screen, your own priority weightings if you build " +
-  "a custom search. All of it lives in your browser's own local " +
-  "storage, not on any server. Clear your browser data and it's gone. " +
-  "We never see it, because it's never sent to us in the first place.";
+// FOUR PARAGRAPHS, NOT ONE. Committed UI copy, landed verbatim.
+// Rendered through paras() below, the same construction #privacy-leaves,
+// #privacy-light and #privacy-checkable already use — same escaping
+// guarantee .textContent gave, no new mechanism.
+//
+// The organising idea is DURATION, not location, which is what the heading
+// above it now asks: most of what this site learns is gone when the tab
+// closes, and a little of it waits. Nothing here leaves the browser, so
+// "stays" is true across all four; the heading's "and for how long" is what
+// stops a reader hearing "stays" as "forever" — which is why P3 is not
+// droppable.
+const STAYS_PARAS = [
+  "Two different things happen to what this site learns about you, and the difference is the whole of this section: most of it is gone when you close the tab, and a little of it waits for you.",
+  "Gone when you close the tab: everything you tell the welcome box \u2014 your figures, your priorities, your passport, the lens you picked \u2014 along with which ranking you last chose, whether you asked to look without a lens at all, whether you've already answered the welcome box this visit, and today's exchange rates, kept so the site doesn't go asking for them twice. That is the default. You don't have to do anything to get it.",
+  "Waiting for you next time: whether you asked for dark mode. And \u2014 only if you tick \u201cKeep this on my device\u201d on the welcome box \u2014 a copy of those same four answers, so they're there when you come back. That switch is off until you turn it on, and un-ticking it removes the copy.",
+  "The same box has a button that clears every answer you gave it, the visit copy and the kept copy both. Clearing your browser data does the same job from the other end. Your dark-mode setting is left alone either way \u2014 it's the one thing here that says nothing about you. And none of it was ever sent to us: it is written by the page you are reading, in your browser, on a site with nothing at the other end to receive it.",
+];
 
 const LIGHT_PARAS = [
   "The other half of this promise is what we don't make you download. " +
@@ -127,7 +134,7 @@ async function main() {
     LEAVES_ITEMS.map((it) => `<p><strong>${escapeHtml(it.lead)}</strong> ${escapeHtml(it.body)}</p>`).join("") +
     `<p>${escapeHtml(LEAVES_CLOSING)}</p>`;
 
-  document.getElementById("privacy-stays").textContent = STAYS_TEXT;
+  document.getElementById("privacy-stays").innerHTML = paras(STAYS_PARAS);
 
   document.getElementById("privacy-light").innerHTML = paras(LIGHT_PARAS);
   document.getElementById("privacy-checkable").innerHTML = paras(CHECKABLE_PARAS);

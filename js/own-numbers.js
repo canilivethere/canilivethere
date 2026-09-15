@@ -216,8 +216,18 @@ const LIMITS_LINES = [
 // which is what the privacy paragraph above promises them. One string,
 // one claim, wherever it renders.
 export const SAVE_LABEL = "Keep this on my device";
+// REWORDED. The shipped note named ONE
+// of the four things the switch now governs — ticking it writes the
+// passport, the priorities and the door's memory of the chosen lens as well
+// as the figures. This is the consent text for the switch and the defect
+// being closed was a scope claim, so the scope is named item by item: the
+// four keys in READER_ANSWER_KEYS, in the order the reader answered them,
+// with the lens last because it is the site's memory of a choice rather than
+// something typed. The off-state's lifetime is stated plainly rather than
+// left as an absence. The closing sentence is unchanged and still true in
+// both states — no write path in this box reaches the network.
 export const SAVE_NOTE =
-  "Off by default. Saving puts your figures in this browser's storage so the box remembers them next time. Nothing is sent anywhere either way.";
+  "Off by default. Turn it on and this browser keeps your answers \u2014 your figures, your priorities, your passport, the lens you picked \u2014 so they're here next time. Leave it off and they go when this visit ends. Nothing is sent anywhere either way.";
 // AUTHORED-CHOICE (unchanged from v1): B9 asks for one plain line saying
 // why, without giving the line.
 export const SAVE_UNAVAILABLE_LINE =

@@ -100,8 +100,13 @@ function readReaderPreferences() {
 // The custom_profile sub-object ({ weights, answers, created_at,
 // updated_at }), or null if none is stored / the stored value doesn't
 // parse / the version doesn't match.
+// VISIT COPY FIRST, THEN THE DURABLE ONE — the same precedence
+// loadOwnNumbers() already uses, for the same reason: a reader who
+// answered the box this visit must be answered with what they just said,
+// not with something a previous visit left on the device.
 export function loadCustomProfile() {
-  const prefs = readReaderPreferences();
+  const session = readSessionPreferences();
+  const prefs = (session && session.custom_profile) ? session : readReaderPreferences();
   return prefs && prefs.custom_profile ? prefs.custom_profile : null;
 }
 
@@ -145,11 +150,16 @@ function writeReaderPreferenceKey(key, value) {
 // created_at is preserved across an edit (only set fresh the first time);
 // updated_at always reflects this write. Returns true/false rather than
 // throwing, matching this module's fail-open discipline throughout.
+// THE DEFAULT IS THIS VISIT. See the block comment on
+// writeReaderAnswer() below: what the reader tells the box is written to
+// sessionStorage, and reaches localStorage only where they have turned
+// the keep switch on. Priorities used to be written durably on submit,
+// with no opt-in anywhere in the process.
 export function saveCustomProfile(weights, answers) {
   const now = new Date().toISOString();
-  const existing = readReaderPreferences();
+  const existing = readSessionPreferences() || readReaderPreferences();
   const createdAt = existing?.custom_profile?.created_at || now;
-  return writeReaderPreferenceKey("custom_profile", { weights, answers, created_at: createdAt, updated_at: now });
+  return writeReaderAnswer("custom_profile", { weights, answers, created_at: createdAt, updated_at: now });
 }
 
 // ---------------------------------------------------------------------
@@ -163,15 +173,21 @@ export function saveCustomProfile(weights, answers) {
 // 3166-1 alpha-2 string (§15.5's ratified vocabulary) — single-select by
 // contract (§15.4).
 export function loadNationality() {
-  const prefs = readReaderPreferences();
+  const session = readSessionPreferences();
+  const prefs = (session && session.nationality) ? session : readReaderPreferences();
   return prefs && prefs.nationality ? prefs.nationality : null;
 }
 
+// NATIONALITY IS THE MOST SENSITIVE FIELD IN THE BOX AND IT USED TO BE
+// THE ONE THAT PERSISTED BY DEFAULT — written to localStorage on submit,
+// permanently, with no opt-in anywhere in the process, while the figures
+// the switch does name went to sessionStorage. That is now inverted to
+// match the copy: visit-scoped unless the reader keeps it.
 export function saveNationality(code) {
   const now = new Date().toISOString();
-  const existing = readReaderPreferences();
+  const existing = readSessionPreferences() || readReaderPreferences();
   const createdAt = existing?.nationality?.created_at || now;
-  return writeReaderPreferenceKey("nationality", { code, created_at: createdAt, updated_at: now });
+  return writeReaderAnswer("nationality", { code, created_at: createdAt, updated_at: now });
 }
 
 // { kind: "persona"|"custom"|"none", persona_id, chosen_at } | null — the
@@ -180,14 +196,19 @@ export function saveNationality(code) {
 // getActivePersona() below never reads it directly; only the door itself
 // (perspective-door.js) reads it, to pre-offer the resume band.
 export function loadSavedPerspective() {
-  const prefs = readReaderPreferences();
+  const session = readSessionPreferences();
+  const prefs = (session && session.saved_perspective) ? session : readReaderPreferences();
   return prefs && prefs.saved_perspective ? prefs.saved_perspective : null;
 }
 
 // kind: "persona" | "custom" | "none". personaId: required iff
 // kind==="persona", else null.
+// Visit-scoped by the same rule, and for a plain reason: it is the
+// door's record of what the reader chose. Leaving it durable while the
+// thing it points at is visit-scoped would produce a door offering to
+// continue from a profile that is no longer there.
 export function saveSavedPerspective(kind, personaId) {
-  return writeReaderPreferenceKey("saved_perspective", {
+  return writeReaderAnswer("saved_perspective", {
     kind,
     persona_id: kind === "persona" ? personaId : null,
     chosen_at: new Date().toISOString(),
@@ -327,6 +348,71 @@ function writeSessionPreferenceKey(key, value) {
   }
 }
 
+// ---------------------------------------------------------------------
+// THE ONE WRITE RULE FOR EVERYTHING THE READER TELLS THE BOX
+//
+// THE DEFECT THIS CLOSES, found on a cold walk of the live site: the box
+// promises, in step one's own privacy paragraph, that what the reader
+// types "stays in this browser, on this device, FOR THIS VISIT", and that
+// "keeping them for next time is a switch you turn on yourself" — a
+// switch that ships off by default. Measured against that promise, the
+// build kept two different rules: the figures honoured it, and the
+// passport and the priorities did not. Both were written to localStorage
+// on submit, permanently, with no opt-in anywhere in the process.
+// Nationality is the most sensitive field in the form and it was the one
+// that persisted by default.
+//
+// THE RULE, one for all four sub-objects: every answer is written to the
+// VISIT store always, and to the DURABLE store only where the reader has
+// turned the keep switch on. Reads take the visit copy first and fall
+// back to the durable one, which is the precedence loadOwnNumbers()
+// already used and the only one that answers a reader with what they
+// just said.
+//
+// readerKeepsOnDevice() is the consent test and it is deliberately the
+// presence of a durable copy of ANY answer, not a separate boolean flag:
+// a flag can disagree with what is actually on the device, and a flag
+// that says "off" over a stored passport is the exact class of defect
+// this block exists to remove. The switch's own tick reads the same test.
+// ---------------------------------------------------------------------
+export function readerKeepsOnDevice() {
+  const prefs = readReaderPreferences();
+  if (!prefs) return false;
+  return !!(prefs.own_numbers || prefs.nationality || prefs.custom_profile || prefs.saved_perspective);
+}
+
+function writeReaderAnswer(key, value) {
+  const okSession = writeSessionPreferenceKey(key, value);
+  if (readerKeepsOnDevice()) writeReaderPreferenceKey(key, value);
+  return okSession;
+}
+
+// Turning the switch ON copies whatever is in play THIS VISIT onto the
+// device — all of it, because the reader is answering one question about
+// one box, not four questions about four keys. Turning it OFF removes
+// every durable copy and leaves the visit copies exactly where they are:
+// un-ticking undoes "keep this for next time", it does not wipe the map
+// the reader is currently looking at. Erasing everything is a different
+// control with a different label (forgetReaderPreferences, below).
+const READER_ANSWER_KEYS = ["own_numbers", "nationality", "custom_profile", "saved_perspective"];
+
+export function keepReaderAnswersOnDevice() {
+  const session = readSessionPreferences();
+  const durable = readReaderPreferences();
+  let ok = true;
+  for (const key of READER_ANSWER_KEYS) {
+    const value = (session && session[key]) || (durable && durable[key]);
+    if (value !== undefined && value !== null) ok = writeReaderPreferenceKey(key, value) && ok;
+  }
+  return ok;
+}
+
+export function stopKeepingReaderAnswers() {
+  let ok = true;
+  for (const key of READER_ANSWER_KEYS) ok = writeReaderPreferenceKey(key, undefined) && ok;
+  return ok;
+}
+
 export function saveOwnNumbersForVisit(fields) {
   const now = new Date().toISOString();
   const existing = readSessionPreferences();
@@ -334,55 +420,17 @@ export function saveOwnNumbersForVisit(fields) {
   return writeSessionPreferenceKey("own_numbers", { ...fields, created_at: createdAt, updated_at: now });
 }
 
-// ownNumbersAreVisitOnly() REMOVED, with the keep-switch fix that made
-// it dead. It answered "are the figures in play visit-only?" by comparing
-// the two stored copies field by field; the keep switch was its only
-// caller, and the switch now reads hasDurableOwnNumbers() instead. The
-// comparison it performed is also no longer a question the code can ask
-// twice and get two answers to: commitFlow() refreshes the durable copy
-// whenever one exists, so "a durable copy" and "a durable copy equal to
-// the figures in play" are now the same thing. A second zero-call-site
-// storage function is exactly the defect that was found here the first
-// time.
-
-// True when a DURABLE copy of the reader's figures exists — i.e. the
-// "Keep this on my device" switch has actually been used and not undone.
-// The keep switch's own checked state is this and nothing else, so the
-// tick mark cannot drift from what is on the device.
-export function hasDurableOwnNumbers() {
-  const prefs = readReaderPreferences();
-  return !!(prefs && prefs.own_numbers);
-}
-
-// Un-ticking an opt-in save has to actually un-save, or the control is a
-// lie. Writing `undefined` through the merge-write path drops the key
-// from the serialized envelope entirely (JSON.stringify omits undefined
-// values), leaving every sibling key untouched — the same "remove the
-// whole key, never field surgery" discipline forgetReaderPreferences()
-// uses one level up.
+// ownNumbersAreVisitOnly(), hasDurableOwnNumbers() and clearOwnNumbers()
+// are all REMOVED, and the reason is one rule replacing three.
 //
-// THE DURABLE COPY ONLY, and that is the whole point — corrected after
-// this function was found with zero call sites. It is now the untick handler (js/perspective-door.js
-// wireKeepSwitch), and it is the exact inverse of saveOwnNumbers(), which
-// is the durable write. It must not touch the visit-scoped copy: the
-// switch's own words promise one thing only — "Saving puts your figures
-// in this browser's storage so the box remembers them NEXT TIME" — while
-// the block's heading states the other as a separate fact ("Your figures
-// are here for this visit"). Unticking undoes the first promise, and
-// wiping the reader's map mid-visit is not something they asked for.
-// Erasing everything is a different control with a different label, and
-// forgetReaderPreferences() below is still the only thing that does it.
-export function clearOwnNumbers() {
-  return writeReaderPreferenceKey("own_numbers", undefined);
-}
-
-// Whether this browser will let the site read its own envelope at all
-// (private-browsing lockdowns, disabled storage, some enterprise
-// policies). Read-only probe, no new key written, no reader value
-// touched: the welcome box uses it to render its opt-in save control
-// disabled with a plain reason instead of offering a save that silently
-// fails. Quota failures still surface at write time, where the writer's
-// own false return is the signal.
+// Each answered a figures-only version of a question that is now asked
+// about the whole box: "is this kept?" is readerKeepsOnDevice(), "keep
+// it" is keepReaderAnswersOnDevice(), "stop keeping it" is
+// stopKeepingReaderAnswers() — see the write-rule block above. Leaving
+// the old three beside the new three would be four storage functions for
+// two ideas, and a second zero-call-site storage function is exactly the
+// defect that was found here the first time.
+//
 export function isReaderStorageAvailable() {
   try {
     localStorage.getItem(READER_PREFS_KEY);
@@ -499,7 +547,7 @@ export function forgetReaderPreferences() {
 // one implementation shared by both surfaces it renders at (the switcher
 // block above, the door's resume band in perspective-door.js) — no modal
 // stack, a single button whose own label carries the confirm step. The
-// button's starting label ("Forget what I've saved here") is read from
+// button's starting label ("Forget my answers") is read from
 // the DOM rather than hardcoded here, so each call site's own markup
 // stays the single source of that first-state string.
 export function wireForgetControl(btn, { onDone } = {}) {
@@ -508,15 +556,16 @@ export function wireForgetControl(btn, { onDone } = {}) {
   btn.addEventListener("click", () => {
     if (!confirming) {
       confirming = true;
-      // Amended for the welcome box. This control now also
-      // clears the reader's own income figures, and the old string — which
-      // enumerated answers and passport — no longer named them. A confirm
-      // dialogue that under-describes what it deletes is a false sentence
-      // the reader acts on, created by the new feature and therefore that
-      // feature's to fix. Enumerating four things would rot again at the
-      // fifth, so the count is gone; the wording matches the control's own
-      // label, "Forget what I've saved here".
-      btn.textContent = "Sure? This clears everything you've saved on this device.";
+      // REWORDED. "everything you've
+      // saved on this device" named a device copy that does not exist with
+      // the keep switch off — the default — while the control still really
+      // does clear the visit copy. The new line keeps the existing
+      // second-person turn and states the true scope: this browser, both
+      // copies, in the only word that covers session and device without
+      // claiming either. Enumerating the four things would rot again at the
+      // fifth, so there is still no count; the wording matches the control's
+      // own new label, "Forget my answers".
+      btn.textContent = "Sure? This clears your answers out of this browser.";
       return;
     }
     forgetReaderPreferences();
@@ -819,8 +868,14 @@ export const SCALE_ANCHOR_STRING =
 // site: every consumer looked the value up as
 // `STATE_HEADLINE[state] || state`, so the `|| state` fallback surfaced the
 // raw null — an empty verdict sentence in the Lists table, the literal
-// string "null" on the map card. Measured: 24 rows carry it,
-// 6 personas x 13 locations, 13 `hard_fail` / 11 `uncertain_or_conditional`.
+// string "null" on the map card. It was measured live on real rows across
+// several personas and both bands; the counts that used to be written out
+// here are not restated, because every one of them moves on every
+// re-export (re-measured, they had already moved, in both the shipped
+// export and the source one). What does NOT move is that the case is
+// real, non-empty, and reachable — which is the whole reason the fallback
+// below exists. Any re-measurement belongs in the export's own tooling,
+// not in this comment.
 // The seventh case therefore lives in STATE_HEADLINE_LOCATION_CAPPED below
 // and is reached through stateHeadline(), never by a bracket lookup — a
 // null key would only work by JS coercing it to the string "null", which is
@@ -952,6 +1007,22 @@ export const STATE_HEADLINE = {
     "Not this kind of income — no route here the site could read takes it as the qualifying kind." + READER_PARTIAL_READ_CLAUSE,
   READER_NONE_CLEARS_SOME_UNREAD:
     "No residency route the site could read here clears on income — some set a bar above your figure, and some don't take this kind of income." + READER_PARTIAL_READ_CLAUSE,
+  // ---------------------------------------------------------------------
+  // THE ENGINE'S FOUR NEW STATES. Not reader states and not a fifth
+  // vocabulary: these are engine tokens that the composition fix and the
+  // currency read emit, and they land here for one reason — nothing may
+  // render a raw token. `stateHeadline()` falls back to the
+  // token itself, so a state with no entry here ships its own key to a
+  // reader's screen. All four are registered in STATE_HEADLINE_BAND
+  // below as well, or the legend and the banding would disagree.
+  //
+  // Committed UI copy, landed verbatim and not reworded here.
+  // ---------------------------------------------------------------------
+  PARTIAL_READ_NO_CLEAR: "No route the site could read here clears. Some routes here couldn't be read at all \u2014 so this is a no on what was read, not on everything.",
+  UNCERTAIN_BAR_BASIS: "Not decided either way. The bar this answer rests on is set after tax; the figure read against it is before tax. Those are two different measurements, so the site won't call it a yes or a no.",
+  NEAR_LINE_AMOUNT: "Right at the line. The figure sits within about a tenth of the bar, above or below. A move that small in either number would change the answer.",
+  UNCERTAIN_FX_UNAVAILABLE: "Not decided either way. This comparison crosses currencies, and the site couldn't get an exchange rate it trusts. It won't guess one.",
+
 };
 
 // The seventh case (see the long note on STATE_HEADLINE above): the state
@@ -984,19 +1055,29 @@ export function stateHeadline(state) {
 }
 
 // Which of the four `overall_band` values each `overall_state` belongs to —
-// verified by a direct cross-tab of the real 304-row derived/verdicts.jsonl
-// (every state maps to exactly one band, confirmed, not assumed from the
-// enum names alone). Used only by the map legend (v9 Part 6.5), to group
-// STATE_HEADLINE's six labels under their four band colors.
+// verified by a direct cross-tab of the real derived/verdicts.jsonl (every
+// state maps to exactly one band, confirmed, not assumed from the enum
+// names alone). Used only by the map legend, to group STATE_CHIP_LABEL's
+// labels under their band colors.
 //
 // The seventh case is DELIBERATELY ABSENT from this map and must stay
 // absent: it is the one state that does not belong to exactly one band.
-// Measured on the real derived/verdicts.jsonl — 13 of its 24
-// rows are `hard_fail`, 11 are `uncertain_or_conditional`. Giving it an
-// entry here would hand it a single legend color and tell half those
-// readers the wrong direction. Whether the legend needs a seventh row at
-// all — and what a two-color meaning would even look like — is a design
-// call, not a mechanical one. Named, not invented.
+// Giving it an entry here would hand it a single legend color and tell
+// some of those readers the wrong direction. Whether the legend needs a
+// row for it at all — and what a two-color meaning would even look like —
+// is a design call, not a mechanical one. Named, not invented.
+//
+// THE COUNTS THIS NOTE USED TO CARRY WERE STALE, AND NO CURRENT PAIR IS
+// WRITTEN IN THEIR PLACE. What was removed, quoted so a reader meeting an
+// older copy of this file can recognise it as dead and not as evidence: a
+// "304-row" file and "13 of its 24 rows hard_fail, 11
+// uncertain_or_conditional". Re-measured, every one of those figures had
+// already moved — and moved by different amounts in the shipped export
+// and in the source one, which is the argument against a
+// hardcoded pair rather than an aside to it. What does NOT move is that
+// the split is non-empty on both sides, and that — not any particular
+// ratio — is the whole reason this state has no entry here. Any
+// re-measurement belongs in the export's own tooling, not in this comment.
 export const STATE_HEADLINE_BAND = {
   QUALIFIES_AND_CONVERTS: "clean",
   QUALIFIES_CONDITIONAL: "uncertain_or_conditional",
@@ -1032,6 +1113,22 @@ export const STATE_HEADLINE_BAND = {
   READER_BELOW_SOME_UNREAD: "uncertain_or_conditional",
   READER_WRONG_TYPE_SOME_UNREAD: "uncertain_or_conditional",
   READER_NONE_CLEARS_SOME_UNREAD: "uncertain_or_conditional",
+  // The engine's four new states, all uncertain_or_conditional per the
+  // engine's own family sets. Registered here as well as in
+  // STATE_HEADLINE, so the pin colour, the Lists banding and the chip
+  // read one table and cannot disagree.
+  //
+  // PARTIAL_READ_NO_CLEAR is the one worth arguing rather than asserting:
+  // it is a "no" on every route that could be read, and it still bands
+  // uncertain rather than hard_fail, because routes behind it were never
+  // read at all. A hard_fail colour over a sentence that says "not on
+  // everything" leans more certain than the sentence under it, which is
+  // the exact reason the three partial-read states above were re-banded.
+  PARTIAL_READ_NO_CLEAR: "uncertain_or_conditional",
+  UNCERTAIN_BAR_BASIS: "uncertain_or_conditional",
+  NEAR_LINE_AMOUNT: "uncertain_or_conditional",
+  UNCERTAIN_FX_UNAVAILABLE: "uncertain_or_conditional",
+
 };
 
 // The ten short forms that put the band in the pin's own accessible
@@ -1405,7 +1502,7 @@ export function renderFooter(store) {
     <p><a href="${withPersona(siteUrl("principles.html"))}">How we work</a> — the rules we hold ourselves to, and how to check us on them.</p>
     <p><a href="${withPersona(siteUrl("privacy.html"))}">What this site does with your browser</a> — what leaves it, what stays, and why the pages are this light.${
       hasAnySavedReaderState()
-        ? ` <button type="button" class="btn-chip" id="forget-saved-btn">Forget what I've saved here</button>`
+        ? ` <button type="button" class="btn-chip" id="forget-saved-btn">Forget my answers</button>`
         : ""
     }</p>
     <p>Want something researched, or found something wrong? <a href="${withPersona(siteUrl("contact.html"))}">Write to us.</a></p>

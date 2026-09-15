@@ -310,7 +310,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       // Measured: no route row carries a basis field, so this renders on
       // every reader verdict today — and stops on its own, row by row,
       // once a real `bar_basis` field lands on the route rows.
-      const basisLine = readerBasisIsAssumed(store, loc.country_id)
+      const basisLine = readerBasisIsAssumed(store, loc)
         ? `<p class="fact-notes">${escapeHtml(READER_BASIS_DECLARED_LINE)}</p>`
         : "";
       div.innerHTML = `

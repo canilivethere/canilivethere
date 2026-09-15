@@ -46,10 +46,25 @@ export const CURRENCY_TOKENS = OWN_NUMBERS_CURRENCIES;
 export const PERIOD_TOKENS = OWN_NUMBERS_PERIODS;
 export const DURATION_BANDS = OWN_NUMBERS_DURATION_BANDS;
 
-// The near-the-bar band. Ratified elsewhere in this project's data
-// conventions as the same-currency margin buffer (`margin_buffer`, tier
-// "fixed-same-currency": 0.10) — ±10% is exactly right for the
-// same-currency-only comparison this box actually ships.
+// The near-the-bar band, and THIS COMMENT IS THE CITATION IT IS OWED.
+//
+// SINGLE SOURCE: `visa-fit:_param:margin_buffer`, v2, in the rules layer
+// (`derived/rules.jsonl`) — its `near_line_band` field. That row is now
+// the one source of this number for BOTH the engine's amount gate and
+// this reader read: one rule, one pipeline, no second copy with an
+// opinion of its own.
+//
+// SYMMETRIC, and the row says so in its own words: a read within this
+// fraction of its bar EITHER WAY is near the line and lands uncertain,
+// rather than clear or refused. A fail inside the band is as undecided
+// as a pass inside it.
+//
+// WHAT THIS LINE STILL IS, stated plainly rather than papered over: a
+// value-copy. The site does not fetch `rules.jsonl` client-side yet, so
+// the number is written here and agrees with its source by coincidence
+// of value, not by construction. It is owed a live read the moment that
+// accessor exists, and until then this constant must never be changed
+// here — it changes in the row, and follows.
 export const BAND = 0.10;
 
 // The coarse-record allowance. Where a reader says their income is

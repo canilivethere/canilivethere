@@ -38,7 +38,7 @@ import {
   hasAnySavedReaderState, wireForgetControl,
   isDoorAnswered, markDoorAnswered, loadOwnNumbers,
   saveOwnNumbersForVisit, saveOwnNumbers,
-  clearOwnNumbers, hasDurableOwnNumbers,
+  readerKeepsOnDevice, keepReaderAnswersOnDevice, stopKeepingReaderAnswers,
   isReaderStorageAvailable, CUSTOM_TILE_ICON, REOPEN_FLAG,
 } from "./app-shared.js";
 import { loadStore, defaultWeightForCriterion } from "./data.js";
@@ -106,7 +106,22 @@ const PASSPORT_MORE_LINE = "That's the whole form — one passport, nothing else
 const PASSPORT_SCOPE_FOOTER = "This reads entry rules from your passport — nothing more.";
 const PASSPORT_PLACEHOLDER_OPTION = "Choose a passport…";
 
-const FORGET_LABEL = "Forget what I've saved here";
+// REWORDED. The old label — "Forget
+// what I've saved here" — was true in one of the control's two states: with
+// the keep switch off, nothing was ever saved, and the control offered to
+// forget something that does not exist. The control still does real work in
+// both states (forgetReaderPreferences() clears the sessionStorage envelope
+// as well as the localStorage one), so this is a wording fix and not a
+// render-condition one. The new label names what the reader GAVE rather
+// than where it went, so it carries no storage claim to be wrong about in
+// either state. "Answers" is the site's own word for these four things
+// already (READER_ANSWER_KEYS, writeReaderAnswer()).
+//
+// THE SAME STRING LIVES AT THREE SITES and they move together or the site
+// ships two names for one control: here, the footer's own hardcoded copy
+// (app-shared.js renderFooter), and wireForgetControl()'s confirm text,
+// which reads this first-state label out of the DOM.
+const FORGET_LABEL = "Forget my answers";
 const SWITCH_LABEL = "Switch or start over";
 
 // REWORDED — the return greeting. "Your saved view" described the band;
@@ -126,14 +141,28 @@ const RESUME_CONTINUE_LABEL = "Continue where you left off";
 // and the surface that already carries the other control over their saved
 // state. It renders only while there is something to keep: figures
 // carried for this visit that the device is not already holding.
-const KEEP_HEADING = "Your figures are here for this visit.";
+// REWORDED — "Your figures" was false in both
+// states the same way: the switch governs every key in READER_ANSWER_KEYS
+// (own_numbers, nationality, custom_profile, saved_perspective), so a reader
+// who handed over a passport was told, in the loudest line of the block,
+// that this is about money. The file's own comment at keepSwitchHtml() has
+// said so since the switch's scope changed.
+const KEEP_HEADING = "Your answers are here for this visit.";
 // The switch's SECOND state, needed once un-ticking un-saves. That fix
 // makes un-ticking un-save, so the switch has to stay on screen once it is
 // ticked; the heading above it then goes on saying "for this visit" about
 // figures the device is holding, which is the same false-by-one-state
 // shape F2 itself was. No instruction in the heading: SAVE_NOTE already
 // says what the switch does.
-const KEEP_HEADING_KEPT = "Your figures are kept on this device.";
+//
+// AND THE HORIZON CLAUSE LIVES HERE, NOT ON THE RESUME BAND:
+// "until you clear them" belongs in exactly one of the two places that
+// could carry it, and this is the one that renders wherever there are
+// figures in play — keepSwitchHtml() is emitted on the no-band branch too,
+// so the clause is never orphaned by the band's absence. It points at two
+// controls the reader can see from this same block: un-ticking the switch,
+// and the forget button beneath it.
+const KEEP_HEADING_KEPT = "Your answers are kept on this device until you clear them.";
 
 function portraitSrc(id) {
   return `assets/portraits/${id}.png`;
@@ -176,15 +205,40 @@ function savedPerspectiveDescriptor() {
   return { lensKind, personaName, nationalityName };
 }
 
+// THE INDEFINITE ARTICLE, because "a Ireland passport" shipped and a
+// stranger read it. The country name is interpolated from the vendored
+// CLDR list, so the article has to be chosen at runtime from the name.
+//
+// The rule, boring on purpose: a vowel LETTER takes "an", except names
+// beginning with U, which in English almost all open on a "yoo" sound and
+// take "a" — "a United States passport", "a Uruguay passport", "a U.S.
+// Virgin Islands passport". Measured against the shipped list: 250 names,
+// 42 vowel-initial, 9 of them U-initial.
+//
+// UZBEKISTAN IS THE ONE EXCEPTION IN THE WHOLE LIST — it opens on a true
+// vowel sound ("uz-"), so the U rule would get it wrong. Named explicitly
+// rather than handled by a cleverer heuristic: one entry is auditable and
+// a phonetic guesser is not. Anything else here is a pronunciation
+// question, not a code question, and belongs to whoever writes the copy.
+const NATIONALITY_AN_EXCEPTIONS = new Set(["Uzbekistan"]);
+function nationalityArticle(name) {
+  if (!name) return "a";
+  const first = name.charAt(0).toUpperCase();
+  if (NATIONALITY_AN_EXCEPTIONS.has(name)) return "an";
+  if (first === "U") return "a";
+  return "AEIOU".includes(first) ? "an" : "a";
+}
+
 // 29.2B/29.2D: the shared fragment+verb pair every resume-band string is
 // built from — one branch per saved combination.
 function resumeStateParts(descriptor) {
   const { lensKind, personaName, nationalityName } = descriptor;
+  const art = nationalityArticle(nationalityName);
   if (lensKind === "persona" && nationalityName) {
-    return { fragment: `${personaName}'s example and a ${nationalityName} passport`, verb: "are" };
+    return { fragment: `${personaName}'s example and ${art} ${nationalityName} passport`, verb: "are" };
   }
   if (lensKind === "priorities" && nationalityName) {
-    return { fragment: `Your own priorities and a ${nationalityName} passport`, verb: "are" };
+    return { fragment: `Your own priorities and ${art} ${nationalityName} passport`, verb: "are" };
   }
   if (lensKind === "persona") {
     return { fragment: `${personaName}'s example`, verb: "is" };
@@ -193,14 +247,30 @@ function resumeStateParts(descriptor) {
     return { fragment: "Your own priorities", verb: "are" };
   }
   if (nationalityName) {
-    return { fragment: `A ${nationalityName} passport`, verb: "is" };
+    return { fragment: `${art === "an" ? "An" : "A"} ${nationalityName} passport`, verb: "is" };
   }
   return null;
 }
 
+// TWO VARIANTS, keyed on the switch. The single
+// shipped sentence — "... is saved on this device." — was true only with the
+// keep switch ON, which is not the default and not the state most readers
+// who see this band are in: the band renders from savedPerspectiveDescriptor(),
+// whose loaders read the visit copy first. With the switch off, every named
+// dimension lives in sessionStorage and goes when the visit does.
+//
+// NO NEW BRANCH IN resumeStateParts(). The horizon clause moved to the keep
+// switch's own heading (see KEEP_HEADING_KEPT above), which withdrew the
+// `is`->`it` / `are`->`them` pronoun the first draft of this sentence needed.
+// All that changes here is which of two literal tails the existing template
+// takes. buildResumeAriaFragment() below uses the fragment alone and is
+// untouched by either variant.
 function buildResumeStateSentence(descriptor) {
   const parts = resumeStateParts(descriptor);
-  return parts ? `${parts.fragment} ${parts.verb} saved on this device.` : null;
+  if (!parts) return null;
+  return readerKeepsOnDevice()
+    ? `${parts.fragment} ${parts.verb} kept on this device.`
+    : `${parts.fragment} ${parts.verb} here for this visit.`;
 }
 
 function buildResumeAriaFragment(descriptor) {
@@ -213,16 +283,55 @@ function markSeenLegacyKeyRemoved() {
   try { localStorage.removeItem(DOOR_SEEN_KEY); } catch (e) {}
 }
 
+// THE STAND-IN BAND ON WALDO'S TILE.
+//
+// WHAT IT IS AND IS NOT. This is NOT Waldo's figure and it must never be
+// read as one: the persona record holds $2,500/month, every pin and
+// verdict on Waldo's map is computed from that, and it is unchanged by
+// this line. The record moving to a euro figure is a confirmed follow-on
+// and not this crossing, so the band lives on the tile and NOT in the
+// store — which is precisely why the copy below says "for scale" and
+// names what it measures instead of asserting anything about him.
+//
+// WHOSE NUMBER IT IS. €3,850 a month, gross, is the EU27 professionals
+// band, Eurostat, 2022. It is on the tile as the nearest MEASURED
+// stand-in, which is the whole label: nobody measures remote workers.
+// The figure and its scope were sourced by a researcher; nothing here
+// looked one up.
+//
+// THE DOLLARS ARE DERIVED, NOT RECORDED — the euro figure is the record.
+// The conversion is stated to the dollar because it is arithmetic on one
+// named rate, not a second measurement.
+//
+// A DEBT, NAMED IN THE PLACE IT IS OWED: this string carries a derived
+// copy of a number whose single source is the fx_rates row in the rules
+// layer (visa-fit:_param:fx_rates, EUR usd_per_unit 1.1597618, as_of
+// 2026-09-14). Nothing on this site fetches that row client-side yet —
+// the reader read is its first consumer and is being built — so the
+// conversion is baked here rather than read live. That is one number in
+// two places, which is the defect this project has ruled against for
+// exactly this kind of parameter; it is recorded rather than hidden, and
+// this line is owed a live read the moment the accessor exists.
+const WALDO_REFERENCE_BAND_NOTE =
+  "For scale, the nearest measured stand-in — nobody measures remote workers: "
+  + "\u20AC3,850 a month gross, the EU27 professionals band (Eurostat, 2022). "
+  + "About $4,465 a month, derived at the rate on file. Waldo's own map is "
+  + "still read from his recorded figure above, not from this band.";
+const PERSONA_REFERENCE_BAND = { waldo: WALDO_REFERENCE_BAND_NOTE };
+
 function tilesHtml() {
   // Eight named personas, unchanged order/size/portraits/descriptors.
   return VALID_PERSONAS.map((id) => {
     const name = personaDisplayName(id);
     const sentence = personaDescriptorSentence(id);
+    const band = PERSONA_REFERENCE_BAND[id];
+    const bandHtml = band ? `<span class="door-tile-band">${escapeHtml(band)}</span>` : "";
     return `
       <button type="button" class="door-tile" data-persona="${id}">
         <span class="door-portrait"><img class="door-portrait-img" src="${portraitSrc(id)}" alt="" loading="lazy"></span>
         <span class="door-name">${escapeHtml(name)}</span>
         <span class="door-descriptor">${escapeHtml(sentence)}</span>
+        ${bandHtml}
       </button>
     `;
   }).join("");
@@ -372,7 +481,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       // device while the switch showed unticked — kept without knowing
       // it, which is F2's defect wearing different clothes. The answered
       // fields only; the durable copy owns its own timestamps.
-      if (hasDurableOwnNumbers()) {
+      if (readerKeepsOnDevice()) {
         saveOwnNumbers({
           amount: flow.numbers.amount,
           currency: flow.numbers.currency,
@@ -576,7 +685,10 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     // render — not a local flag the handler sets. A checkbox whose
     // checked-ness is a guess about what is stored is the same class of
     // lie as a switch with no un-save behind it.
-    const kept = hasDurableOwnNumbers();
+    // THE SWITCH NOW GOVERNS EVERY ANSWER THE BOX TOOK, not the figures
+    // alone — see the write-rule block in app-shared.js. The tick mark is
+    // still the state of the device read fresh, never a local flag.
+    const kept = readerKeepsOnDevice();
     return `
       <div class="own-save" id="door-keep-block">
         <p class="door-resume-line">${escapeHtml(kept ? KEEP_HEADING_KEPT : KEEP_HEADING)}</p>
@@ -594,32 +706,16 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     if (!toggle) return;
     toggle.addEventListener("change", () => {
       if (!toggle.checked) {
-        // THE UN-SAVE FIX. This branch used to be a bare
-        // `return` — the un-save path went out with the retired result
-        // screen and nothing replaced it, so clearOwnNumbers() sat in
-        // app-shared.js with zero call sites and a stranger's income went
-        // durable one-way. The durable copy goes; the visit-scoped copy
-        // stays, because the reader unticked "keep this", not "forget
-        // this" — see clearOwnNumbers()'s own note. The map they are
-        // looking at does not change, and next visit there is nothing
-        // left to resume from.
-        clearOwnNumbers();
+        // Every durable copy goes — figures, passport, priorities and the
+        // door's own memory of the choice. The visit copies stay, because
+        // the reader unticked "keep this", not "forget this": the map
+        // they are looking at does not change, and next visit there is
+        // nothing left to resume from.
+        stopKeepingReaderAnswers();
         renderMainScreen();
         return;
       }
-      const numbers = loadOwnNumbers();
-      if (!numbers) return;
-      // Copy the visit-scoped figures into the durable store, field for
-      // field — never the stored object, which carries timestamps the
-      // durable copy owns for itself.
-      const ok = saveOwnNumbers({
-        amount: numbers.amount,
-        currency: numbers.currency,
-        period: numbers.period,
-        income_type: numbers.income_type,
-        duration_band: numbers.duration_band,
-        ...(numbers.property_capital ? { property_capital: numbers.property_capital } : {}),
-      });
+      const ok = keepReaderAnswersOnDevice();
       if (!ok) {
         toggle.checked = false;
         toggle.disabled = true;

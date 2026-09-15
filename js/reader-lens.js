@@ -149,9 +149,34 @@ export function routeBarBasisOnFile(row) {
 }
 
 // True when at least one route behind this country's reader verdict has
-// no basis on file — i.e. the declaration applies to the read.
-export function readerBasisIsAssumed(store, countryId) {
-  const rows = store.visaRoutesByCountry.get(countryId) || [];
+// no basis on file AND a comparison actually ran — i.e. the declaration
+// applies to the read.
+//
+// THE SECOND CONDITION, AND WHY IT IS A CONDITION AND NOT A REWORDING.
+// The sentence declares the basis of a computation. On a `data_gap`
+// country no amount reading happened at all — the bar was in another
+// currency, the field was absent, the source was silent — so there is no
+// comparison for a per-person assumption to qualify, and the line was
+// describing a computation that never ran. On a cold walk it rode all
+// twelve marked pins, including the two that passed; it is removed from
+// ten and KEPT on the two, because a clean pass computed against a bar
+// that might be a household bar is exactly the claim that needs its
+// assumption declared. Designing it off the passes would be honesty
+// designed out of view.
+//
+// It takes the LOCATION, not the country id, so the band it tests is the
+// one the reader is actually looking at and all three surfaces — map
+// tooltip, Lists, location page — agree by construction rather than by
+// three matching edits.
+//
+// It retires itself twice over: when a real `bar_basis` field lands on
+// the route rows, and when the currency read makes the ten readable — at
+// which point the line returns to them automatically, with no edit here.
+export function readerBasisIsAssumed(store, loc) {
+  if (!loc) return false;
+  const verdict = resolveVerdict(store, READER_ID, loc);
+  if (!readerVerdictHasAnswer(verdict)) return false;
+  const rows = store.visaRoutesByCountry.get(loc.country_id) || [];
   const slice = sliceRoutes(rows);
   if (!slice.length) return false;
   return slice.some((row) => !routeBarBasisOnFile(row));

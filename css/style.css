@@ -788,12 +788,6 @@ h3 { font-size: 1.05rem; }
    carries no hue at all now, and the key that explains it places the same
    <symbol> the map draws. */
 
-/* v6 addendum R4: Ormen Lange — monochrome border-ink line-art, never a
-   click/focus target (non-interactive by construction, see map.js's own
-   comment; pointer-events:none lives here, not inline, per this file's
-   convention). */
-.ormen-lange { pointer-events: none; }
-.ormen-lange path { fill: none; stroke: var(--country-border); stroke-opacity: 0.55; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- perspective door (v7 Part 10, js/perspective-door.js) ---------- */
 /* "Visible but foggy, not hidden" — the map keeps rendering underneath,

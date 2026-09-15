@@ -45,7 +45,7 @@ import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 import { resolveVerdict } from "./data.js";
 import { bandVisual, indexToColor, isGapValue } from "./colors.js";
 import {
-  READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarTable,
+  READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarTable, ROUTE_BARS,
 } from "./own-numbers-data.js";
 
 // ---------------------------------------------------------------------
@@ -254,6 +254,50 @@ export function composeCountryState(routeStates) {
   return unread ? S_BELOW_SOME_UNREAD : S_BELOW;
 }
 
+// WHICH KIND OF BAR THE READER WAS ACTUALLY MEASURED AGAINST — the one
+// fact the composed below-sentence needs and never had.
+//
+// THE DEFECT THIS EXISTS FOR, found on the rendered site, not in review:
+// a reader with a EUR income and USD capital, on a country whose two
+// INCOME routes both hit the currency wall and went unread, was told
+// "Below the income bar on every route here the site could read." The
+// only route that could be read set a CAPITAL bar — an asset threshold
+// their income never entered. Every quantifier in that sentence was
+// true; the four words naming the instrument were not.
+//
+// composeCountryState() takes state tokens and nothing else, so no
+// wording could reach this: the fact is absent from the composer's whole
+// input. It is NOT absent from the call site — evaluateRow() has set
+// `result.barKind` on every entry since the capital path was built. This
+// function is that fact, summarised over exactly the routes the sentence
+// is about.
+//
+// NO NEW STATE TOKEN, and that boundary is the ruling's, not a
+// preference: READER_BELOW_BAR and READER_BELOW_SOME_UNREAD keep their
+// tokens, their hard_fail band, their legend rows and their
+// STATE_HEADLINE_BAND entries. Only the TEXT behind an existing token
+// varies, selected by this summary.
+//
+// Returns null when no route was read-and-below (so every non-below
+// state is untouched), otherwise { kind, phrase }:
+//   kind "income"  - every below route measured income. The shipped
+//                    sentence is already true; it is kept verbatim.
+//   kind "capital" - every below route measured capital.
+//   kind "mixed"   - both, and the sentence may name neither instrument.
+// `phrase` is set only where every below-capital route shares ONE
+// barPhrase, which is what makes the singular "that bar" safe: the four
+// phrases in ROUTE_BARS are pairwise distinct, so two capital routes read
+// and below necessarily differ and the phrase falls away to null.
+export function belowBarKindSummary(entries) {
+  const below = entries.filter((e) => e.state === S_BELOW);
+  if (!below.length) return null;
+  const kinds = new Set(below.map((e) => e.result.barKind));
+  const kind = kinds.size > 1 ? "mixed" : [...kinds][0];
+  if (kind !== "capital") return { kind, phrase: null };
+  const phrases = new Set(below.map((e) => (ROUTE_BARS[e.row.route_key] || {}).barPhrase).filter(Boolean));
+  return { kind, phrase: phrases.size === 1 ? [...phrases][0] : null };
+}
+
 // The deciding route's own confidence tier, copied verbatim. A MECHANICAL
 // rule, not an opinion: the tier is the tier of the row that set the
 // band, transported unchanged. No tier is authored here and none is
@@ -333,6 +377,16 @@ export function buildReaderVerdictRows(store, input) {
     });
     const overallState = composeCountryState(entries.map((e) => e.state));
     if (!overallState) continue;
+    // Carried on the row beside the state, never folded into it — and
+    // ONLY where the composed state is one of the two the summary
+    // describes. A country whose best route is above the bar can still
+    // have a sibling route that fell below it, so the summary would be
+    // non-null there while describing routes the sentence is not about.
+    // Nothing consumes it in that case today; this makes it impossible
+    // for anything to start.
+    const readerBarKind = (overallState === S_BELOW || overallState === S_BELOW_SOME_UNREAD)
+      ? belowBarKindSummary(entries)
+      : null;
     rows.push({
       persona_id: READER_ID,
       location_id: null,
@@ -342,6 +396,11 @@ export function buildReaderVerdictRows(store, input) {
       overall_state: overallState,
       confidence_tier: decidingTier(entries, overallState),
       deciding_group_kind: "route",
+      // Read by stateHeadline()/readerStateShort() to pick which text an
+      // existing token renders. Null on every row where no route was read
+      // and below, which is every row whose sentence never claimed a bar
+      // kind in the first place.
+      reader_bar_kind: readerBarKind,
       companion_disclosure: null,
       cadence: null,
       cadence_burden: null,
@@ -641,7 +700,21 @@ export function perspectiveLineParts(store, persona) {
         : "the general Fit index";
       return {
         text,
-        meta: `Your numbers are read against the residence routes in ${joinList(names)} — income bars only; elsewhere they aren't read yet, and each page says so. Pin colors and the ranking are ${fitClause}, everywhere.`,
+        // TWO CORRECTIONS, and the first is the bigger one. "THE residence
+        // routes" was an every-route claim and it was false inside the named
+        // countries independently of bar kind: a route stating no single
+        // figure returns before any comparison, three of the four capital
+        // rules return before one, and the currency wall catches any route
+        // whose bar is in a currency the reader did not enter. Dropping the
+        // article makes this a sentence about WHERE the reading happens
+        // rather than a claim that it happened everywhere.
+        // Second: "income bars only" undercounted — capital bars are read
+        // too, and it was a capital bar's reading that produced the false
+        // sentence this crossing exists to fix. The trailing clause is
+        // cause-neutral on purpose: it covers all four mechanisms above in
+        // one breath and diagnoses none, which is the pattern this file
+        // already chose over an enumerated list.
+        meta: `Your numbers are read against residence routes in ${joinList(names)} — income bars and capital bars, where a route states one this site can compare; elsewhere they aren't read yet, and each page says so. Pin colors and the ranking are ${fitClause}, everywhere.`,
       };
     }
     return {

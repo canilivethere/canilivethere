@@ -903,7 +903,9 @@ export const STATE_HEADLINE = {
   QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
   QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
   UNCERTAIN_TYPE: "Possible — but whether this profile's income type qualifies for this route isn't confirmed yet.",
-  FAILS_AMOUNT: "Doesn't clear the income bar this route sets.",
+  // Kind-neutral, same reason as the legend label: this state fires on
+  // capital bars too, so the sentence names the bar and not its kind.
+  FAILS_AMOUNT: "Doesn't clear the bar this route sets.",
   DEAD_END_BLOCKING: "Confirmed dead end — this route doesn't lead where this profile needs it to.",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet for a real read.",
   // ---------------------------------------------------------------------
@@ -919,13 +921,26 @@ export const STATE_HEADLINE = {
   // The texts are the specified ones, verbatim. Their
   // band mapping is STATE_HEADLINE_BAND below, which they are also
   // registered in, so the legend and the banding cannot disagree.
-  READER_ABOVE_BAR: "Above the bar this route sets — on income. The other gates weren't read for you.",
+  // "— on income" DELETED. bandFor() returns "above" on the capital
+  // compare path exactly as it returns "below", so a reader whose CAPITAL
+  // cleared an asset threshold was told they cleared on income when their
+  // income was never read. The mirror of the below-bar defect, live on the
+  // same route, and it survived every gate because it flatters rather than
+  // closing a door. A deletion, not a rewording: the sentence is true of
+  // either bar kind without those three words.
+  READER_ABOVE_BAR: "Above the bar this route sets. The other gates weren't read for you.",
   // AUTHORED JOIN, flagged rather than smuggled: §6.3 specifies "v1's own
   // chip text, verbatim: 'Right at the line' + the v1 band sentence's
   // first clause" and does not write the joined sentence. Both halves are
   // transported word for word; only the ". " between them is mine.
   READER_AT_LINE: "Right at the line. Where you're within about a tenth of a bar either way, the site says \u201cright at the line\u201d rather than yes or no — these figures are dated snapshots, and a rule can move by more than that.",
   READER_ABOVE_CONDITIONAL: "Above the bar — but only with conditions this route sets in its own words.",
+  // The kind-aware variants live in READER_BELOW_VARIANTS below; this
+  // entry is the all-income reading, kept verbatim because it is true and
+  // because it is the parallel the capital row mirrors. A consumer that
+  // calls stateHeadline() without the row's bar-kind summary still gets a
+  // sentence — this one — which is why the variant is a refinement and not
+  // a dependency.
   READER_BELOW_BAR: "Below the bar every route here sets — on income.",
   READER_WRONG_TYPE: "Not this kind of income — none of the routes here take it as the qualifying kind.",
   // A specified string, corrected against the rule it is written under.
@@ -961,7 +976,13 @@ export const STATE_HEADLINE = {
   // site's own shipped, already-gated label (NO_RESIDENCY_ROUTE_CLEARS_LABEL
   // below). Only the second clause, which names both causes so the reader
   // knows which applies to which route, is mine.
-  READER_NONE_CLEARS: "No residency route clears here on income — some of these routes set a bar above your figure, and some don't take this kind of income.",
+  // "on income" DELETED FROM THE LEAD. Reached when a country refuses one
+  // route on the reader's income KIND and another on their FIGURE — and
+  // that second refusal can be a capital bar, in which case nothing about
+  // the composition was "on income". The carrier was the lead, not the
+  // clause it points at: the second clause names both causes and is
+  // kind-neutral, so it survives untouched and nothing is lost.
+  READER_NONE_CLEARS: "No residency route clears here — some of these routes set a bar above your figure, and some don't take this kind of income.",
 
   // ------------------------------------------------------------------
   // THREE MORE, and the every-route defect they fix. The states above
@@ -1001,12 +1022,15 @@ export const STATE_HEADLINE = {
   // branch), the map pin tooltip, the Lists row. State: the reader gave
   // long-stay figures; this country is in the read set; every route that
   // COULD be read refuses; at least one route could not be read at all.
+  // THE SENTENCE THE DEFECT WAS FOUND ON. Kept as the all-income reading;
+  // the capital and mixed readings are in READER_BELOW_VARIANTS below.
   READER_BELOW_SOME_UNREAD:
     "Below the income bar on every route here the site could read." + READER_PARTIAL_READ_CLAUSE,
   READER_WRONG_TYPE_SOME_UNREAD:
     "Not this kind of income — no route here the site could read takes it as the qualifying kind." + READER_PARTIAL_READ_CLAUSE,
+  // "on income" DELETED from this lead too, same reason as READER_NONE_CLEARS.
   READER_NONE_CLEARS_SOME_UNREAD:
-    "No residency route the site could read here clears on income — some set a bar above your figure, and some don't take this kind of income." + READER_PARTIAL_READ_CLAUSE,
+    "No residency route the site could read here clears — some set a bar above your figure, and some don't take this kind of income." + READER_PARTIAL_READ_CLAUSE,
   // ---------------------------------------------------------------------
   // THE ENGINE'S FOUR NEW STATES. Not reader states and not a fifth
   // vocabulary: these are engine tokens that the composition fix and the
@@ -1049,9 +1073,84 @@ export const STATE_HEADLINE_LOCATION_CAPPED =
 // Unknown non-null states still fall through to the raw value on purpose
 // (fail-visible: a new engine state should look wrong on screen, not
 // silently borrow another state's sentence).
-export function stateHeadline(state) {
+// THE TWO BELOW-SENTENCES, BY THE KIND OF BAR THE READER WAS MEASURED
+// AGAINST. One existing token, three readings — no fourth state, no new
+// band, no new legend row.
+//
+//   income   the shipped sentence, verbatim. It was always true here.
+//   capital  names the instrument where one instrument can be named
+//            ("that bar is an asset requirement"), and falls back to the
+//            kind where it cannot. The singular "that bar" is safe by
+//            construction: the barPhrase values are pairwise distinct, so
+//            two capital routes read and below necessarily carry
+//            different phrases and `phrase` arrives null.
+//   mixed    names NEITHER instrument, deliberately. Naming one while the
+//            other bars measure something else would tell the reader
+//            which phrase belongs to which route, which a single sentence
+//            about several routes cannot know. It follows the house
+//            pattern READER_NONE_CLEARS already sets for a two-cause
+//            refusal.
+//
+// "capital" is the READER'S OWN WORD, not the schema's `kind` and not
+// "assets": the box asks for this figure as "I also have capital I could
+// put into property" / "How much capital?", so the sentence hands back
+// the word they were asked for.
+const READER_BELOW_VARIANTS = {
+  READER_BELOW_BAR: {
+    capitalWithPhrase: (phrase) =>
+      `Below the bar every route here sets — that bar is ${phrase}, not an income one.`,
+    capital: "Below the bar every route here sets — on capital, not income.",
+    mixed: "Below the bar every route here sets — some of those bars measure income, some measure capital.",
+  },
+  READER_BELOW_SOME_UNREAD: {
+    capitalWithPhrase: (phrase) =>
+      `Below the bar on every route here the site could read — that bar is ${phrase}, not an income one.` + READER_PARTIAL_READ_CLAUSE,
+    capital: "Below the bar on every route here the site could read — on capital, not income." + READER_PARTIAL_READ_CLAUSE,
+    mixed: "Below the bar on every route here the site could read — some of those bars measure income, some measure capital." + READER_PARTIAL_READ_CLAUSE,
+  },
+};
+
+// The short twin, same three readings. It renders as a pin's accessible
+// name, so leaving it kind-blind would ship the false claim to a screen
+// reader while the visible sentence told the truth. No figure, no count,
+// no instrument — this table's own rule.
+const READER_BELOW_SHORT_VARIANTS = {
+  READER_BELOW_BAR: {
+    capital: "below the bar, on capital not income",
+    mixed: "below the bar, on income and on capital",
+  },
+};
+
+// The one lookup every consumer uses. Kept as a function rather than a
+// seventh object key because the seventh case's key is `null`, and the
+// only way an object literal can hold it is by string coercion.
+// Unknown non-null states still fall through to the raw value on purpose
+// (fail-visible: a new engine state should look wrong on screen, not
+// silently borrow another state's sentence).
+//
+// `barKind` is the reader row's own `reader_bar_kind` summary and is
+// OPTIONAL: every existing `stateHeadline(state)` call keeps working
+// unchanged and keeps getting the all-income reading, which is the
+// sentence that shipped. Only a caller holding a reader row can select a
+// variant, and only a reader row can carry one.
+export function stateHeadline(state, barKind) {
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
+  const variants = barKind && READER_BELOW_VARIANTS[state];
+  if (variants && barKind.kind === "mixed") return variants.mixed;
+  if (variants && barKind.kind === "capital") {
+    return barKind.phrase ? variants.capitalWithPhrase(barKind.phrase) : variants.capital;
+  }
   return STATE_HEADLINE[state] || state;
+}
+
+// Same contract for the compact form: optional second argument, identical
+// fallback, so a caller without the summary gets exactly what it got before.
+export function readerStateShort(state, barKind) {
+  const variants = barKind && READER_BELOW_SHORT_VARIANTS[state];
+  if (variants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
+    return variants[barKind.kind];
+  }
+  return READER_STATE_SHORT[state];
 }
 
 // Which of the four `overall_band` values each `overall_state` belongs to —
@@ -1150,16 +1249,16 @@ export const STATE_HEADLINE_BAND = {
 // number, no count, no "one of three": a short form compresses the headline's direction and never
 // re-states a figure.
 export const READER_STATE_SHORT = {
-  READER_ABOVE_BAR: "above the bar, on income",
+  READER_ABOVE_BAR: "above the bar",
   READER_ABOVE_CONDITIONAL: "above the bar, with conditions",
   READER_AT_LINE: "right at the line",
   READER_BELOW_BAR: "below the income bar",
   READER_WRONG_TYPE: "not this kind of income",
-  READER_NONE_CLEARS: "no route clears on income",
+  READER_NONE_CLEARS: "no route clears",
   READER_NOT_ENOUGH: "couldn't be read against your figures",
   READER_BELOW_SOME_UNREAD: "below the bar on the routes that could be read, some unread",
   READER_WRONG_TYPE_SOME_UNREAD: "not this kind of income on the routes that could be read, some unread",
-  READER_NONE_CLEARS_SOME_UNREAD: "no readable route clears on income, some unread",
+  READER_NONE_CLEARS_SOME_UNREAD: "no readable route clears, some unread",
 };
 
 // The build error is a real throw rather than a warning: a missing short form would ship a pin whose accessible name
@@ -1187,9 +1286,27 @@ export const READER_STATE_SHORT = {
 // knot label have to say the same thing about the same absence.
 export const READER_LABEL_UNREAD = "Not read against your figures.";
 export const READER_LABEL_UNREAD_MEMBER = "not read against your figures";
-// The solo label's lead-in: "{place}, {country}. Your own income
-// read: {short}."
-export const READER_LABEL_READ_PREFIX = "Your own income read:";
+// The solo label's lead-in: "{place}, {country}. Your own read: {short}."
+//
+// "income" DELETED, and this label is only ever MET SPOKEN — it is an
+// aria-label, assembled by soloAriaLabel() in js/map.js. Once the short
+// form became bar-kind aware, a screen reader began saying, in one
+// breath: "Antigua, Guatemala. Your own income read: below the bar, on
+// capital not income." The label cancelled its own value inside a single
+// sentence, and a listener with no way to re-read it would reasonably
+// conclude the site was confused about its own answer.
+//
+// "Your own" STAYS — it is the perspective-disclosure marker, naming
+// whose lens this reading is.
+//
+// THE BETTER-PAIRED WORDING WAS DELIBERATELY NOT TAKEN, recorded so it
+// is not "improved" back in: "Read against your figures:" would mirror
+// READER_LABEL_UNREAD above exactly. But "read" is a heteronym, and
+// sentence-initially — straight after the full stop that ends the place
+// name — a synthesiser's likely guess is the imperative, which turns a
+// verdict into an instruction. The shipped negative is safe only because
+// its leading "Not" forces the participle.
+export const READER_LABEL_READ_PREFIX = "Your own read:";
 
 // v9 Part 8: the mandatory rule-derived-verdict disclosure. Two load-
 // bearing content requirements, both from this project's own residency-
@@ -1204,11 +1321,25 @@ export const READER_LABEL_READ_PREFIX = "Your own income read:";
 // Door v2: the persona sentence reads "checked against
 // {Name}'s stated profile", which for the reader is both bad grammar and
 // an overclaim — the reader gave figures, not a profile, and what was
-// read against them is twenty income bars and nothing else. Sentences
-// three to five are the shipped sentence's own, verbatim; only the first
-// two change, and they narrow the claim rather than widening it.
+// read against them is a table of route bars. Measured rather than
+// recalled, because the figure this comment used to carry was wrong twice:
+// the table holds TWENTY ENTRIES ACROSS FIVE COUNTRIES, of which 14 set an
+// income bar, 4 set a capital bar and 2 state no single figure at all — so
+// "twenty income bars" conflated the entry count with the income count,
+// and "and nothing else" was the same over-claim the string below is being
+// corrected for. A stale number left beside a corrected sentence makes the
+// file argue with itself.
+//
+// Sentences three to five are the shipped sentence's own, verbatim.
+// THE FIRST TWO NOW NARROW AND WIDEN AT ONCE, and the test this comment
+// sets is met on the axis that matters: the ROUTE axis narrows twice (the
+// universal "the" goes, and a comparability condition is added), so
+// strictly less is promised as read. The KIND axis widens — capital bars
+// are named where they were not — but that is a correction of an
+// undercount, not a new promise: capital bars were already being read, and
+// one of them produced the defect this crossing repaired.
 export const READER_VERDICT_DISCLOSURE =
-  "This read is computed from this site's documented visa and residency rules, checked against the figures you entered on this device — the income bars on the residence routes in five countries, nothing else yet. Not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.";
+  "This read is computed from this site's documented visa and residency rules, checked against the figures you entered on this device — the income and capital bars on residence routes in five countries, where a route states one this site can compare. Nothing else yet. Not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.";
 
 // RULED COPY, quoted verbatim and not this build's to reword: where a
 // route's per-person basis isn't on file, the reader's verdict declares

@@ -9,7 +9,7 @@ import {
   READER_ID, personaDisplayLabel, hasReaderWeights,
   loadViewIndex, saveViewIndex, wireCornerLensInPlace,
   READER_BASIS_DECLARED_LINE,
-  READER_STATE_SHORT, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
+  READER_STATE_SHORT, readerStateShort, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
   READER_LABEL_READ_PREFIX,
 } from "./app-shared.js";
 import {
@@ -806,9 +806,9 @@ function renderPurposeSelector(store, lenses) {
 // the first clause names, and the fill is the reader's weighted index or
 // the general one on exactly that test.
 const READER_EXPLAINER_VERDICTS_WEIGHTED =
-  "Every pin is colored by the Fit index, weighted by your priorities — how well the place fits what you said matters. The mark on a pin is your own income read, and only the countries this box has read carry one; hover a pin and it says which.";
+  "Every pin is colored by the Fit index, weighted by your priorities — how well the place fits what you said matters. The mark on a pin is your own read, and only the countries this box has read carry one; hover a pin and it says which.";
 const READER_EXPLAINER_VERDICTS_GENERAL =
-  "Every pin is colored by the general Fit index — place quality, not eligibility. The mark on a pin is your own income read, and only the countries this box has read carry one; hover a pin and it says which.";
+  "Every pin is colored by the general Fit index — place quality, not eligibility. The mark on a pin is your own read, and only the countries this box has read carry one; hover a pin and it says which.";
 const READER_EXPLAINER_PASSPORT_ONLY =
   "Pins colored by the general Fit index. Your saved passport changes the entry rules on each place's own page, not these colors.";
 
@@ -983,22 +983,11 @@ function renderMap(store, lenses) {
   // viewBox) so it never needs recomputing on zoom/pan — the SVG's own
   // viewBox window naturally shows the right cropped portion of it,
   // exactly as it already does for the country-path fills above. Painted
-  // after the base fills and before Ormen Lange/pins, so neither the
-  // ornament nor a pin gets textured — only the fills do, per Part 15's
-  // own scope (coastline/border strokes explicitly untouched).
+  // after the base fills and before the pins, so no pin gets textured —
+  // only the fills do, per Part 15's own scope (coastline/border strokes
+  // explicitly untouched).
   renderMapGrain(svg, svgNS);
 
-  // v6 addendum R4: the site's first pure ornament — Ormen Lange, open
-  // North Atlantic, ahead of the pin layer so a pin can never render under
-  // it even though their coordinates don't collide today. Draws directly
-  // in PROJECTION world-space (not a persisted <g transform>), so it stays
-  // correctly pinned to its own anchor through zoom/pan with no extra code
-  // — the same viewBox mechanism that keeps country-path fills correctly
-  // positioned already covers it (Part 9 item 5's own requirement, met by
-  // the existing draw method rather than by a group-transform this file
-  // no longer uses — flagged as a small factual mismatch against the
-  // spec's own described mechanism, not a gap in the actual requirement).
-  renderOrmenLange(svg, svgNS);
 
   // ---- Pin data pass: compute fill/tooltip per location, unchanged
   // logic from before zoom/decluster existed — just deferred from
@@ -1047,6 +1036,7 @@ function renderMap(store, lenses) {
     //                   only row explaining a colour a fixture pin paints.
     let verdictState = null;
     let verdictKind = null;
+    let readerBarKind = null;
     // Part 30.8 (score-driven pin draw order): set
     // alongside `fill` in every branch below. `isRampColored` is true only
     // when the FINAL rendered fill is a scoreToColor()/indexToColor() call
@@ -1269,6 +1259,9 @@ function renderMap(store, lenses) {
       rampValue = paint.rampValue;
       markBand = paint.markBand;
       readerState = paint.state;
+      // The bar-kind summary rides with the state so the PIN's accessible
+      // name can carry the same correction the tooltip sentence does.
+      readerBarKind = paint.verdict ? paint.verdict.reader_bar_kind : null;
       // THE TOOLTIP BRANCHES ON `read`, NOT ON "REACHED AN ANSWER" — the
       // overlay reaching the words as well as the paint. Under it a
       // data_gap read carries a MARK (in the gap colour), so it is a pin
@@ -1279,7 +1272,7 @@ function renderMap(store, lenses) {
       // carry an unplaced-copy placeholder: it needed one only while the
       // pin was silent about the read, and it is not anymore.
       if (paint.read) {
-        const stateText = stateHeadline(readerVerdict.overall_state);
+        const stateText = stateHeadline(readerVerdict.overall_state, readerVerdict.reader_bar_kind);
         // The same no-bare-no instead-line every other verdict branch in
         // this file carries — now on `bandEliminated`, because the pin's
         // own `eliminated` is false on every reader pin by construction
@@ -1329,7 +1322,7 @@ function renderMap(store, lenses) {
         // no-lens state disclosing itself by silence rather than by a
         // sentence about a read that never happened.
         const eligibilityLine = hasReaderVerdicts(store)
-          ? `\nThis box hasn't read ${country.name} against your figures, so there's no income read for you here — the color is the place's Fit index, not a verdict. Open this place's page for the general figures.`
+          ? `\nThis box hasn't read ${country.name} against your figures, so there's no read for you here — the color is the place's Fit index, not a verdict. Open this place's page for the general figures.`
           : "";
         tooltip = `${headline}\n${qualityLine}${eligibilityLine}`;
       }
@@ -1396,7 +1389,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState, verdictState, verdictKind });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState, readerBarKind, verdictState, verdictKind });
   }
 
   const wrap = document.createElement("div");
@@ -1427,8 +1420,8 @@ function renderMap(store, lenses) {
   const pxPerWorldUnit = containerWidthPx / STATE.viewBox.w;
   const groups = clusterPins(pinEntries, pxPerWorldUnit);
 
-  // v10 §13.4: ground layer, appended here — after grain/Ormen Lange (both
-  // already in the SVG's child list above) and strictly before any pin
+  // v10 §13.4: ground layer, appended here — after the grain (already in
+  // the SVG's child list above) and strictly before any pin
   // below (none have been appended yet at this point in the function) — so
   // paint order alone, not a z-index, guarantees a pin never renders behind
   // its own local terrain, same rule Part 12.1's grain fix already
@@ -1659,7 +1652,7 @@ function renderMap(store, lenses) {
   // country. READER_STATE_SHORT is asserted against STATE_HEADLINE's
   // reader keys at module load (app-shared.js), so a lookup that comes
   // back undefined here is impossible rather than merely unlikely.
-  const readerShort = (entry) => (entry.readerState ? READER_STATE_SHORT[entry.readerState] : null);
+  const readerShort = (entry) => (entry.readerState ? readerStateShort(entry.readerState, entry.readerBarKind) : null);
   // Both forms of the pin label.
   function soloAriaLabel(entry) {
     const base = `${entry.loc.display_name}, ${entry.country.name}`;
@@ -2124,11 +2117,20 @@ function renderMap(store, lenses) {
 // sits under exactly one row, and each label is written to be true of
 // every state in its band. The tooltip still carries each state's own
 // sentence; the key compresses, the tooltip diagnoses.
-const READER_MARK_KEY_TITLE = "Mark on a pin — your own income read:";
+// THE HEADING AND ITS ROWS MOVE TOGETHER, ALWAYS. This summary sits over
+// READER_MARK_ROWS below; dropping "income" here while a row still reads
+// "on income" would ship a heading and a list that disagree inside one
+// open <details>.
+const READER_MARK_KEY_TITLE = "Mark on a pin — your own read:";
 const READER_MARK_ROWS = [
-  { band: "clean", label: "Above the bar, on income" },
+  // "on income" deleted — matches the same deletion on the sentence this
+  // row compresses. A clean band can be earned against a capital bar.
+  { band: "clean", label: "Above the bar" },
   { band: "uncertain_or_conditional", label: "Not settled — right at the line, above with conditions, or a no on only the routes the site could read" },
-  { band: "hard_fail", label: "Doesn't clear on income — below the bar, or not this kind of income" },
+  // Lead deleted, trailing clause KEPT: "or not this kind of income" is
+  // READER_WRONG_TYPE, which genuinely is about income type. Only the
+  // lead claimed the whole band was an income reading.
+  { band: "hard_fail", label: "Doesn't clear — below the bar, or not this kind of income" },
   { band: "data_gap", label: "Couldn't be read — not enough recorded, or the bar is in another currency" },
 ];
 // The trailing line, no swatch: the absence is a state too, and the
@@ -2496,37 +2498,6 @@ function computeMapViewBox(store) {
   return computeViewBoxForLocations(store.locations);
 }
 
-// v6 addendum R4 placeholder: the site's first pure
-// ornament slot — asserting no fact, citing no source, carrying no
-// confidence tier (exempt from the why/instead render contract by
-// construction). The original line-art longship attempt is retired by
-// direct instruction ("let's get rid of the attempt at Ormen Lange") —
-// a plain X placeholder holds the spot until real artwork lands; same
-// slot, same non-interactive contract, nothing else changed.
-function renderOrmenLange(svg, svgNS) {
-  const g = document.createElementNS(svgNS, "g");
-  g.setAttribute("class", "ormen-lange");
-  // aria-hidden, no role/tabindex, no <title>/data-tooltip, no fill — pure
-  // decoration per the render contract; pointer-events:none lives in CSS
-  // (style.css), not inline, matching this file's own styling convention.
-  g.setAttribute("aria-hidden", "true");
-
-  // Placement: open North Atlantic, west of the Iberian pin cluster, south
-  // of the British Isles — no coastline crossing at this resolution, and
-  // inside R1's post-crop viewBox for the current pin set (verified:
-  // computeMapViewBox() above returns roughly x:[118,721] y:[390,653] for
-  // today's 38 locations; this point sits well inside both ranges).
-  const cx = PROJECTION.x(-20);
-  const cy = PROJECTION.y(45);
-
-  // Placeholder X, an 8-unit cross centered on (cx, cy) — deliberately the
-  // plainest possible marker, not a second art attempt.
-  const path = document.createElementNS(svgNS, "path");
-  path.setAttribute("d", `M${cx - 4},${cy - 4} L${cx + 4},${cy + 4} M${cx - 4},${cy + 4} L${cx + 4},${cy - 4}`);
-  path.setAttribute("fill", "none");
-  g.appendChild(path);
-  svg.appendChild(g);
-}
 
 // v10 Part 15.5, short form kept as the single legend vocabulary by Part
 // 23.9: a short chip-style label parallel to STATE_HEADLINE, keyed the
@@ -2562,7 +2533,10 @@ const STATE_CHIP_LABEL = {
   QUALIFIES_AND_CONVERTS: "Clears, leads to permanent residency",
   QUALIFIES_CONDITIONAL: "Clears, with conditions",
   UNCERTAIN_TYPE: "Possible, income type unconfirmed",
-  FAILS_AMOUNT: "Doesn't clear the income bar",
+  // Kind-neutral: FAILS_AMOUNT fires on capital bars in the shipped data,
+  // so naming the instrument here would be false on those rows. Kind-aware
+  // persona wording is a separate question and is not answered here.
+  FAILS_AMOUNT: "Doesn't clear the bar",
   DEAD_END_BLOCKING: "Confirmed dead end",
   GAP_INSUFFICIENT_DATA: "Not enough documented yet",
   // The engine's four new states. Each is already registered in
@@ -2638,8 +2612,28 @@ const STATE_CHIP_LABEL = {
 // says otherwise sends the eye to the wrong pixels. ONE constant, ONE
 // remaining substitution: "fits your priorities" / "fits, on the general
 // figures".
+// THE MIDDLE CLAUSE CARRIED BOTH DEFECTS AT ONCE and the third sentence
+// is transported verbatim.
+//   "whether ITS residence routes take your income" was the same
+//   every-route claim the two scope strings carried — false inside the
+//   named countries independently of bar kind.
+//   "your income" became "your figures", the site's own noun for what
+//   the reader gave, and what the mark is actually computed from.
+//   "take" became "read against": "take" describes income-TYPE
+//   acceptance alone, while this mark carries above, at-line, below,
+//   wrong-type and couldn't-read. That third edit is not a scope fix —
+//   it is the clause being made true of the mark it explains.
+//   "income bars and nothing else yet" became the same condition clause
+//   now on three surfaces: one condition, one wording.
+//
+// WHY THIS ONE MATTERED MORE THAN ITS SIZE: index.html renders this
+// legend and the corrected scope sentence on the SAME page, both
+// reader-lens-only, and for the reader who found this crossing's defect
+// the mark took its value from a CAPITAL bar. A stale legend here walked
+// that reader straight back to "my income is below the income bar" —
+// one paragraph from where it had just been repaired.
 const READER_LEGEND_NOTE_TEMPLATE =
-  "The color is how well the place {fitClause}; the mark at a pin's top-right is whether its residence routes take your income, read against income bars and nothing else yet. Pins with no mark are in countries this box hasn't read against your figures — their color is still the place's Fit index, and none of it is a verdict.";
+  "The color is how well the place {fitClause}; the mark at a pin's top-right is how your figures read against residence routes in that country — income bars and capital bars, where a route states one this site can compare. Pins with no mark are in countries this box hasn't read against your figures — their color is still the place's Fit index, and none of it is a verdict.";
 const READER_LEGEND_FIT_CLAUSE_WEIGHTED = "fits your priorities";
 const READER_LEGEND_FIT_CLAUSE_GENERAL = "fits, on the general figures";
 // The two recede summaries. UI copy about the site's own display, not a

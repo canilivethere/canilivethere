@@ -287,7 +287,7 @@ function buildVerdictBlock(store, loc, country, persona) {
     const value = idx ? idx.value : null;
     if (readerVerdict) {
       const visual = bandVisual(readerVerdict.overall_band);
-      const stateText = stateHeadline(readerVerdict.overall_state);
+      const stateText = stateHeadline(readerVerdict.overall_state, readerVerdict.reader_bar_kind);
       // The same no-bare-no instead-line every other verdict branch on
       // this page carries, on the same gate: two pointers to content
       // already on this page, zero new facts.
@@ -341,7 +341,7 @@ function buildVerdictBlock(store, loc, country, persona) {
       const readSuffixPhrase = hasReaderWeights() ? "weighted by your priorities" : "the general figures";
       div.innerHTML = `
         <p class="verdict-headline">${escapeHtml(buildFitHeadline(store, null, loc, country, value))} (${escapeHtml(readSuffix)})</p>
-        <p class="verdict-prose">Not checked yet for you at this location — this box hasn't read this country's residence routes against your figures, so nothing here is an income read or a verdict. The Fit index above is ${escapeHtml(readSuffixPhrase)} and stands on its own.</p>
+        <p class="verdict-prose">Not checked yet for you at this location — this box hasn't read this country's residence routes against your figures, so nothing here is a read or a verdict. The Fit index above is ${escapeHtml(readSuffixPhrase)} and stands on its own.</p>
         ${redFlagBadgeGeneral}
         ${breakdownLinkGeneral}
       `;

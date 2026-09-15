@@ -377,7 +377,7 @@ function readerContextLine(store, rows) {
   // still open, and a flat fit-ranked alternative is specified and
   // waiting if it is wanted.
   const readerFitPhrase = weighted ? "weighted by your priorities" : "the general figures";
-  return `${rankingClause} Your own income read is shown per row where this box has read the country — ${joinList(readCountryNames(store))} — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries this box hasn't read against your figures and the ones where the record doesn't reach an answer; neither is a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
+  return `${rankingClause} Your own read is shown per row where this box has read the country — ${joinList(readCountryNames(store))} — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries this box hasn't read against your figures and the ones where the record doesn't reach an answer; neither is a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
 }
 
 function buildRows(store, persona) {
@@ -654,7 +654,9 @@ function buildVerdictHtml(store, row, persona) {
     // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
     // comment cites).
     const visual = bandVisual(row.engineVerdict.overall_band);
-    const stateText = stateHeadline(row.engineVerdict.overall_state);
+    // Second argument is the reader row's own bar-kind summary, undefined
+    // on every persona row. See stateHeadline()'s own note.
+    const stateText = stateHeadline(row.engineVerdict.overall_state, row.engineVerdict.reader_bar_kind);
     // Sourcing-confidence tier badge, same skip-on-data-gap rule as
     // location.js's own verdict block (a data-gap band already says "not
     // enough to judge" — a tier badge there would wrongly imply one exists).

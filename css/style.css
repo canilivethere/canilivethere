@@ -1305,15 +1305,6 @@ table.rank-table th[aria-sort="ascending"]::after { content: " ▲"; }
 table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .rank-fit-cell { display: flex; align-items: center; gap: 0.5rem; }
 
-/* Corrections & changes page: reuses .rank-table's border/sticky-header
-   look, but this table isn't sortable (no click-to-sort wired, unlike
-   Lists) — overriding the pointer cursor so the header doesn't promise an
-   interaction that isn't there (same no-false-affordance standard applied
-   elsewhere on this site: no visual promise without a real interaction
-   behind it). No [aria-sort] attribute is ever set on this table, so the
-   ⇅/▲/▼ decoration rule above never fires here either — this is
-   belt-and-suspenders for the cursor specifically. */
-#corrections-table th { cursor: default; }
 .fit-swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); flex: none; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0; align-items: center; }
 .filters label { font-size: 0.85rem; }
@@ -1573,6 +1564,15 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .fact-value { font-size: 1rem; }
 .fact-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.78rem; color: var(--muted); }
 .fact-notes { font-size: 0.85rem; color: var(--muted); }
+/* A visa route's `documentation_shape` — the paperwork the route asks an
+   applicant to produce. Deliberately NOT .fact-notes: these entries run
+   323-1,384 characters (median 578), and muted 0.85rem type at that length
+   reads as a footnote when it is one of the two things that actually decide
+   whether a reader can use the route. Body ink, body size, capped at a
+   readable measure, tight top margin so it stays visibly attached to its own
+   label rather than floating between rows. */
+.route-doc-label { margin-top: 0.4rem; }
+.route-doc { margin: 0.1rem 0 0; font-size: 0.95rem; max-width: 68ch; }
 .scope-tag { font-size: 0.72rem; color: var(--muted); font-style: italic; }
 /* The Sources chapter's per-fact date breakdown — rendered only when the
    facts behind one URL do NOT share a date, so no single date can honestly
@@ -1625,19 +1625,6 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
    the shared panel-card contract above — margin-top kept here since it's
    a spacing need specific to this module's position on the page. */
 .next-best { margin-top: 2rem; }
-.change-event { border-left: 3px solid var(--line); padding-left: 0.6rem; margin-bottom: 0.6rem; }
-/* A change event's detail text is the site's only multi-paragraph stored
-   field; it renders as one <p> per author paragraph (escapeParagraphs(),
-   js/app-shared.js). Without this the browser's own 1em default would
-   open a gap above the first line, floating the text off its headline.
-   Tighter than a body paragraph on purpose — these sit inside a row, not
-   on the page. Single-paragraph details carry no <p> at all and are
-   untouched by both rules. */
-.change-event .fact-notes p { margin: 0 0 0.5rem; }
-.change-event .fact-notes p:last-child { margin-bottom: 0; }
-.sev-3 { border-left-color: #b02a2a; }
-.sev-2 { border-left-color: #b95d00; }
-.sev-1 { border-left-color: #2c7fb8; }
 
 /* "What to verify yourself" (v2 addendum §5.4) — plate treatment shared,
    see panel-card contract above. */
@@ -1747,9 +1734,6 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 [data-theme="dark"] body { background: var(--paper); }
 [data-theme="dark"] .disclaimer { background: #3a2f14; border-color: #a47c1b; color: var(--muted); }
 
-[data-theme="dark"] .sev-3 { border-left-color: #bf2e2e; }
-[data-theme="dark"] .sev-2 { border-left-color: #a05000; }
-[data-theme="dark"] .sev-1 { border-left-color: #256b9b; }
 
 [data-theme="dark"] .breakdown-item { background: var(--panel); }
 

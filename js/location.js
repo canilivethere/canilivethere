@@ -7,13 +7,14 @@ import {
   applyStoredTheme, renderTopBar,
   renderFooter, getActivePersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
-  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, loadFxRates,
+  FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, FIT_INDEX_DEFAULT_WEIGHTING_LINE,
+  FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED, buildFitHeadline, loadFxRates,
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   READER_ID, hasReaderWeights, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
-  sentenceCaseRuleParagraph, locationGateProvenanceHtml, escapeParagraphs,
+  sentenceCaseRuleParagraph, locationGateProvenanceHtml,
 } from "./app-shared.js";
 import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
 import { siteUrl } from "./site-root.js";
@@ -153,7 +154,11 @@ async function main() {
   }
   root.appendChild(buildSourcesSection(sourcedFacts));
   root.appendChild(buildVerifyYourself(gapFacts));
-  root.appendChild(buildChangeEvents(store, loc, country));
+  // The "Recent change events" section used to render here. The change log
+  // is internal — a reader never sees it — so the section is gone rather
+  // than shortened. Nothing replaces it: a fact that is still true renders
+  // in its own chapter, and the site no longer narrates the rows that
+  // dropped.
   root.appendChild(buildNextBest(store, loc, persona));
 }
 
@@ -573,10 +578,20 @@ function buildVerdictBlock(store, loc, country, persona) {
     // buildFitHeadline()'s exact mechanism — the same string a reader
     // may have already seen on this location's map pin (zero new
     // authorship, transport of an already-computed value).
+    //
+    // The index renders in this state rather than waiting for the box to
+    // be filled, and it says whose weighting it is while it is not yet the
+    // reader's — the no-lens state naming itself, per the
+    // perspective-disclosure law. The string is canonical in app-shared.js
+    // so the prerendered no-JS twin can carry the identical sentence.
     const general = store.generalIndex(loc.location_id);
     const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
+    const weightingLine = hasReaderWeights()
+      ? FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED
+      : FIT_INDEX_DEFAULT_WEIGHTING_LINE;
     div.innerHTML = `
       <p class="verdict-headline">${escapeHtml(headline)}</p>
+      <p class="verdict-prose">${escapeHtml(weightingLine)}</p>
       ${redFlagBadge}
       ${breakdownLink}
     `;
@@ -756,22 +771,6 @@ function buildScoreBar(store, loc, persona) {
     });
   });
   return details;
-}
-
-function buildChangeEvents(store, loc, country) {
-  const div = document.createElement("div");
-  const events = [
-    ...(store.changeEventsByLocation.get(loc.location_id) || []),
-    ...(store.changeEventsByCountry.get(country.country_id) || []).filter((e) => !e.location_id),
-  ].sort((a, b) => (a.date < b.date ? 1 : -1));
-  if (!events.length) return div;
-  div.innerHTML = `<h2>Recent change events</h2>` + events.map((ev) => `
-    <div class="change-event sev-${ev.severity}">
-      <strong>${escapeHtml(ev.date)}</strong> — ${escapeHtml(ev.headline)}
-      <span class="badge">${ev.category}</span> <span class="badge">severity ${ev.severity}</span>
-      ${ev.detail ? `<div class="fact-notes">${escapeParagraphs(ev.detail)}</div>` : ""}
-    </div>`).join("");
-  return div;
 }
 
 function buildSectionNav() {
@@ -1083,6 +1082,14 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
   }
   const cards = [...byRoute.values()].map((group) => {
     const routeKey = group[0].route_key;
+    // One route_key can hold several threshold rows (Thailand's LTR
+    // categories, Egypt's three real-estate tiers). Those rows carry the
+    // SAME documentation_shape text where they carry one at all — measured:
+    // all 3 EG:route:real-estate-investment-residency rows are identical —
+    // so it is rendered once per card, at the first row that has it, rather
+    // than three times verbatim under three <hr>s. Distinct texts within one
+    // card would still each render; none exist today.
+    const seenDocShapes = new Set();
     const rowsHtml = group.map((r) => {
       const asFact = routeAsFact(r);
       const notes = [];
@@ -1108,7 +1115,37 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
       // uses elsewhere (e.g. a zero-red-flag location shows no badge at
       // all rather than "0 red flags").
       if (r.age_gate && r.age_gate !== "0") {
-        notes.push(`<div class="fact-notes">Minimum age: <strong>${escapeHtml(r.age_gate)}</strong> years</div>`);
+        // "[GAP]" is a gap marker, not an age. Rendering it raw shipped
+        // "Minimum age: [GAP] years" on 21 routes across 9 countries;
+        // it takes the same wording the sibling fields above already use.
+        const ageText = r.age_gate === "[GAP]"
+          ? "Not yet researched"
+          : `${escapeHtml(r.age_gate)} years`;
+        notes.push(`<div class="fact-notes">Minimum age: <strong>${ageText}</strong></div>`);
+      }
+      // `documentation_shape` — what this route asks an applicant to PRODUCE,
+      // as opposed to what it asks them to earn. Substance, not overhead: a
+      // route a reader clears on income can still be unreachable on paperwork
+      // (an apostilled police certificate from a country you left, a
+      // consular-legalized bank history), and until now the field reached no
+      // reader at all — it is in derived/visa-routes.jsonl and nothing
+      // rendered it.
+      //
+      // Site-wide, every country, on the same terms as its sibling fields
+      // above: 34 of 95 route rows carry one, across 11 countries. The other
+      // 61 do not carry the key at all, and render NOTHING — no label, no
+      // empty bullet, no "not available" line. An absent shape is an
+      // un-researched gap, and a gap stated in a bullet is still a bullet.
+      //
+      // Rendered as prose on its own line, not as an inline value: these run
+      // 323-1,384 characters (median 578), which no `<strong>` tail can hold
+      // legibly. Text is rendered exactly as stored, escaped, never trimmed
+      // to a summary — a documentation list with an item silently dropped is
+      // worse than none.
+      const docShape = typeof r.documentation_shape === "string" ? r.documentation_shape.trim() : "";
+      if (docShape && !seenDocShapes.has(docShape)) {
+        seenDocShapes.add(docShape);
+        notes.push(`<div class="fact-label route-doc-label">What this route asks you for</div><p class="route-doc">${escapeHtml(docShape)}</p>`);
       }
       // ':visit:' rows (see isVisitRoute() above): threshold_label/
       // income_threshold are structurally NULL by design, not a gap on

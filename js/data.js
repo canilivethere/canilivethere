@@ -85,13 +85,20 @@ async function fetchJson(path) {
 }
 
 async function buildStore(basePath) {
-  const [countries, locations, criteria, scores, changeEvents, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, meta] =
+  // change-events.jsonl is NOT fetched here. The change log and the
+  // corrections record are internal working records: no page on this site
+  // renders them, so the site stopped consuming the file rather than
+  // loading it and hiding it. "Internal" means unpublished, not concealed
+  // — this module is itself served at a public URL, and a reader who
+  // opens it is reading this note. Whether the export keeps shipping
+  // under derived/ is a change to the published data files, not to this
+  // module.
+  const [countries, locations, criteria, scores, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
       fetchJsonl(basePath + "criteria.jsonl"),
       fetchJsonl(basePath + "scores.jsonl"),
-      fetchJsonl(basePath + "change-events.jsonl"),
       fetchJsonl(basePath + "profiles.jsonl"),
       fetchJsonl(basePath + "fixtures.jsonl"),
       // v9 Part 6/7: the verdict-coverage engine's public export — the
@@ -171,17 +178,9 @@ async function buildStore(basePath) {
     factsByLocation.set(loc.location_id, [...inherited, ...own]);
   }
 
-  // changeEventsByCountry / ByLocation
-  const changeEventsByCountry = new Map();
-  const changeEventsByLocation = new Map();
-  for (const ev of changeEvents) {
-    if (!changeEventsByCountry.has(ev.country_id)) changeEventsByCountry.set(ev.country_id, []);
-    changeEventsByCountry.get(ev.country_id).push(ev);
-    if (ev.location_id) {
-      if (!changeEventsByLocation.has(ev.location_id)) changeEventsByLocation.set(ev.location_id, []);
-      changeEventsByLocation.get(ev.location_id).push(ev);
-    }
-  }
+  // The changeEventsByCountry / ByLocation indexes used to be built here.
+  // They had two consumers, the per-location "Recent change events"
+  // section and the corrections page, and both are gone.
 
   // fixturesByPersona: persona_id -> location_id -> { criteria: Map(critId->row), verdict: row|null }
   // A `:verdict` fixture row is now country-scoped (location_id: null,
@@ -295,7 +294,6 @@ async function buildStore(basePath) {
     locations,
     criteria,
     scores,
-    changeEvents,
     profiles,
     fixtures,
     verdicts,
@@ -306,8 +304,6 @@ async function buildStore(basePath) {
     factsByLocation,
     factsByCountry,
     factsByKey,
-    changeEventsByCountry,
-    changeEventsByLocation,
     fixturesByPersona,
     verdictsByPersona,
     visaRoutesByCountry,

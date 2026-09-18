@@ -56,21 +56,10 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-// Hand-kept copy of js/app-shared.js's escapeParagraphs() — same
-// duplication class as escapeHtml()/formatValue()/sectionForFact() above,
-// which this file's own header comment already names. Keep the two
-// identical: the static page and the JS-hydrated page have to render a
-// change event's paragraphs the same way. The reasoning behind the
-// mechanism (one <p> per author paragraph, chosen over CSS pre-line or
-// <br><br> for screen-reader structure) lives in app-shared.js, once.
-function escapeParagraphs(str) {
-  if (str == null) return "";
-  const text = String(str);
-  if (!text) return "";
-  const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
-  if (paras.length <= 1) return escapeHtml(text);
-  return paras.map((para) => `<p>${escapeHtml(para)}</p>`).join("");
-}
+// The hand-kept copy of js/app-shared.js's escapeParagraphs() stood here.
+// Its only caller was the change-event detail block, which is gone, and a
+// change event's `detail` was the one multi-paragraph stored field either
+// emitter rendered. The original still lives in app-shared.js.
 
 // --- Date semantics: a hard rule, not a style choice -------------------
 // A fact's `date` is when the figure was true or the rule took effect —
@@ -158,7 +147,13 @@ const countries = readJsonl(join(DERIVED, "countries.jsonl"));
 const locations = readJsonl(join(DERIVED, "locations.jsonl"));
 const criteria = readJsonl(join(DERIVED, "criteria.jsonl")).sort((a, b) => a.display_order - b.display_order);
 const scores = readJsonl(join(DERIVED, "scores.jsonl"));
-const changeEvents = readJsonl(join(DERIVED, "change-events.jsonl"));
+// visa-routes.jsonl — read here for ONE field, `documentation_shape` (see
+// buildRouteDocShapesHtml() below). The rest of the route card stays the
+// interactive page's job.
+const visaRoutes = readJsonl(join(DERIVED, "visa-routes.jsonl"));
+// change-events.jsonl is deliberately not read: the change log is internal
+// and comes off the location pages, so neither emitter renders it. Same
+// removal as js/data.js's own fetch list — both emitters have to agree.
 
 const countriesById = new Map(countries.map((c) => [c.country_id, c]));
 
@@ -183,16 +178,6 @@ for (const loc of locations) {
   factsByLocation.set(loc.location_id, [...inherited, ...own]);
 }
 
-const changeEventsByCountry = new Map();
-const changeEventsByLocation = new Map();
-for (const ev of changeEvents) {
-  if (!changeEventsByCountry.has(ev.country_id)) changeEventsByCountry.set(ev.country_id, []);
-  changeEventsByCountry.get(ev.country_id).push(ev);
-  if (ev.location_id) {
-    if (!changeEventsByLocation.has(ev.location_id)) changeEventsByLocation.set(ev.location_id, []);
-    changeEventsByLocation.get(ev.location_id).push(ev);
-  }
-}
 
 // generalIndex — same formula as js/data.js's own generalIndex(), a
 // second implementation because this script runs in Node (fs) not the
@@ -248,6 +233,20 @@ function buildFitHeadline(loc, country, value) {
     ? `${loc.display_name}, ${country.name} — ${band}; ${tb.top.name} is a strength, ${tb.bottom.name} is the catch.`
     : `${loc.display_name}, ${country.name} — ${band}.`;
 }
+
+// Hand-kept copy of js/app-shared.js's FIT_INDEX_DEFAULT_WEIGHTING_LINE,
+// duplicated for the same Node-vs-browser reason as buildFitHeadline()
+// above. This page is always the no-lens state — a crawler or a no-JS
+// visitor has no box and no persona — so the line renders unconditionally
+// here, where the JS page renders it only on its own no-lens branch.
+// Only the first of app-shared.js's two strings has a home here: the
+// second is for a reader who has saved priorities, which this file cannot
+// know and a no-JS visitor cannot have.
+// If the string in app-shared.js moves, move this one with it: the static
+// page and the hydrated page must not disagree about whose weighting the
+// reader is looking at.
+const FIT_INDEX_DEFAULT_WEIGHTING_LINE =
+  "This is the site's default weighting — you haven't told it what matters most to you, so nothing here is reweighted for you yet.";
 
 // sectionForFact — same lookup as js/data.js, duplicated for the same
 // Node-vs-browser reason as generalIndex() above.
@@ -322,6 +321,141 @@ function buildIllegalRoutesHtml(facts) {
     `;
   }).join("");
   return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
+}
+
+// --- What a visa route asks you to PRODUCE ----------------------------
+// The Node-side twin of the `documentation_shape` block inside
+// js/location.js's buildVisaRoutesHtml() — same duplication class this
+// file's header comment already names for generalIndex()/sectionForFact(),
+// and the same reader-facing wording ("What this route asks you for") so
+// the static and hydrated surfaces do not disagree about what they are
+// showing.
+//
+// Deliberately ONE FIELD, not the route card: no income thresholds, no
+// permanent-residency conversion, no age gates, no confidence or
+// divergence badges. Those remain the interactive page's job. This exists
+// because until now the field reached a JS reader only — a crawler and a
+// no-JS visitor saw no trace of it, though it is often the part that
+// decides whether a route is reachable at all (an apostilled police
+// certificate from a country you left is a harder bar than an income
+// figure you clear).
+//
+// Two conventions carried across from the client-side block verbatim:
+//   - EMPTY RENDERS NOTHING. 61 of 95 route rows carry no
+//     `documentation_shape` at all. They produce no label, no bullet, no
+//     placeholder line: an absent shape is an un-researched gap, and a gap
+//     stated in a bullet is still a bullet. A country with none at all
+//     emits no block and no heading.
+//   - DEDUPE WITHIN A ROUTE. One route_key can hold several threshold rows
+//     whose documentation text is identical (all three
+//     EG:route:real-estate-investment-residency rows are). The text renders
+//     once per route. Measured: 34 populated rows across 11 countries
+//     collapse to 32 rendered blocks. Two distinct texts under one route
+//     would each render; none exist today.
+//
+// Text is rendered exactly as stored, escaped, never trimmed to a summary
+// — a documentation list with an item silently dropped is worse than none.
+// These run 323-1,384 characters, hence prose on its own line rather than
+// an inline value.
+//
+// Label: all 34 populated rows are ':route:' rows carrying a real
+// `threshold_label`, so location.js's ':visit:' de-slug fallback
+// (routeCategoryLabel()) is not needed here and is not copied. A populated
+// ':visit:' row would render with no route label — the signal to port it.
+const routesByCountry = new Map();
+for (const r of visaRoutes) {
+  if (!routesByCountry.has(r.country_id)) routesByCountry.set(r.country_id, []);
+  routesByCountry.get(r.country_id).push(r);
+}
+
+// The collapse itself, lifted out of the renderer so the suppression
+// below reads from the SAME map the block prints from. One source, so the
+// two cannot drift into disagreeing about what is on the page.
+// Returns route_key -> { label, shapes[] }.
+function collapseRouteDocShapes(countryId) {
+  const rows = routesByCountry.get(countryId) || [];
+  const byRoute = new Map();
+  for (const r of rows) {
+    const shape = typeof r.documentation_shape === "string" ? r.documentation_shape.trim() : "";
+    if (!shape) continue;
+    if (!byRoute.has(r.route_key)) byRoute.set(r.route_key, { label: r.threshold_label || "", shapes: [] });
+    const entry = byRoute.get(r.route_key);
+    if (!entry.shapes.includes(shape)) entry.shapes.push(shape);
+  }
+  return byRoute;
+}
+
+// Every documentation paragraph this country's block will actually print,
+// as a Set of the exact strings — the suppression test below.
+function routeDocTexts(countryId) {
+  const texts = new Set();
+  for (const { shapes } of collapseRouteDocShapes(countryId).values()) {
+    for (const shape of shapes) texts.add(shape);
+  }
+  return texts;
+}
+
+// --- The paragraph this page used to print twice ----------------------
+// 32 facts carry group_role "documentation_shape", holding the same
+// paragraph as a route row's `documentation_shape` field — the text is
+// stored in both the fact table and the route table.
+//
+// js/location.js never prints those facts. Its visa chapter groups any
+// fact with a group_key into a route card and renders three roles from it
+// (threshold, converts_to_pr, accepts_passive_income); a
+// documentation_shape fact falls through unrendered, and the reader meets
+// the text once, in that page's own route-documentation block.
+//
+// This file had the block but not the suppression, so the static page
+// printed the paragraph twice — once as a plain fact row in the visa
+// chapter, once under "What this route asks you for". Measured on the
+// shipped bytes before this change: 68 of 70 route-doc blocks were
+// byte-identical to a paragraph already on the same page, 40,537
+// characters of verbatim repetition, 11 blocks on each Thai page.
+//
+// SUPPRESS ON TEXT, NOT ON ROLE, and that distinction is the whole job.
+// 32 doc-shape facts against 32 populated route_keys is not the same 32:
+//   - MA:route:employer-sponsored-work-visa carries a documentation fact
+//     (the ANAPEC non-availability-certificate exemption) with NO route
+//     row behind it. Blanket role suppression would delete the only way
+//     that route's requirements reach a static reader at all.
+//   - GT:route:digital-nomad-visa is the mirror case: a route row whose
+//     fact twin is gone.
+// So a fact whose rendered text is one the block on this page is already
+// printing does not render; a fact with no such twin renders exactly as
+// before. If a fact's text ever diverges from its route row's, BOTH
+// render, loudly, on the same page — the correct failure: two texts that
+// disagree are a data problem for the lane to resolve, not something a
+// render pass gets to hide by silently picking one.
+//
+// Applied at the chapter body only, which is where js/location.js applies
+// it too. The Sources chapter still counts and cites these facts on both
+// emitters — a fact whose text is shown once is still sourced.
+function withoutDuplicatedRouteDocs(facts, docTexts) {
+  if (!docTexts.size) return facts;
+  return facts.filter(
+    (f) => !(f.group_role === "documentation_shape" && docTexts.has(formatValue(f).trim()))
+  );
+}
+
+function buildRouteDocShapesHtml(country) {
+  const byRoute = collapseRouteDocShapes(country.country_id);
+  if (!byRoute.size) return "";
+  const items = [...byRoute.values()].map(({ label, shapes }) => {
+    const labelHtml = label ? `<div class="fact-label">${escapeHtml(label)}</div>` : "";
+    const shapesHtml = shapes.map((shape) =>
+      `<div class="fact-label route-doc-label">What this route asks you for</div><p class="route-doc">${escapeHtml(shape)}</p>`
+    ).join("");
+    return `<li class="fact-item">${labelHtml}${shapesHtml}</li>`;
+  }).join("");
+  // Perspective-disclosure law: this block states whose lens it shows. It
+  // is the no-lens, general case — a static page cannot know the reader's
+  // nationality, and paperwork requirements commonly differ by passport.
+  return `
+    <h3>What the visa routes ask you for</h3>
+    <p class="fact-notes">The paperwork side of each documented route into ${escapeHtml(country.name)} — what an applicant has to produce, as opposed to what they have to earn. General, not checked against any one reader's nationality or circumstances; requirements often differ by passport. Income thresholds, permanent-residency conversion and age limits are in the interactive version of this page. Routes whose documentation isn't researched yet are simply absent here.</p>
+    <ul class="fact-list">${items}</ul>
+  `;
 }
 
 const SECTION_TITLES = {
@@ -406,23 +540,9 @@ for (const loc of locations) {
     ? `<div class="portrait-block"><p>${escapeHtml(portrait.portrait)}</p><p class="portrait-teaser">${escapeHtml(portrait.hook)} — ${escapeHtml(portrait.number)}</p></div>`
     : "";
 
-  const events = [
-    ...(changeEventsByLocation.get(loc.location_id) || []),
-    ...(changeEventsByCountry.get(country.country_id) || []).filter((e) => !e.location_id),
-  ].sort((a, b) => (a.date < b.date ? 1 : -1));
-  // Position on the page: below every content section, sources included,
-  // directly above "Where now?" — same order the JS-hydrated page builds
-  // (js/location.js's own top-to-bottom comment carries the reasoning).
-  // Both emitters have to agree, or a no-JS visitor and a JS visitor read
-  // the same page in two different orders.
-  const eventsHtml = events.length
-    ? `<h2>Recent change events</h2>` + events.map((ev) => `
-        <div class="change-event sev-${ev.severity}">
-          <strong>${escapeHtml(ev.date)}</strong> — ${escapeHtml(ev.headline)}
-          <span class="badge">${ev.category}</span> <span class="badge">severity ${ev.severity}</span>
-          ${ev.detail ? `<div class="fact-notes">${escapeParagraphs(ev.detail)}</div>` : ""}
-        </div>`).join("")
-    : "";
+  // The "Recent change events" block used to be assembled here and emitted
+  // below the sources chapter, directly above "Where now?". It is gone from
+  // both emitters: the change log is internal and a reader never sees it.
 
   const facts = factsByLocation.get(loc.location_id) || [];
   const bySection = new Map(SECTION_ORDER.map((s) => [s, []]));
@@ -432,8 +552,22 @@ for (const loc of locations) {
     bySection.get(s).push(f);
   }
 
+  // Per-section extra HTML, the static twin of js/location.js's
+  // buildSection(key, facts, extraHtml) third argument. Only the visa
+  // chapter has one, and only where the country's routes carry any
+  // documentation at all.
+  const sectionExtras = { visa: buildRouteDocShapesHtml(country) };
+  // What that block prints on THIS page, for the duplicate test — empty
+  // for a country with no documented route paperwork, which suppresses
+  // nothing.
+  const docTexts = routeDocTexts(country.country_id);
+
   const chapterHtml = (key) => {
-    const list = bySection.get(key) || [];
+    // Filtered before the length test, so a chapter left empty by the
+    // suppression falls through to the honest "not yet researched" line
+    // rather than printing an empty list.
+    const list = withoutDuplicatedRouteDocs(bySection.get(key) || [], docTexts);
+    const extra = sectionExtras[key] || "";
     const title = SECTION_TITLES[key];
     const intro = CHAPTER_INTROS[key] ? `<p class="chapter-intro">${escapeHtml(CHAPTER_INTROS[key])}</p>` : "";
     // Rendered OPEN (not the JS build's closed-by-default) — see this
@@ -441,7 +575,10 @@ for (const loc of locations) {
     // here on purpose.
     const cls = "chapter" + (key === "redflags" ? " chapter-redflags" : "");
     if (!list.length) {
-      return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p></details>`;
+      // A chapter with no facts but real extra content is not a gap, and
+      // must not claim to be one.
+      const body = extra || `<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
+      return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${body}</details>`;
     }
     const rows = list.map((f) => `
       <li class="fact-item">
@@ -449,7 +586,7 @@ for (const loc of locations) {
         <div class="fact-value">${escapeHtml(formatValue(f))}</div>
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`).join("");
-    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}</details>`;
+    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}${extra}</details>`;
   };
 
   const introChapterHtml = chapterHtml(INTRO_SECTION);
@@ -574,6 +711,7 @@ ${THEME_SCRIPT}
     <div class="loc-header"><h1>${escapeHtml(loc.display_name)} <span class="scope-tag">(${escapeHtml(country.name)})</span></h1></div>
     <div class="verdict-block">
       <p class="verdict-headline">${escapeHtml(headline)}</p>
+      <p class="verdict-prose">${escapeHtml(FIT_INDEX_DEFAULT_WEIGHTING_LINE)}</p>
       <p class="fit-link-line"><a href="#sec-breakdown">See the full score breakdown</a></p>
     </div>
     <nav class="section-nav">${SECTION_ORDER.map((s) => `<a href="#sec-${s}">${SECTION_TITLES[s]}</a>`).join("")}</nav>
@@ -581,7 +719,6 @@ ${THEME_SCRIPT}
     ${introChapterHtml}
     ${chaptersHtml}
     ${sourcesHtml}
-    ${eventsHtml}
     ${nextBestHtml}
   </div>
 </main>

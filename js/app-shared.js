@@ -835,6 +835,35 @@ const PERSONA_LABELS = {
 export const FIT_INDEX_DEFINITION =
   "Fit index: a 1–5 score combining every researched factor. Higher is better — 5 is the strongest fit, 1 is the weakest. It's a sort key, not a verdict on its own.";
 
+// The no-lens disclosure for the Fit index: the index renders before the
+// reader has filled the box, and the line says whose weighting they are
+// looking at while it is not yet theirs. A perspective-disclosure case —
+// the no-lens state naming itself, not a placeholder and not an apology
+// for the number.
+//
+// Render home: the location page's no-lens branch, and its prerendered
+// no-JS twin in tools/prerender-locations.mjs, which duplicates the
+// string for the same Node-vs-browser reason as buildFitHeadline(). Both
+// emitters have to agree or the same page says two different things
+// depending on whether JS ran. Lists and the map already carry their own
+// sibling sentence for this state and are untouched.
+//
+// TWO strings, not one, because the no-lens state has two populations and
+// only one sentence is true of each. A reader can fill the box and then
+// switch the corner lens back to "nobody" — cornerLensValue() resolves to
+// nobody whenever no persona is active, regardless of what is saved — and
+// in that state the page still shows generalIndex(), the site's own
+// weighting. Telling that reader "you haven't told it what matters most to
+// you" would be a false statement about them, which is the exact failure
+// the perspective-disclosure law exists to prevent. The static prerender
+// can only ever emit the first: it has no localStorage to read, and any
+// reader who has saved priorities is by definition running JS, so
+// location.js replaces the static line before they see it.
+export const FIT_INDEX_DEFAULT_WEIGHTING_LINE =
+  "This is the site's default weighting — you haven't told it what matters most to you, so nothing here is reweighted for you yet.";
+export const FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED =
+  "This is the site's default weighting, not your own — the priorities you gave reweight this number only while your own view is switched on.";
+
 // v8 Part 5: the scale-anchor disclosure — one canonical string, cited (not
 // restated) from this project's own internal scale-semantics ruling: a 5
 // is the world benchmark, not perfection and not merely "best of this
@@ -1600,9 +1629,10 @@ export const DISCLAIMER_DETAILS_HTML = `
   <details class="recede">
     <summary>Information, not advice — read what this site is and isn't</summary>
     <p class="disclaimer recede-body">
-      Every figure here carries a source, a last-checked date, and a
-      confidence tier — rules change; confirm anything that matters with
-      the relevant embassy, notary, or accountant before acting on it.
+      Every figure here shows what we have behind it — the source where we
+      have one, and the date we re-checked it where we have one. Rules change —
+      confirm anything that matters with the relevant embassy, notary, or
+      accountant before acting on it.
     </p>
   </details>
 `;
@@ -1629,7 +1659,10 @@ export function renderFooter(store) {
       periodically — it is never hand-edited here.
       ${meta ? `Snapshot extracted ${escapeHtml(meta.extracted_at || "")}.` : ""}
     </p>
-    <p><a href="${withPersona(siteUrl("corrections.html"))}">Corrections &amp; changes</a> — every dated update, including what we got wrong.</p>
+    <!-- The "Corrections & changes" line stood here and pointed at
+         corrections.html. Both are gone: the corrections record and the
+         change log are internal, so the footer no longer offers a reader
+         a page that does not exist. Nothing takes its slot. -->
     <p><a href="${withPersona(siteUrl("principles.html"))}">How we work</a> — the rules we hold ourselves to, and how to check us on them.</p>
     <p><a href="${withPersona(siteUrl("privacy.html"))}">What this site does with your browser</a> — what leaves it, what stays, and why the pages are this light.${
       hasAnySavedReaderState()

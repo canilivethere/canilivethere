@@ -4,11 +4,11 @@
 // Renders the approved copy deck verbatim: the privacy posture is the
 // reason to write in, stated before the address (27.3's own reading
 // order) — a bare mailto with no "why" is furniture. Same static-shell +
-// JS-module idiom as principles.html/corrections.html (one-word lowercase
+// JS-module idiom as principles.html (one-word lowercase
 // filename, no fresh format question to route): no persona block, no lens
 // machinery — copy here makes no claim whose truth depends on a lens
-// (perspective-disclosure law), same reasoning corrections.js's own
-// comment already states for omitting a persona picker.
+// (perspective-disclosure law), the same reasoning the other method
+// pages already state for omitting a persona picker.
 //
 // C8 ("We read what arrives") ships: the mailbox is monitored, and that
 // was confirmed — a claim about actual practice this build could never
@@ -17,8 +17,7 @@
 // C6, per the copy deck's own placement note.
 
 import { loadStore } from "./data.js";
-import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml, withPersona } from "./app-shared.js";
-import { siteUrl } from "./site-root.js";
+import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml } from "./app-shared.js";
 
 applyStoredTheme();
 renderTopBar("contact");
@@ -81,7 +80,8 @@ async function main() {
 
   document.getElementById("contact-safety").textContent = SAFETY_TEXT;
 
-  document.getElementById("contact-corrections").innerHTML =
-    `If you're reporting an error: fixes land on the ` +
-    `<a href="${withPersona(siteUrl("corrections.html"))}">corrections page</a>, dated, including what we got wrong.`;
+  // The corrections line used to render here, promising that a reported
+  // error lands dated on a public corrections page. The page is gone and
+  // the record is internal, so the claim is removed rather than softened —
+  // and with it this module's last use of withPersona()/siteUrl().
 }

@@ -5,13 +5,12 @@
 // three-part honesty/checkability argument, then how a reader actually
 // uses the site) — traced and held up against a second, independent
 // test: what question is a first-time visitor actually asking, in what
-// order? Same static-placeholder shell as corrections.html/js — no new
-// page pattern invented. Zero new facts: this page states method, not
+// order? Same static-placeholder shell every other method page uses — no
+// new page pattern invented. Zero new facts: this page states method, not
 // place-data, so there is no data fetch for content, only loadStore()
-// for renderFooter()'s snapshot-date line (same reason criteria.js and
-// corrections.js both call it). No persona picker — method isn't
-// persona-specific, same reasoning those two pages already use for
-// omitting one.
+// for renderFooter()'s snapshot-date line (same reason criteria.js calls
+// it). No persona picker — method isn't persona-specific, same reasoning
+// the other method pages already use for omitting one.
 
 import { loadStore } from "./data.js";
 import { applyStoredTheme, renderTopBar, renderFooter, escapeHtml, withPersona } from "./app-shared.js";
@@ -95,11 +94,18 @@ function buildPrincipleHtml(p) {
   return `<div class="principle"><p><strong>${escapeHtml(p.lead)}</strong> ${escapeHtml(p.body)}</p></div>`;
 }
 
-// The helpful-or-onward law: one onward link, pointing at Corrections &
-// changes rather than back to browsing.
+// The helpful-or-onward law: one onward link, and still not back to
+// browsing. Its original destination was Corrections & changes, because a
+// reader who has just read "here is how we hold ourselves to honesty" is
+// best served by the page that proves it. That page is gone — the
+// corrections record is internal now — so the link moves to the one
+// surviving surface that acts on the same sentence:
+// telling us where we are wrong. The wording is the footer's own committed
+// phrasing, not a new promise. FLAGGED, not settled: the destination was a
+// design call the first time and this re-pointing is owed the same review.
 function onwardHtml() {
-  const href = withPersona(siteUrl("corrections.html"));
-  return `See it in practice → <a href="${href}">Corrections &amp; changes</a>, every dated update including what we got wrong.`;
+  const href = withPersona(siteUrl("contact.html"));
+  return `Found something wrong? → <a href="${href}">Write to us.</a>`;
 }
 
 async function main() {

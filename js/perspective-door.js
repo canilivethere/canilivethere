@@ -306,12 +306,12 @@ function markSeenLegacyKeyRemoved() {
 // A DEBT, NAMED IN THE PLACE IT IS OWED: this string carries a derived
 // copy of a number whose single source is the fx_rates row in the rules
 // layer (visa-fit:_param:fx_rates, EUR usd_per_unit 1.1597618, as_of
-// 2026-09-14). Nothing on this site fetches that row client-side yet —
-// the reader read is its first consumer and is being built — so the
-// conversion is baked here rather than read live. That is one number in
-// two places, which is the defect this project has ruled against for
-// exactly this kind of parameter; it is recorded rather than hidden, and
-// this line is owed a live read the moment the accessor exists.
+// 2026-09-14). Nothing on this site fetches that row client-side, so the
+// conversion is baked
+// here rather than read live. That is one number in two places, which is
+// the defect this project has ruled against for exactly this kind of
+// parameter; it is recorded rather than hidden, and this line is owed a
+// live read the moment the accessor exists.
 const WALDO_REFERENCE_BAND_NOTE =
   "For scale, the nearest measured stand-in — nobody measures remote workers: "
   + "\u20AC3,850 a month gross, the EU27 professionals band (Eurostat, 2022). "

@@ -1,10 +1,10 @@
 // CanILiveThere — "What this site does with your browser" (the trust-
 // statement page, Part 27.7's placement ruling: a standalone root page,
-// same static-shell + JS-module idiom as principles.html/corrections.html,
-// footer-linked in the same accountability-surface family). No persona
-// block, no lens machinery — same reasoning corrections.js's own comment
-// already states for omitting a persona picker: nothing here renders data
-// or makes a claim whose truth depends on a lens.
+// same static-shell + JS-module idiom as principles.html, footer-linked in
+// the same accountability-surface family). No persona block, no lens
+// machinery — the same reasoning the other method pages state for omitting
+// a persona picker: nothing here renders data or makes a claim whose truth
+// depends on a lens.
 //
 // Renders the approved copy deck verbatim (register pass,
 // Doubt 6's own drafted default, ratified rather than restructured) — this

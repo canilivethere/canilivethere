@@ -57,6 +57,26 @@ export async function fetchJsonl(path) {
   return rows;
 }
 
+// The rules layer's fx_rates parameter row, read the way the carrier
+// shape names it: `rule_id === "visa-fit:_param:fx_rates"`, then
+// the row's own `expression` field parsed a second time (it's a JSON
+// string inside the JSONL line, not a nested object). Returns null on
+// anything that doesn't add up to a usable table — absent row,
+// unparseable expression, or no `rates` object — never a guessed shape.
+function resolveFxRates(rows) {
+  const candidates = rows.filter((r) => r.rule_id === "visa-fit:_param:fx_rates");
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => (b.version || 0) - (a.version || 0));
+  try {
+    const parsed = JSON.parse(candidates[0].expression);
+    if (!parsed || typeof parsed !== "object" || !parsed.rates || !parsed.base) return null;
+    return parsed;
+  } catch (e) {
+    console.warn("Bad fx_rates expression in rules.jsonl", e);
+    return null;
+  }
+}
+
 let _storePromise = null;
 
 // v7 no-JS fallback: resolved via siteUrl() (site-root.js), not a bare
@@ -93,7 +113,7 @@ async function buildStore(basePath) {
   // opens it is reading this note. Whether the export keeps shipping
   // under derived/ is a change to the published data files, not to this
   // module.
-  const [countries, locations, criteria, scores, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, meta] =
+  const [countries, locations, criteria, scores, profiles, fixtures, verdicts, visaRoutes, glossary, nationalityTiers, rules, meta] =
     await Promise.all([
       fetchJsonl(basePath + "countries.jsonl"),
       fetchJsonl(basePath + "locations.jsonl"),
@@ -110,9 +130,7 @@ async function buildStore(basePath) {
       // row per documented threshold, country-scoped (route_key/
       // threshold_fact_key already public, no new exposure). Previously
       // published but never fetched client-side; this is the first
-      // consumer. rules.jsonl (the engine's own parameter table, one row
-      // today) is not fetched here — nothing on this site renders it
-      // directly yet; see the location-page build notes.
+      // consumer.
       fetchJsonl(basePath + "visa-routes.jsonl"),
       // Part 23.6: the acronym/glossary registry (term -> expansion ->
       // first_use_rule) — most rows still carry a null expansion (an
@@ -125,6 +143,15 @@ async function buildStore(basePath) {
       // an error — see resolveNationalityTier() below, which is the only
       // place this array gets read.
       fetchJsonl(basePath + "nationality-tiers-public.jsonl"),
+      // The conversion crossing: rules.jsonl (the engine's own
+      // parameter table) IS now fetched here — the reader read is the one
+      // named display-layer exception to "display layers never consume
+      // this row" (the fx_rates row's own `selector` field says so).
+      // resolveFxRates()
+      // below does the second, row-own JSON.parse() and hands back a
+      // parsed object or null — every other row in this file (margin_buffer
+      // included) still goes unread client-side.
+      fetchJsonl(basePath + "rules.jsonl"),
       fetchJson(basePath + "meta.json"),
     ]);
 
@@ -289,6 +316,17 @@ async function buildStore(basePath) {
   // set of codes the library has verified anything about.
   const nationalityCodes = [...new Set(nationalityTiers.map((r) => r.nationality))];
 
+  // fxRates: the rules layer's own currency table, parsed — the ONE
+  // named display-layer exception (the reader read; see the fetch
+  // comment above). Two JSON.parse() calls: rules.jsonl's own row, then
+  // that row's own `expression` string field. Highest `version` wins if
+  // more than one row ever carries this rule_id (none does, today). Any
+  // failure — no row, an unparseable expression, or a parsed value with
+  // no `rates` object — resolves to null, and every consumer
+  // (js/own-numbers-data.js's convertAmount()) treats null exactly like a
+  // stale or pair-missing rate: it doesn't guess.
+  const fxRates = resolveFxRates(rules);
+
   const store = {
     countries,
     locations,
@@ -311,6 +349,7 @@ async function buildStore(basePath) {
     glossaryByTerm,
     nationalityTiersByKey,
     nationalityCodes,
+    fxRates,
     meta,
   };
 

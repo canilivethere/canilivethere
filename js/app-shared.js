@@ -250,11 +250,13 @@ export function saveSavedPerspective(kind, personaId) {
 // strings — and this file is the base every feature imports, so a base
 // that reached back into a feature is the shape a cycle grows out of.
 // This file imports nothing from the box, and the box is a leaf.
-// "OTHER" is an explicit sentinel, not an ISO code: it exists because
-// currency is a required sub-unit of the amount field, so null would be
-// ambiguous between "another currency" and "not answered". No code path
-// may feed it to a rate lookup or default it to anything.
-export const OWN_NUMBERS_CURRENCIES = ["USD", "EUR", "THB", "OTHER"];
+// RETIRED: "OTHER" (the no-rate-lookup
+// sentinel) and "THB" both came out of the dropdown the reader actually
+// picks from — THB and MXN wait, and OTHER's only job was covering a
+// currency this crossing still can't convert. Two currencies, both real
+// ISO codes, both now readable against a bar stated in the other one via
+// the rules-layer fx_rates row (js/own-numbers-data.js's convertAmount()).
+export const OWN_NUMBERS_CURRENCIES = ["USD", "EUR"];
 export const OWN_NUMBERS_PERIODS = ["month", "year"];
 export const OWN_NUMBERS_INCOME_TYPES = ["pension", "passive", "remote_active", "local_active", "unspecified"];
 export const OWN_NUMBERS_DURATION_BANDS = ["visit", "long_stay"];
@@ -283,7 +285,17 @@ export function loadOwnNumbers() {
     const p = v.property_capital;
     if (!p || typeof p !== "object") return null;
     if (!Number.isFinite(p.amount) || p.amount <= 0) return null;
-    if (!OWN_NUMBERS_CURRENCIES.includes(p.currency)) return null;
+    // One currency per submission: property_capital
+    // no longer carries its own currency going forward — it reads in the
+    // same currency as the top-level `currency` field above. A record
+    // saved BEFORE this shipped can still carry a stray p.currency from
+    // when the second selector existed: if it disagrees with the top-level currency, that mismatch
+    // means nothing the site can use, so the WHOLE record fails closed
+    // here — the same already-established pattern this function uses for
+    // every other malformed field, never a silent strip-and-keep with no
+    // precedent elsewhere in this function. If it happens to agree, it's
+    // harmless and simply never read again from here on.
+    if (p.currency !== undefined && p.currency !== v.currency) return null;
   }
   return v;
 }
@@ -980,15 +992,21 @@ export const STATE_HEADLINE = {
   // standing test — "a refusal that misdiagnoses its own cause is a false
   // statement, not a soft one" — applies to it.
   //
-  // This is the SPECIFIED INTERIM, chosen by the one condition set on it: the
-  // cause-true variants need the deciding route's reason carried up to the
-  // country headline, and carrying it is logic, which this dispatch does
-  // not write. The interim is cause-NEUTRAL instead — it diagnoses
-  // nothing, so it misdiagnoses nothing. MEASURED on the shipped data
-  // (8x4x2x5 grid x five read countries, 1,600 country reads): 1,232 of
-  // them land here, and the currency wall is reachable in every one of the
-  // four currencies the box offers.
-  READER_NOT_ENOUGH: "The site couldn't read this against your figures — not enough recorded, or recorded in another currency.",
+  // SUPERSEDED BY THE CONVERSION CROSSING. The note above
+  // described the cause-NEUTRAL interim this key used to hold, kept as
+  // history now that the currency wall it measured against is gone: a
+  // currency mismatch converts where the rate on file allows it, and only
+  // falls to UNCERTAIN_FX_UNAVAILABLE below where it can't. What is left
+  // behind READER_NOT_ENOUGH is genuinely cause-composable (196 of 588
+  // post-conversion reads carry more than one cause at once), so the sentence is now COMPOSED per country from up to three
+  // clauses (READER_NOT_ENOUGH_CLAUSES below), selected by the cause
+  // summary carried on the row's own reader_bar_kind field for this one
+  // state (js/reader-lens.js's notEnoughCauseSummary()) — the same
+  // carried-field mechanism READER_BELOW_VARIANTS already uses for a
+  // different state. The flat string below is now only the fallback for a
+  // caller that holds no summary at all (composeNotEnoughSentence()'s own
+  // no-causes branch), so it makes no claim about a specific cause.
+  READER_NOT_ENOUGH: "The site couldn't read this against your figures.",
   // A SEVENTH READER STATE, NOT IN THE SPEC — added because the spec's
   // two hard_fail sentences both say "every", and MEASURED AGAINST THE
   // LIVE DATA neither is always true. Probe over a 280-read
@@ -1074,7 +1092,16 @@ export const STATE_HEADLINE = {
   PARTIAL_READ_NO_CLEAR: "No route the site could read here clears. Some routes here couldn't be read at all \u2014 so this is a no on what was read, not on everything.",
   UNCERTAIN_BAR_BASIS: "Not decided either way. The bar this answer rests on is set after tax; the figure read against it is before tax. Those are two different measurements, so the site won't call it a yes or a no.",
   NEAR_LINE_AMOUNT: "Right at the line. The figure sits within about a tenth of the bar, above or below. A move that small in either number would change the answer.",
-  UNCERTAIN_FX_UNAVAILABLE: "Not decided either way. This comparison crosses currencies, and the site couldn't get an exchange rate it trusts. It won't guess one.",
+  // REWORDED BY THE CONVERSION CROSSING — the existing token is reused as
+  // reader vocabulary rather than replaced. The
+  // string this replaces described a live fetch failing — this token now
+  // also covers the rules-layer fx_rates row being absent, missing the
+  // needed pair, or stale (js/own-numbers-data.js's convertAmount()), so
+  // "couldn't get a rate it trusts" would be incomplete rather than false
+  // on two of those three. This one sentence covers all three without
+  // asserting an age this site may not have ("too old"
+  // would be a lie on a missing-row or missing-pair read).
+  UNCERTAIN_FX_UNAVAILABLE: "Not decided either way. This bar is stated in another currency, and the site has no exchange rate on file it can convert with today. It won't guess one — the figure itself is recorded.",
 
 };
 
@@ -1150,6 +1177,71 @@ const READER_BELOW_SHORT_VARIANTS = {
   },
 };
 
+// Added by the conversion crossing: a comparison against a converted bar
+// that lands inside θ reads "right at the line" and names the rate as the
+// reason it cannot be tighter. Not a new state:
+// READER_AT_LINE keeps its token, its band and its legend row; only the
+// TEXT varies, selected by the same carried-field mechanism
+// READER_BELOW_VARIANTS uses (reader_bar_kind, set for this state by
+// js/reader-lens.js's atLineConversionSummary() to { converted: true }
+// when the deciding comparison was a currency conversion). Drops the
+// shipped sentence's "dated snapshots" clause on purpose: the rate is
+// named as THE reason, and two reasons in one headline reads as hedging.
+const READER_AT_LINE_CONVERTED =
+  "Right at the line. This route's bar was converted into your currency at the rate on file, and that rate is why the answer can't be tighter — within about a tenth of a bar either way, the site says “right at the line” rather than yes or no.";
+
+// Added by the conversion crossing. READER_NOT_ENOUGH's sentence
+// used to be one cause-neutral string (see the long SUPERSEDED note on
+// that key above) — with the currency wall gone, what's left is genuinely
+// composable: up to three independent things can each be missing on a
+// country's routes, and 196 of 588 post-conversion reads
+// are mixed-cause, so three exclusive sentences would ship two unreachable
+// strings and a false one on a third of the rest. Each clause below ships
+// in a SOLE form (the only cause present) and an AMONG form (one of
+// several) — composeNotEnoughSentence() below picks the form, never a
+// caller.
+const READER_NOT_ENOUGH_LEAD = "The site couldn't read this against your figures. What stopped it:";
+const READER_NOT_ENOUGH_CLAUSES = {
+  // Gate 1: no route here records whether it takes this kind of income
+  // (own-numbers-data.js's gate1() falling to {typeState:"absent"}).
+  A: {
+    sole: "no route here records whether it takes the kind of income you named, so nothing was compared",
+    among: "some routes don't record whether they take the kind of income you named",
+  },
+  // Gate 2 condition 1: the bar measures capital, not the figure the
+  // reader gave (kind_mismatch / property_bank_balance / property_total_assets).
+  B: {
+    sole: "the bars here measure capital — a bank balance, a total-assets test, a deposit — not a figure yours could be read against",
+    among: "some set a capital bar — a bank balance, a total-assets test, a deposit — not one yours could be read against",
+  },
+  // Gate 2 condition 2: the route states no single figure at all (no_number).
+  C: {
+    sole: "no route here states a single figure to compare a number with",
+    among: "some state no single figure to compare a number with",
+  },
+};
+
+// Clause order is fixed A, B, C — the engine's own rule is "the first gate
+// that cannot answer is the answer" (own-numbers-data.js), so the
+// sentence reads in the same order the gates run. `causes` is the
+// { hasA, hasB, hasC } summary js/reader-lens.js's notEnoughCauseSummary()
+// carries on the row's reader_bar_kind field for this one state; a caller
+// with no summary (or the structurally-unreachable case where a
+// READER_NOT_ENOUGH row carries none of the three) gets an honest
+// sentence that names no specific cause, never the old, now-false,
+// cause-neutral string.
+function composeNotEnoughSentence(causes) {
+  if (!causes) return STATE_HEADLINE.READER_NOT_ENOUGH;
+  const present = [];
+  if (causes.hasA) present.push("A");
+  if (causes.hasB) present.push("B");
+  if (causes.hasC) present.push("C");
+  if (!present.length) return "The site couldn't read this against your figures.";
+  const form = present.length === 1 ? "sole" : "among";
+  const clauses = present.map((k) => READER_NOT_ENOUGH_CLAUSES[k][form]);
+  return `${READER_NOT_ENOUGH_LEAD} ${clauses.join("; ")}.`;
+}
+
 // The one lookup every consumer uses. Kept as a function rather than a
 // seventh object key because the seventh case's key is `null`, and the
 // only way an object literal can hold it is by string coercion.
@@ -1164,6 +1256,8 @@ const READER_BELOW_SHORT_VARIANTS = {
 // variant, and only a reader row can carry one.
 export function stateHeadline(state, barKind) {
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
+  if (state === "READER_AT_LINE" && barKind && barKind.converted) return READER_AT_LINE_CONVERTED;
+  if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughSentence(barKind);
   const variants = barKind && READER_BELOW_VARIANTS[state];
   if (variants && barKind.kind === "mixed") return variants.mixed;
   if (variants && barKind.kind === "capital") {
@@ -1288,6 +1382,15 @@ export const READER_STATE_SHORT = {
   READER_BELOW_SOME_UNREAD: "below the bar on the routes that could be read, some unread",
   READER_WRONG_TYPE_SOME_UNREAD: "not this kind of income on the routes that could be read, some unread",
   READER_NONE_CLEARS_SOME_UNREAD: "no readable route clears, some unread",
+  // Added by the conversion crossing. Not required by the
+  // assertion below (the key doesn't start with "READER_", so a reader
+  // country row carrying it was never checked for a short form) but real:
+  // a reader row can now carry this token (js/own-numbers-data.js's
+  // convertAmount() failing closed), and without an entry here the pin's
+  // accessible name would go `undefined` with no build error. Lifted
+  // verbatim from the map's own already-gated chip label (js/map.js) —
+  // one vocabulary, not a second.
+  UNCERTAIN_FX_UNAVAILABLE: "no exchange rate to compare on",
 };
 
 // The build error is a real throw rather than a warning: a missing short form would ship a pin whose accessible name
@@ -1595,6 +1698,18 @@ export function renderTopBar(activePage) {
     <button type="button" id="theme-toggle" aria-pressed="false">Dark mode</button>
   `;
   document.body.prepend(bar);
+
+  // Added mid-crossing, wording as given and not reworded: "This site is very much under construction. We
+  // appreciate your patience, traveler." A site-wide notice, so it goes
+  // beside the bar every page already prepends — one place, same
+  // duplication guard as the bar itself, no new banner component and no
+  // new CSS.
+  const existingNotice = document.querySelector(".site-under-construction");
+  if (existingNotice) existingNotice.remove();
+  const notice = document.createElement("p");
+  notice.className = "site-under-construction";
+  notice.textContent = "This site is very much under construction. We appreciate your patience, traveler.";
+  bar.insertAdjacentElement("afterend", notice);
 
   const btn = bar.querySelector("#theme-toggle");
   const syncButton = () => {

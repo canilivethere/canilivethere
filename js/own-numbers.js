@@ -29,8 +29,12 @@
 //      any field value.
 //   B2 no share affordance, no permalink, no copy-to-clipboard.
 //   B3 zero transmission — this file makes no network call of any kind.
-//   B4 no FX conversion feeds anything here; loadFxRates() is never
-//      imported, so the reader's currency can never reach it.
+//   B4 REWORDED BY THE CONVERSION CROSSING: conversion here
+//      reads the rules layer's fx_rates row and nothing else;
+//      loadFxRates() is still never imported, so no live rate can reach
+//      a reader's answer. The distinction that matters is the live fetch
+//      (still barred) vs. the rules-layer table (now the intended path)
+//      — see convertAmount() in js/own-numbers-data.js.
 //   B5 no console, anywhere, not behind a flag, not commented out.
 //   B6 no dormant transmission — no placeholder endpoint, no analytics
 //      stub, no "TODO: POST".
@@ -41,7 +45,7 @@
 //      reader is asked for anything.
 
 import { escapeHtml } from "./app-shared.js";
-import { assertRouteBarTable, hasIncomeBarInCurrency } from "./own-numbers-data.js";
+import { assertRouteBarTable, convertAmount } from "./own-numbers-data.js";
 
 // ---------------------------------------------------------------------
 // Copy table. The wording is the spec's, not this file's: none of these
@@ -86,80 +90,42 @@ const FIELD_B_NOTE =
   "This picks which set of rules the site reads for you, not a legal cut-off. Short stays run on your passport, not on your income.";
 
 // Field A — the amount. Currency and period are sub-units of the keyed
-// income amount field, not new fields: each is a closed list (4 values and
-// 2), never free text. The three currencies are not arbitrary — they are
-// the only currencies the twenty rows' bars are stated in.
+// income amount field, not new fields: each is a closed list, never free
+// text.
+//
+// NARROWED BY THE CONVERSION CROSSING: "OTHER" came out first (the
+// no-rate-lookup sentinel,
+// with conversion now real, had no job left) and THB waits with MXN —
+// EUR and USD only, for now. One currency per submission: this same list
+// now governs both Field A and Field D, since
+// Field D's own select is retired below.
 const FIELD_A_LABEL = "What do you live on?";
 const CURRENCY_OPTIONS = [
   { value: "USD", label: "US dollars (USD)" },
   { value: "EUR", label: "Euros (EUR)" },
-  { value: "THB", label: "Thai baht (THB)" },
-  { value: "OTHER", label: "Another currency" },
 ];
 const PERIOD_OPTIONS = [
   { value: "month", label: "a month" },
   { value: "year", label: "a year" },
 ];
-// AUTHORED-CHOICE (unchanged from v1): the spec routes the "currencies
-// other than USD, EUR, THB" limit to a note rendered at the point of
-// selection, but gives no at-selection string. Composed from two spec
-// sentences that are given.
-//
-// FIRST SENTENCE REPLACED, and FLAGGED: the amendment reaches beyond the
-// narrow scope it was asked for — which was the THB line in the box —
-// though it stays inside the same surface. It is landed and named here,
-// not smuggled, so it can be struck rather than found.
-// WHAT IT REPLACES, kept so the change is legible: "The routes this box
-// reads state their bars in US dollars, euros and Thai baht." True of the
-// TABLE and false as a promise — the only baht rows are bank-balance and
-// security-deposit figures the box notes and never compares. Without this
-// edit the two notes in this one box contradict each other the moment the
-// baht line below lands: one would promise a baht reading the other
-// exists to say does not happen.
-// Second sentence unchanged, verbatim.
-const CURRENCY_OTHER_NOTE =
-  "The routes this box reads state their income bars in US dollars and euros; the only baht figures are bank-balance requirements on Thai routes, which it notes but doesn't compare. The site shows you each bar as recorded rather than converting your figure — today's exchange rate would be the thing deciding the answer, and that isn't a fact about the route.";
 
-// Four sentences, four jobs: what happens, why (the box's own coverage,
-// never a claim about Thai law), the no-conversion principle
-// CURRENCY_OTHER_NOTE already makes, and what the reader can do without
-// being pushed toward a conversion this site refuses to perform.
-//
-// THE FAILURE THIS ANSWERS, seen from the chair: the box offers Thai baht
-// and returns 12 of 12 "couldn't be read", Thailand included. This line is
-// shown at the point of selection, BEFORE the effort is spent, rather
-// than as twelve identical refusals afterwards.
-const THB_NO_INCOME_BAR_NOTE =
-  "Entered in baht, your income can't be read against any route yet. None of the routes this box reads states its income bar in Thai baht — the baht figures it holds are bank-balance requirements on Thai routes, which it will note but doesn't compare. The site doesn't convert currencies, so every country would come back as “couldn't be read”. If your income is actually paid in dollars or euros, enter it in that currency; if it's paid in baht, the box can't read it for you today.";
-
-// The limit visible in the dropdown BEFORE selection, not only after,
-// because a control's promise counts as a claim. The specified literal is
-// `{ value: "THB", label: "Thai baht (THB) — reads no income bar yet" }`;
-// it is built here by concatenation onto the base label rather than
-// re-typed, so the two can never drift, and it is GATED on the same
-// computed predicate as the note — the suffix retires itself with the
-// sentence.
-//
-// NAMED, NOT HIDDEN: CURRENCY_OPTIONS feeds TWO
-// selects — the income amount's and the optional property capital's. The
-// spec addresses the income one; the suffix reaches both, because one
-// list is what keeps them from drifting. It is not false in the property
-// select (the box reads no baht income bar there either, and the two baht
-// capital rows return before any currency is compared), but it answers a
-// question that control did not ask. Landed as specified and reported
-// rather than split on a builder's own call.
-const THB_OPTION_LIMIT_SUFFIX = " — reads no income bar yet";
-
-// The two gates, computed from ROUTE_BARS on every render (never cached
-// at module scope, so a table edit takes effect without a reload).
-function bahtIncomeIsUnreadable() {
-  return !hasIncomeBarInCurrency("THB");
-}
-function currencyOptions() {
-  if (!bahtIncomeIsUnreadable()) return CURRENCY_OPTIONS;
-  return CURRENCY_OPTIONS.map((o) =>
-    o.value === "THB" ? { value: o.value, label: o.label + THB_OPTION_LIMIT_SUFFIX } : o);
-}
+// ALWAYS RENDERED, not gated on a selection — a control's promise counts
+// as a claim (perspective-disclosure law), and with only two currencies
+// left to pick from, the promise IS the point of selection. Replaces the
+// two retired notes this crossing falsifies (the old THB-unreadable line
+// and the old "the site doesn't convert" OTHER line — see
+// COVERAGE_LINE below for the one fact worth carrying out of the second
+// of those).
+const OWN_CURRENCY_NOTE_BASE =
+  "Bars stated in the other currency are converted into yours at the rate on file. Your income and your property capital are read in the currency you pick here.";
+// Appended when the rules-layer rate this promise depends on can't be
+// trusted right now — the row absent, the pair missing, or stale
+// (js/own-numbers-data.js's convertAmount()) — at the point of selection
+// rather than as an unexplained "couldn't be read" later (the failure the
+// retired baht note was written to answer, carried forward to the one
+// cause that can still happen).
+const OWN_CURRENCY_NOTE_FX_DOWN =
+  "Today the site has no exchange rate on file it can convert with, so routes whose bars are stated in the other currency won't be read against your figure. It won't guess a rate.";
 
 // Field C — where the income comes from. The display names are the
 // spec's; the stored token underneath is the corpus vocabulary's own
@@ -190,8 +156,13 @@ const FIELD_D_AMOUNT_LABEL = "How much capital?";
 const FIELD_D_INCOMPLETE_NOTE =
   "You've ticked the capital box but not put an amount in it — enter one, or untick the box.";
 
+// Second sentence added by the conversion crossing: the one
+// surviving fact from the retired CURRENCY_OTHER_NOTE (the baht-bars-are-
+// bank-balances-only note), carried here now that no reader can select
+// baht to be told it there.
 const COVERAGE_LINE =
-  "This box reads Thailand, Guatemala, Portugal, Spain and Crete. Everywhere else, it says so instead of guessing.";
+  "This box reads Thailand, Guatemala, Portugal, Spain and Crete. Everywhere else, it says so instead of guessing. "
+  + "Bars are stated in dollars or euros; a few Thai routes set a bank-balance figure in baht, which the box notes and doesn't compare.";
 
 // The "not now, and why" limits — the ones that are not rendered at a
 // point of selection, in the spec's own order.
@@ -260,7 +231,6 @@ function selectHtml(id, options, selected, ariaLabel) {
 }
 const ARIA_CURRENCY = "Currency";
 const ARIA_PERIOD = "Per month or per year";
-const ARIA_PROPERTY_CURRENCY = "Currency of your property capital";
 
 /**
  * Render step 1's interior into `container`.
@@ -292,6 +262,16 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   const saved = prefill || null;
   const hasProperty = Boolean(saved && saved.property_capital);
 
+  // Computed once per render, not per keystroke: whether the rules-layer
+  // rate this box's conversion promise depends on can be trusted right
+  // now. EUR<->USD is the only pair this crossing's own inputs ever
+  // exercise (both currencies left in CURRENCY_OPTIONS), so that's the
+  // one pair checked here.
+  const fxAvailable = convertAmount(store.fxRates, 1, "EUR", "USD") !== null;
+  const currencyNoteText = fxAvailable
+    ? OWN_CURRENCY_NOTE_BASE
+    : `${OWN_CURRENCY_NOTE_BASE} ${OWN_CURRENCY_NOTE_FX_DOWN}`;
+
   container.innerHTML = `
     <div class="own-numbers-box">
       <p class="door-passport-scope">${escapeHtml(INPUT_SCOPE_LINE)}</p>
@@ -312,10 +292,10 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
         <div class="own-amount-row">
           <input type="text" inputmode="decimal" id="own-amount" autocomplete="off"
                  value="${saved ? escapeHtml(String(saved.amount)) : ""}">
-          ${selectHtml("own-currency", currencyOptions(), saved ? saved.currency : "USD", ARIA_CURRENCY)}
+          ${selectHtml("own-currency", CURRENCY_OPTIONS, saved ? saved.currency : "USD", ARIA_CURRENCY)}
           ${selectHtml("own-period", PERIOD_OPTIONS, saved ? saved.period : "month", ARIA_PERIOD)}
         </div>
-        <p class="own-field-note own-currency-note" id="own-currency-note" hidden>${escapeHtml(CURRENCY_OTHER_NOTE)}</p>
+        <p class="own-field-note own-currency-note" id="own-currency-note">${escapeHtml(currencyNoteText)}</p>
       </div>
 
       <fieldset class="door-question own-field">
@@ -335,7 +315,6 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
           <div class="own-amount-row">
             <input type="text" inputmode="decimal" id="own-property-amount" autocomplete="off"
                    value="${hasProperty ? escapeHtml(String(saved.property_capital.amount)) : ""}">
-            ${selectHtml("own-property-currency", currencyOptions(), hasProperty ? saved.property_capital.currency : "USD", ARIA_PROPERTY_CURRENCY)}
           </div>
           <p class="own-field-note" id="own-property-note" hidden>${escapeHtml(FIELD_D_INCOMPLETE_NOTE)}</p>
         </div>
@@ -351,9 +330,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   const propToggle = container.querySelector("#own-property-toggle");
   const propGroup = container.querySelector("#own-property-group");
   const propAmount = container.querySelector("#own-property-amount");
-  const propCurrency = container.querySelector("#own-property-currency");
   const localNote = container.querySelector("#own-local-note");
-  const currencyNote = container.querySelector("#own-currency-note");
   const propertyNote = container.querySelector("#own-property-note");
 
   // Readers type "2,400" and "2 400". Stripping separators at PARSE time
@@ -382,25 +359,9 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   const sync = () => {
     const propertyIncomplete = propToggle.checked && !parseAmount(propAmount);
     localNote.hidden = checkedValue("own-type") !== "local_active";
-    // ONE slot, two notes, never both and never a stale one. The baht line renders "the moment THB is selected, in
-    // the same slot and style as CURRENCY_OTHER_NOTE", which means this
-    // paragraph's text is chosen here rather than baked into the markup:
-    // whichever note is true of the current selection is the one in the
-    // element, and the element is hidden when neither is.
-    //
-    // The baht branch is gated on the COMPUTED condition, not on the
-    // string being present, so the day a baht income bar lands in
-    // ROUTE_BARS this branch stops firing, the option-label suffix goes
-    // with it, and no copy is edited to make either happen.
-    if (currency.value === "THB" && bahtIncomeIsUnreadable()) {
-      currencyNote.textContent = THB_NO_INCOME_BAR_NOTE;
-      currencyNote.hidden = false;
-    } else if (currency.value === "OTHER") {
-      currencyNote.textContent = CURRENCY_OTHER_NOTE;
-      currencyNote.hidden = false;
-    } else {
-      currencyNote.hidden = true;
-    }
+    // The currency note is no longer selection-dependent (§5a of the
+    // conversion crossing's wording deck): it is the box's own promise,
+    // set once above at render time. Nothing here toggles it any more.
     propGroup.hidden = !propToggle.checked;
     propertyNote.hidden = !propertyIncomplete;
     if (onValidity) onValidity(isComplete());
@@ -425,9 +386,11 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
     };
     // property_capital is absent entirely unless the reader ticked the box
     // AND entered a figure — never null, never 0, which is the ruled
-    // storage shape.
+    // storage shape. One currency per submission: no
+    // property_capital.currency any more — it reads in the same currency
+    // as the income figure above.
     const propValue = propToggle.checked ? parseAmount(propAmount) : null;
-    if (propValue) input.property_capital = { amount: propValue, currency: propCurrency.value };
+    if (propValue) input.property_capital = { amount: propValue };
     return input;
   }
 

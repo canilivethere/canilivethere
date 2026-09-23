@@ -249,7 +249,12 @@ export function isValidOwnNumbers(v) {
     const p = v.property_capital;
     if (!p || typeof p !== "object") return false;
     if (!Number.isFinite(p.amount) || p.amount <= 0) return false;
-    if (!CURRENCY_TOKENS.includes(p.currency)) return false;
+    // One currency per submission (mirrors app-shared.js's loadOwnNumbers()
+    // — the same two-copy rule this file's header comment already names):
+    // property_capital no longer carries its own currency going forward.
+    // A pre-migration record can still carry a stray one; it fails the
+    // whole record closed only if it disagrees with the top-level currency.
+    if (p.currency !== undefined && p.currency !== v.currency) return false;
   }
   return true;
 }
@@ -263,6 +268,57 @@ export function toPeriod(amount, fromPeriod, toPeriodName) {
   if (fromPeriod === "month" && toPeriodName === "year") return amount * 12;
   if (fromPeriod === "year" && toPeriodName === "month") return amount / 12;
   return null;
+}
+
+// ---------------------------------------------------------------------
+// The conversion crossing. The currency wall Gate 2 used to
+// raise (reason "currency_wall") is gone: a currency mismatch now
+// converts where the rules layer's own fx_rates row (derived/rules.jsonl,
+// resolved by js/data.js's resolveFxRates(), threaded in as `fxRates`
+// below) allows it, and falls to reason "fx_unavailable" — the SAME
+// non-guess branch, whatever the specific cause — only where it can't:
+// the row is absent, the pair isn't in it, or the one rate consulted is
+// stale (the carrier shape's own rule). No new gate and no new θ:
+// bandFor() below is unchanged and is called on the SAME two numbers it
+// always was, one of which may now be a converted figure rather than a
+// native one.
+// ---------------------------------------------------------------------
+
+// Resolves the one non-base rate entry a conversion actually consults for
+// `currency`, or null when it can't be trusted right now — absent from
+// the table, or older than the row's own `stale_after_days` (30, today).
+// `nowMs` is injectable for a test; every real call uses the running
+// page's own clock.
+function fxEntryFor(fxRates, currency, nowMs) {
+  if (!fxRates || !fxRates.rates || !fxRates.base) return null;
+  if (currency === fxRates.base) return { usd_per_unit: 1, as_of: null, source: null, isBase: true };
+  const entry = fxRates.rates[currency];
+  if (!entry || !entry.as_of) return null;
+  const staleAfter = Number.isFinite(fxRates.stale_after_days) ? fxRates.stale_after_days : 30;
+  const ageDays = Math.floor((nowMs - Date.parse(entry.as_of + "T00:00:00Z")) / 86400000);
+  if (ageDays > staleAfter) return null;
+  return entry;
+}
+
+// Converts `amount` (in `fromCurrency`) into `toCurrency`, pivoting
+// through the row's own USD base — the general two-hop formula the
+// carrier shape documents as unreached by this launch's own
+// inputs (EUR<->USD is the only pair this crossing's data ever exercises)
+// but not to be actively broken. Returns null on the same non-guess
+// branch as fxEntryFor() above, for either leg. On success, the
+// rate/asOf/source describe the ONE non-base entry actually used — never
+// both, on today's reachable inputs, since fromCurrency/toCurrency are
+// never both non-USD in this crossing's own data.
+export function convertAmount(fxRates, amount, fromCurrency, toCurrency, nowMs = Date.now()) {
+  if (fromCurrency === toCurrency) return { amount, rate: null, asOf: null, source: null };
+  const fromEntry = fxEntryFor(fxRates, fromCurrency, nowMs);
+  if (!fromEntry) return null;
+  const toEntry = fxEntryFor(fxRates, toCurrency, nowMs);
+  if (!toEntry) return null;
+  const usd = amount * fromEntry.usd_per_unit;
+  const out = usd / toEntry.usd_per_unit;
+  const named = fromEntry.isBase ? toEntry : fromEntry;
+  return { amount: out, rate: named.usd_per_unit, asOf: named.as_of, source: named.source };
 }
 
 // The near-the-bar band, applied only to a same-currency comparison.
@@ -333,7 +389,7 @@ function gate1(row, input) {
 // Gate 2 — is the bar comparable to what the reader entered?
 // Three independent conditions, all of which must hold; each failure has
 // its own rendered reason, and none is a silent skip.
-function gate2(row, bar, input) {
+function gate2(row, bar, input, fxRates) {
   // Condition 2 is checked first for the two rows that state no single
   // figure at all: the no-single-figure condition names exactly those
   // two rows (TH O-A and TH privilege) as the ones that render their
@@ -353,25 +409,47 @@ function gate2(row, bar, input) {
     if (bar.propertyRule === "bank_balance") return { reason: "property_bank_balance" };
     if (bar.propertyRule === "total_assets") return { reason: "property_total_assets" };
     // propertyRule === "compare": the one row (GT:route:investor-visa)
-    // whose own paperwork names property as a qualifying vehicle.
-    if (input.property_capital.currency !== bar.currency) {
-      return { reason: "currency_wall", readerCurrency: input.property_capital.currency, rowCurrency: bar.currency };
+    // whose own paperwork names property as a qualifying vehicle. One
+    // currency per submission: the property figure is read in
+    // input.currency — there is no separate property_capital.currency
+    // once the second selector is gone.
+    if (input.currency === bar.currency) {
+      return { reason: null, comparable: { readerAmount: input.property_capital.amount, threshold: row.value_num_low, converted: false } };
     }
-    return { reason: null, comparable: { readerAmount: input.property_capital.amount, threshold: row.value_num_low } };
+    const converted = convertAmount(fxRates, input.property_capital.amount, input.currency, bar.currency);
+    if (!converted) return { reason: "fx_unavailable" };
+    return {
+      reason: null,
+      comparable: {
+        readerAmount: converted.amount, threshold: row.value_num_low,
+        converted: true, rate: converted.rate, rateAsOf: converted.asOf, rateSource: converted.source,
+      },
+    };
   }
 
   // kind === "income".
-  if (input.currency !== bar.currency) {
-    return { reason: "currency_wall", readerCurrency: input.currency, rowCurrency: bar.currency };
-  }
   const normalised = toPeriod(input.amount, input.period, bar.period);
   if (!Number.isFinite(normalised)) return { reason: "no_number" };
-  return { reason: null, comparable: { readerAmount: normalised, threshold: row.value_num_low } };
+  if (input.currency === bar.currency) {
+    return { reason: null, comparable: { readerAmount: normalised, threshold: row.value_num_low, converted: false } };
+  }
+  const converted = convertAmount(fxRates, normalised, input.currency, bar.currency);
+  if (!converted) return { reason: "fx_unavailable" };
+  return {
+    reason: null,
+    comparable: {
+      readerAmount: converted.amount, threshold: row.value_num_low,
+      converted: true, rate: converted.rate, rateAsOf: converted.asOf, rateSource: converted.source,
+    },
+  };
 }
 
 // The whole evaluation for one row. Returns reasons and states; the
-// render layer owns every sentence.
-export function evaluateRow(row, input) {
+// render layer owns every sentence. `fxRates` is the rules layer's own
+// currency table (js/data.js's resolveFxRates(), store.fxRates) — passed
+// through to Gate 2 untouched; this function looks at none of its shape
+// itself.
+export function evaluateRow(row, input, fxRates) {
   const bar = ROUTE_BARS[row.route_key];
   const conditional = isConditional(row);
   const result = {
@@ -427,9 +505,13 @@ export function evaluateRow(row, input) {
     result.amountChipSuppressed = g1.typeState === "partial";
   }
 
-  const g2 = gate2(row, bar, input);
+  const g2 = gate2(row, bar, input, fxRates);
   if (g2.reason) {
     result.gate2 = g2;
+    // "fx_unavailable" buckets as 1 — a real, chip-worthy finding — the
+    // same bucket "currency_wall" used to hold before conversion existed:
+    // the record itself is there and comparable in principle, only the
+    // rate to compare it with is missing today.
     result.bucket = g2.reason === "no_number" ? 3 : 1;
     return result;
   }

@@ -2131,7 +2131,14 @@ const READER_MARK_ROWS = [
   // READER_WRONG_TYPE, which genuinely is about income type. Only the
   // lead claimed the whole band was an income reading.
   { band: "hard_fail", label: "Doesn't clear — below the bar, or not this kind of income" },
-  { band: "data_gap", label: "Couldn't be read — not enough recorded, or the bar is in another currency" },
+  // REWORDED BY THE CONVERSION CROSSING: "or
+  // the bar is in another currency" went false the moment a currency
+  // mismatch usually converts instead of dead-ending. Cause-neutral by
+  // design now — this is a legend key for a band, and the band covers
+  // three composable causes whose sentence is composed per country
+  // (READER_NOT_ENOUGH's own clauses in app-shared.js), never one this
+  // key could name without becoming three keys.
+  { band: "data_gap", label: "Couldn't be read — the record doesn't hold what a comparison needs" },
 ];
 // The trailing line, no swatch: the absence is a state too, and the
 // perspective-disclosure law makes it one the key has to name.

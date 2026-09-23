@@ -71,6 +71,12 @@ const S_NONE_CLEARS = "READER_NONE_CLEARS";
 const S_BELOW_SOME_UNREAD = "READER_BELOW_SOME_UNREAD";
 const S_WRONG_TYPE_SOME_UNREAD = "READER_WRONG_TYPE_SOME_UNREAD";
 const S_NONE_CLEARS_SOME_UNREAD = "READER_NONE_CLEARS_SOME_UNREAD";
+// Added by the conversion crossing: reuses the already-registered engine
+// token rather than adding a new reader-only state. A route lands here when
+// Gate 2 needed to convert the reader's figure into the bar's currency
+// and js/own-numbers-data.js's convertAmount() came back null — the row
+// absent, the pair missing, or the one rate consulted stale.
+const S_FX_UNAVAILABLE = "UNCERTAIN_FX_UNAVAILABLE";
 
 const STATE_BAND = {
   [S_ABOVE]: "clean",
@@ -92,6 +98,10 @@ const STATE_BAND = {
   [S_BELOW_SOME_UNREAD]: "uncertain_or_conditional",
   [S_WRONG_TYPE_SOME_UNREAD]: "uncertain_or_conditional",
   [S_NONE_CLEARS_SOME_UNREAD]: "uncertain_or_conditional",
+  // Matches app-shared.js's STATE_HEADLINE_BAND entry for this same
+  // already-registered token, one meaning, two tables, per this table's
+  // own standing rule (comment above).
+  [S_FX_UNAVAILABLE]: "uncertain_or_conditional",
 };
 
 // Does this reader row carry an eligibility ANSWER, or only ignorance?
@@ -154,24 +164,32 @@ export function routeBarBasisOnFile(row) {
 //
 // THE SECOND CONDITION, AND WHY IT IS A CONDITION AND NOT A REWORDING.
 // The sentence declares the basis of a computation. On a `data_gap`
-// country no amount reading happened at all — the bar was in another
-// currency, the field was absent, the source was silent — so there is no
-// comparison for a per-person assumption to qualify, and the line was
-// describing a computation that never ran. On a cold walk it rode all
-// twelve marked pins, including the two that passed; it is removed from
-// ten and KEPT on the two, because a clean pass computed against a bar
-// that might be a household bar is exactly the claim that needs its
-// assumption declared. Designing it off the passes would be honesty
-// designed out of view.
+// country no amount reading happened at all — the field was absent, the
+// source was silent, the route states no single figure, the bar measures
+// something other than income — so there is no comparison for a
+// per-person assumption to qualify, and the line was describing a
+// computation that never ran. On a cold walk (pre-conversion; NOT
+// re-measured against this crossing's own engine, so treat as history
+// rather than a current count) it rode all twelve marked pins, including
+// the two that passed; it is removed from ten and KEPT on the two,
+// because a clean pass computed against a bar that might be a household
+// bar is exactly the claim that needs its assumption declared. Designing
+// it off the passes would be honesty designed out of view.
+// CORRECTED BY THE CONVERSION CROSSING: "the bar was in another currency" dropped from
+// the cause list — that cause now converts, or lands
+// UNCERTAIN_FX_UNAVAILABLE (uncertain_or_conditional, not data_gap), so
+// it no longer belongs among the data_gap causes named here.
 //
 // It takes the LOCATION, not the country id, so the band it tests is the
 // one the reader is actually looking at and all three surfaces — map
 // tooltip, Lists, location page — agree by construction rather than by
 // three matching edits.
 //
-// It retires itself twice over: when a real `bar_basis` field lands on
-// the route rows, and when the currency read makes the ten readable — at
-// which point the line returns to them automatically, with no edit here.
+// RETIRES ITSELF ONCE MORE, NOT TWICE: the second retirement condition
+// this note used to name — "when the currency read makes the ten
+// readable" — is the event the conversion crossing itself is. What
+// remains is the one real retirement left: when a real `bar_basis` field
+// lands on the route rows.
 export function readerBasisIsAssumed(store, loc) {
   if (!loc) return false;
   const verdict = resolveVerdict(store, READER_ID, loc);
@@ -203,11 +221,21 @@ export function readerStateForRow(result) {
   }
   if (result.amountBand === "at") return S_AT_LINE;
   if (result.amountBand === "below") return S_BELOW;
+  // Added by the conversion crossing: a currency mismatch that COULD have been converted
+  // but wasn't — the row absent, the pair missing, or the rate stale — is
+  // its own state now, distinct from ignorance-about-the-record. Checked
+  // before the type-refusal branch below on principle, though the two
+  // never actually collide: Gate 1's blocked/coarse_no return ends the
+  // row before Gate 2 ever runs, so result.gate2 is never set on a row
+  // reaching that branch.
+  if (result.gate2 && result.gate2.reason === "fx_unavailable") return S_FX_UNAVAILABLE;
   // No amount reading at all. A route the reader's kind of income is
   // refused on is a real, recorded negative; everything else — the field
   // is absent, the source was silent, the bar isn't a single figure, the
-  // bar is in another currency, the bar measures something other than
-  // income — is ignorance, not a no (v1 §1.2a's own rule).
+  // bar measures something other than income — is ignorance, not a no
+  // (v1 §1.2a's own rule). "the bar is in another currency" DELETED from
+  // this note: that cause now converts or lands S_FX_UNAVAILABLE above,
+  // never here.
   if (result.typeState === "blocked" || result.typeState === "coarse_no") return S_WRONG_TYPE;
   return S_NOT_ENOUGH;
 }
@@ -298,6 +326,51 @@ export function belowBarKindSummary(entries) {
   return { kind, phrase: phrases.size === 1 ? [...phrases][0] : null };
 }
 
+// Added by the conversion crossing. WHETHER THE "AT THE LINE"
+// READING WAS A CONVERTED COMPARISON — the one fact
+// app-shared.js's READER_AT_LINE variant sentence needs, found the same
+// way belowBarKindSummary() above finds its own fact: summarised over
+// exactly the routes the sentence is about. Returns null (the plain,
+// unchanged sentence renders) unless at least one at-the-line route's
+// deciding comparison was actually converted.
+export function atLineConversionSummary(entries) {
+  const atLine = entries.filter((e) => e.state === S_AT_LINE);
+  if (!atLine.length) return null;
+  const anyConverted = atLine.some((e) => e.result.gate2 && e.result.gate2.comparable && e.result.gate2.comparable.converted);
+  return anyConverted ? { converted: true } : null;
+}
+
+// Added by the conversion crossing. WHICH GATE(S) actually
+// stopped a READER_NOT_ENOUGH country — the fact app-shared.js's composed
+// clause sentence needs. composeCountryState() only ever names this
+// state when EVERY route in the country landed it (S_NOT_ENOUGH ranks
+// worst on BAND_RANK among the bands it can share the country with, so
+// any better-banded sibling would have won `best` instead) — so scanning
+// every entry, not just a filtered subset, is exact here, not an
+// approximation the way it would be for a mixed-band state.
+//
+// A, B, C are own-numbers-data.js's own three causes:
+//   A - gate1() fell to typeState "absent"
+//   B - gate2's bar-kind mismatch (kind_mismatch / property_bank_balance /
+//       property_total_assets)
+//   C - gate2's no_number
+// All three false is the one combination measured structurally
+// unreachable on today's data (no row is not_stated_by_source, no row
+// carries a suppressed amount chip that isn't also one of the above) —
+// composeNotEnoughSentence() in app-shared.js has its own honest fallback
+// for it regardless, so this function never needs to invent a fourth
+// cause to avoid it.
+export function notEnoughCauseSummary(entries) {
+  let hasA = false, hasB = false, hasC = false;
+  for (const e of entries) {
+    const r = e.result;
+    if (r.typeState === "absent") hasA = true;
+    if (r.gate2 && (r.gate2.reason === "kind_mismatch" || r.gate2.reason === "property_bank_balance" || r.gate2.reason === "property_total_assets")) hasB = true;
+    if (r.gate2 && r.gate2.reason === "no_number") hasC = true;
+  }
+  return { hasA, hasB, hasC };
+}
+
 // The deciding route's own confidence tier, copied verbatim. A MECHANICAL
 // rule, not an opinion: the tier is the tier of the row that set the
 // band, transported unchanged. No tier is authored here and none is
@@ -372,21 +445,32 @@ export function buildReaderVerdictRows(store, input) {
     const countryRows = slice.filter((r) => r.country_id === countryId);
     if (!countryRows.length) continue;
     const entries = countryRows.map((row) => {
-      const result = evaluateRow(row, input);
+      const result = evaluateRow(row, input, store.fxRates);
       return { row, result, state: readerStateForRow(result) };
     });
     const overallState = composeCountryState(entries.map((e) => e.state));
     if (!overallState) continue;
     // Carried on the row beside the state, never folded into it — and
-    // ONLY where the composed state is one of the two the summary
-    // describes. A country whose best route is above the bar can still
-    // have a sibling route that fell below it, so the summary would be
-    // non-null there while describing routes the sentence is not about.
-    // Nothing consumes it in that case today; this makes it impossible
-    // for anything to start.
+    // ONLY where the composed state is one the summary describes. A
+    // country whose best route is above the bar can still have a
+    // sibling route that fell below it, so a summary would be non-null
+    // there while describing routes the sentence is not about. Nothing
+    // consumes it in that case today; this makes it impossible for
+    // anything to start.
+    //
+    // Widened by the conversion crossing: two more states now
+    // carry a summary on this same field, same mechanism, same rule —
+    // READER_AT_LINE (whether the deciding comparison was converted) and
+    // READER_NOT_ENOUGH (which of the three causes are actually present,
+    // composed per country since S_NOT_ENOUGH only ever names a country
+    // where EVERY route landed it).
     const readerBarKind = (overallState === S_BELOW || overallState === S_BELOW_SOME_UNREAD)
       ? belowBarKindSummary(entries)
-      : null;
+      : overallState === S_AT_LINE
+        ? atLineConversionSummary(entries)
+        : overallState === S_NOT_ENOUGH
+          ? notEnoughCauseSummary(entries)
+          : null;
     rows.push({
       persona_id: READER_ID,
       location_id: null,
@@ -397,9 +481,11 @@ export function buildReaderVerdictRows(store, input) {
       confidence_tier: decidingTier(entries, overallState),
       deciding_group_kind: "route",
       // Read by stateHeadline()/readerStateShort() to pick which text an
-      // existing token renders. Null on every row where no route was read
-      // and below, which is every row whose sentence never claimed a bar
-      // kind in the first place.
+      // existing token renders. Despite the name, carries three different
+      // shapes now, one per state that needs one: { kind, phrase } for
+      // S_BELOW/S_BELOW_SOME_UNREAD, { converted } for S_AT_LINE,
+      // { hasA, hasB, hasC } for S_NOT_ENOUGH. Null on every row whose
+      // state carries no summary — most of them, by construction.
       reader_bar_kind: readerBarKind,
       companion_disclosure: null,
       cadence: null,

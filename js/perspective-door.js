@@ -45,6 +45,9 @@ import { loadStore, defaultWeightForCriterion } from "./data.js";
 import {
   createOwnNumbersStep, SAVE_LABEL, SAVE_NOTE, SAVE_UNAVAILABLE_LINE,
 } from "./own-numbers.js";
+// The engine half's own convertAmount(), not a second hand-typed rate —
+// see waldoReferenceBandNote() below.
+import { convertAmount } from "./own-numbers-data.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 import { siteUrl } from "./site-root.js";
 
@@ -303,28 +306,43 @@ function markSeenLegacyKeyRemoved() {
 // The conversion is stated to the dollar because it is arithmetic on one
 // named rate, not a second measurement.
 //
-// A DEBT, NAMED IN THE PLACE IT IS OWED: this string carries a derived
-// copy of a number whose single source is the fx_rates row in the rules
-// layer (visa-fit:_param:fx_rates, EUR usd_per_unit 1.1597618, as_of
-// 2026-09-14). Nothing on this site fetches that row client-side, so the
-// conversion is baked
-// here rather than read live. That is one number in two places, which is
-// the defect this project has ruled against for exactly this kind of
-// parameter; it is recorded rather than hidden, and this line is owed a
-// live read the moment the accessor exists.
-const WALDO_REFERENCE_BAND_NOTE =
-  "For scale, the nearest measured stand-in — nobody measures remote workers: "
-  + "\u20AC3,850 a month gross, the EU27 professionals band (Eurostat, 2022). "
-  + "About $4,465 a month, derived at the rate on file. Waldo's own map is "
-  + "still read from his recorded figure above, not from this band.";
-const PERSONA_REFERENCE_BAND = { waldo: WALDO_REFERENCE_BAND_NOTE };
+// LIVE READ, the conversion crossing. The debt this comment
+// used to name here — a baked copy of the fx_rates row's own rate,
+// because nothing on this site fetched that row client-side — is paid:
+// js/data.js now fetches derived/rules.jsonl and resolves it, and this
+// function reads store.fxRates through the same convertAmount() the
+// welcome box's own engine uses, rather than a second, hand-typed rate.
+// Stated to the dollar, no decimals, no "≈" — the precedent this
+// site already sets just above ("arithmetic on one named rate, not a
+// second measurement"). Falls to the site's own non-guess sentence when
+// the rate on file can't be trusted (row absent, pair missing, or stale)
+// rather than asserting a dollar figure it can't back.
+function waldoReferenceBandNote(fxRates) {
+  const lead = "For scale, the nearest measured stand-in — nobody measures remote workers: "
+    + "€3,850 a month gross, the EU27 professionals band (Eurostat, 2022). ";
+  const converted = convertAmount(fxRates, 3850, "EUR", "USD");
+  const derived = converted
+    ? `About $${Math.round(converted.amount).toLocaleString("en-US")} a month, derived at the rate on file. `
+    : "The site has no exchange rate on file it can convert this at today. ";
+  return lead + derived + "Waldo's own map is still read from his recorded figure above, not from this band.";
+}
+function personaReferenceBand(id, fxRates) {
+  return id === "waldo" ? waldoReferenceBandNote(fxRates) : null;
+}
 
-function tilesHtml() {
+// Async since the conversion crossing: Waldo's tile now
+// reads store.fxRates for its band rather than a baked figure, and the
+// store is behind loadStore()'s own promise. loadStore() is memoized, so
+// every call after the map's first render resolves immediately; this
+// awaits it rather than reaching for a synchronous cache this file would
+// have to invent and keep in step with the real one.
+async function tilesHtml() {
+  const store = await loadStore();
   // Eight named personas, unchanged order/size/portraits/descriptors.
   return VALID_PERSONAS.map((id) => {
     const name = personaDisplayName(id);
     const sentence = personaDescriptorSentence(id);
-    const band = PERSONA_REFERENCE_BAND[id];
+    const band = personaReferenceBand(id, store.fxRates);
     const bandHtml = band ? `<span class="door-tile-band">${escapeHtml(band)}</span>` : "";
     return `
       <button type="button" class="door-tile" data-persona="${id}">
@@ -556,7 +574,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   // ------------------------------------------------------------------
   // Screen: the main screen
   // ------------------------------------------------------------------
-  function renderMainScreen() {
+  async function renderMainScreen() {
     const descriptor = savedPerspectiveDescriptor();
     const stateSentence = descriptor ? buildResumeStateSentence(descriptor) : null;
     const ariaFragment = descriptor ? buildResumeAriaFragment(descriptor) : null;
@@ -596,6 +614,13 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       `
         : "";
 
+    // Awaited here, not inlined: tilesHtml() is async as of the
+    // conversion crossing (it reads store.fxRates for Waldo's band). loadStore() is memoized,
+    // so this resolves on the next microtask in the ordinary case — the
+    // map has already loaded the store by the time a reader opens the
+    // door — never a network wait of its own.
+    const tiles = await tilesHtml();
+
     panel.innerHTML = `
       <p class="door-brand">${escapeHtml(DOOR_BRAND_LINE)}</p>
       <p class="door-welcome">${escapeHtml(WELCOME_LINE)}</p>
@@ -609,7 +634,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       </div>
       <div class="door-persona-row">
         <p class="door-persona-row-heading">${escapeHtml(PERSONA_ROW_HEADING)}</p>
-        <div class="door-tiles">${tilesHtml()}</div>
+        <div class="door-tiles">${tiles}</div>
       </div>
       <button type="button" class="door-escape" id="door-escape">${escapeHtml(ESCAPE_HATCH_LABEL)}</button>
     `;

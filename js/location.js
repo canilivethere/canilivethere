@@ -10,7 +10,6 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, FIT_INDEX_DEFAULT_WEIGHTING_LINE,
   FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED, buildFitHeadline, loadFxRates,
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
-  verdictConfidenceBadgeSuppressed,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   READER_ID, hasReaderWeights, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
@@ -308,18 +307,12 @@ function buildVerdictBlock(store, loc, country, persona) {
         : "";
       // Never shown for a data-gap band — that band already says "not
       // enough to judge", so a tier badge there would imply a tier exists.
-      //
-      // And, added by the margin crossing: never shown as a TIER where the
-      // tier on file belongs to a different route from the bar the
-      // sentence just named. That case renders "confidence not shown"
-      // instead of nothing at all, because an empty badge slot on this
-      // page already means "no tier exists" (the line above) and one
-      // absence cannot carry both meanings.
+      // That is the ONE meaning an empty badge slot carries here, and it
+      // stays the only one: the tier a reader row shows is now the tier of
+      // the very bar its sentence names, so there is no second case in
+      // which a tier exists and is withheld.
       const tierBadge = readerVerdict.overall_band === "data_gap"
-        ? ""
-        : readerVerdict.reader_confidence_suppressed
-          ? verdictConfidenceBadgeSuppressed()
-          : verdictConfidenceBadge(readerVerdict.confidence_tier);
+        ? "" : verdictConfidenceBadge(readerVerdict.confidence_tier);
       // The reader's row is computed once for every location in this
       // country, not for this place specifically — the same disclosure a
       // persona's country-scope row carries, in the same words.

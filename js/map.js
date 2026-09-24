@@ -10,7 +10,7 @@ import {
   loadViewIndex, saveViewIndex, wireCornerLensInPlace,
   READER_BASIS_DECLARED_LINE,
   READER_STATE_SHORT, readerStateShort, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
-  READER_LABEL_READ_PREFIX, READER_CONFIDENCE_NOT_SHOWN,
+  READER_LABEL_READ_PREFIX,
 } from "./app-shared.js";
 import {
   applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readerPinPaint,
@@ -20,21 +20,13 @@ import {
 // Plain-text equivalent of app-shared.js's verdictConfidenceBadge(), for
 // the hover tooltip specifically (showTip() sets .textContent, which
 // cannot carry a styled <span>). Same skip rules: no tier, or a data-gap
-// band (already says "not enough to judge"), renders nothing.
-//
-// `suppressed` is the margin crossing's third state: a tier exists, and it
-// belongs to a different route from the bar the sentence beside it just
-// named, so it is hidden. It renders the same three words the badge slot
-// renders on the other two surfaces rather than nothing, for the reason
-// that holds there too — on this surface an empty suffix already means
-// "no tier exists" (the line above), and one absence cannot carry both
-// meanings. The badge's reason clause has no home here: showTip() sets
-// .textContent, so there is no title attribute to hang it on. That is the
-// honest minimum — it distinguishes withheld from absent, which silence
-// does not.
-function verdictConfidenceSuffix(tier, overallBand, suppressed) {
+// band (already says "not enough to judge"), renders nothing — and those
+// two remain the only reasons an empty suffix appears. A reader row's tier
+// is now the tier of the bar its own sentence names, so there is no third
+// state in which a tier exists and is withheld, and no third thing for an
+// absence here to mean.
+function verdictConfidenceSuffix(tier, overallBand) {
   if (!tier || overallBand === "data_gap") return "";
-  if (suppressed) return ` — ${READER_CONFIDENCE_NOT_SHOWN}`;
   return ` — ${CONF_LABEL[tier] || tier}`;
 }
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
@@ -1309,10 +1301,7 @@ function renderMap(store, lenses) {
         const insteadLine = paint.bandEliminated
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
-        const confSuffix = verdictConfidenceSuffix(
-          readerVerdict.confidence_tier, readerVerdict.overall_band,
-          readerVerdict.reader_confidence_suppressed
-        );
+        const confSuffix = verdictConfidenceSuffix(readerVerdict.confidence_tier, readerVerdict.overall_band);
         // The SECOND of the three surfaces this sentence is specified
         // for: its own line after the headline line. The doubt against it
         // is recorded rather than quietly resolved — this makes a compact

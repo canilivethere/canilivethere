@@ -2450,39 +2450,37 @@ export function confidenceBadge(fact, { interactive = true } = {}) {
 // found no single deciding route for) renders nothing at all, matching the
 // skip behavior a caller should also apply for overall_band === "data_gap"
 // before calling this at all — see call sites in location.js/lists.js/map.js.
+// ONE STRING, EVERY RENDER — reader rows and persona rows alike. Two
+// things in it are deliberate.
+//
+// "rules", not "routes": most renders of this badge are persona verdicts,
+// where the tier belongs to a deciding GROUP rather than to a route, and
+// 91 of the 472 exported verdict rows decide on a visit group rather than
+// a route at all. "The rules behind this verdict" is true on both kinds,
+// and it is the vocabulary the reader's own disclosure already uses. The
+// shipped "(s)" is gone with it: a typographic shrug in a tooltip is a
+// reader doing the writer's work, and the phrase is true of one rule and
+// of several without a bracket.
+//
+// The second clause is the honest half. A "High" sitting beside a verdict
+// reads as "we are confident in this answer" unless the string says
+// otherwise — it rates SOURCING. The single-fact badge beside it already
+// makes the same move, asking how we know rather than how right we are.
+//
+// NOT SPLIT INTO A READER-SPECIFIC SECOND STRING, though a reader row now
+// names its bar in the sentence beside the badge: pointing the tooltip at
+// "the bar named here" would be false on the majority of this string's
+// renders, and making it true would mean threading an argument through
+// four call sites to reword a tooltip. The reader already has the
+// precision — the bar is named in the sentence the badge sits against.
+const VERDICT_CONFIDENCE_TOOLTIP =
+  "How well sourced the rules behind this verdict are — not how likely the answer is to be right.";
 export function verdictConfidenceBadge(tier) {
   if (!tier) return "";
   const label = CONF_LABEL[tier] || "confidence not stated";
   const cls = tier === "High" ? "badge-high" : tier === "Medium" ? "badge-medium"
     : tier === "Speculative" ? "badge-speculative" : "badge-neutral";
-  return `<span class="badge ${cls}" title="Sourcing confidence for the route(s) behind this verdict">${escapeHtml(label)}</span>`;
-}
-
-// THE SUPPRESSED FORM, and why it is a string rather than silence.
-// Where the confidence tier's route and the margin's named bar are
-// DIFFERENT routes, the badge is hidden. Something has to render in its
-// place, and the reason is not taste: an absent badge already has a
-// meaning on this site — verdictConfidenceBadge() above
-// returns "" for no tier, and both the location page and the map skip the
-// badge on a data_gap band precisely because "a tier badge there would
-// imply a tier exists". Silence here would make one absence mean both
-// "no tier exists" and "a tier exists and is being withheld", on surfaces
-// where the reader cannot tell which. The perspective-disclosure law names
-// this exactly: a control's promise is a claim, and so is its
-// disappearance.
-//
-// NOT the existing fallback wording "confidence not stated" three lines
-// up. The tier IS stated — it simply is not this bar's — and reusing that
-// phrase would make a third meaning share a second string.
-//
-// No new CSS: badge-neutral is the class this file already uses for a tier
-// it has no colour for.
-export const READER_CONFIDENCE_NOT_SHOWN = "confidence not shown";
-const READER_CONFIDENCE_NOT_SHOWN_REASON =
-  "The confidence tier on file is another route's, not the bar named here — so it isn't shown against this figure.";
-export function verdictConfidenceBadgeSuppressed() {
-  return `<span class="badge badge-neutral" title="${escapeHtml(READER_CONFIDENCE_NOT_SHOWN_REASON)}">`
-    + `${escapeHtml(READER_CONFIDENCE_NOT_SHOWN)}</span>`;
+  return `<span class="badge ${cls}" title="${escapeHtml(VERDICT_CONFIDENCE_TOOLTIP)}">${escapeHtml(label)}</span>`;
 }
 
 // Perspective-disclosure law applied to the two table

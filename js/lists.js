@@ -6,7 +6,7 @@ import {
   renderFooter, getActivePersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, stateHeadline,
-  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, verdictConfidenceBadgeSuppressed,
+  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge,
   CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
   READER_ID, hasReaderWeights, loadViewIndex, saveViewIndex, personaPossessiveLabel,
@@ -663,16 +663,12 @@ function buildVerdictHtml(store, row, persona) {
     );
     // Sourcing-confidence tier badge, same skip-on-data-gap rule as
     // location.js's own verdict block (a data-gap band already says "not
-    // enough to judge" — a tier badge there would wrongly imply one exists)
-    // — and the same margin-crossing suppression: where the tier on file is
-    // a different route from the bar the sentence names, the slot says
-    // "confidence not shown" rather than going empty, which here already
-    // means "no tier exists".
+    // enough to judge" — a tier badge there would wrongly imply one exists),
+    // and that stays the only reason this slot is ever empty: on a reader
+    // row the tier is the tier of the bar the sentence names, so a tier
+    // that exists is never withheld.
     const tierBadge = row.engineVerdict.overall_band === "data_gap"
-      ? ""
-      : row.engineVerdict.reader_confidence_suppressed
-        ? verdictConfidenceBadgeSuppressed()
-        : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
+      ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
     // Provenance label, same fix as above: this is the rule-derived
     // branch — the majority case, 5 of 8 personas at every location.
     // Part 24.3 (Lists table): split pill only, no added prose paragraph

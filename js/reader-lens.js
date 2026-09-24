@@ -418,10 +418,24 @@ export function notEnoughCauseSummary(entries) {
 }
 
 // The deciding route's own confidence tier, copied verbatim. A MECHANICAL
-// rule, not an opinion: the tier is the tier of the row that set the
-// band, transported unchanged. No tier is authored here and none is
+// rule, not an opinion: the tier is the tier of the row the answer rests
+// on, transported unchanged. No tier is authored here and none is
 // averaged, because an average of two tiers is a tier nobody recorded.
-function decidingTier(entries, countryState) {
+//
+// ONE SELECTOR, AND THE INVARIANT IT EXISTS TO SATISFY: the tier shown
+// beside a NAMED bar must be that bar's own tier. Wherever the margin
+// names a bar, `deciding` is the entry it named and the tier is read off
+// that same entry — one object, so the two cannot be different routes.
+// This is structural, not a check: there is no second selection to drift
+// out of step with the first, and nothing detects drift after the fact
+// because nothing can drift.
+//
+// `deciding` is the ONE `decidingEntry()` call made per country row and
+// handed in, never re-derived here. A second call is the defect this
+// closes, so the argument is required rather than optional: a caller that
+// forgot it would get a fallback tier on a row that names a bar, which is
+// exactly the mispairing the pass removes.
+function decidingTier(deciding, entries, countryState) {
   // Four of the ten reader states are COMPOSED — no single route ever
   // carries them — so an exact-state match cannot find their row.
   //
@@ -451,19 +465,32 @@ function decidingTier(entries, countryState) {
   // composer used — never a `data_gap` route, which ranks last and can
   // only win when every route is data_gap, in which case `sameBand`
   // already matched it.
-  return decidingTierEntry(entries, countryState).row.confidence || null;
+  // No named bar — the four refusal states, where `decidingEntry()` has no
+  // candidate set and the sentence points at no single route. Nothing is
+  // mispaired there, so the tier stays: it is a true claim about the
+  // read the sentence rests on, and dropping it would make an absent badge
+  // mean two things at once.
+  return (deciding || noMarginFallbackEntry(entries, countryState)).row.confidence || null;
 }
 
-// The SAME selection, extracted so the badge-suppression check can compare
-// the tier's route against the margin's route without a second copy of
-// this chain drifting from the first. Byte-for-byte the expression
-// decidingTier() held a moment ago — no clause reordered, nothing added.
+// THE NO-MARGIN FALLBACK, and nothing else now — named so the two-selector
+// structure is legible at the call site. It runs on exactly the four
+// composed states that name no bar: the two wrong-type readings, the
+// not-enough reading, and the no-exchange-rate reading. Those states have
+// no candidate set above, so there is no pairing for the invariant to be
+// about, and the chain below is kept EXACTLY as it shipped — no clause
+// reordered, nothing added.
 //
-// DELIBERATELY NOT UNIFIED WITH decidingEntry() BELOW. Unifying the two is
-// the better end state and it is held for a pass of its own: it moves a
-// shipped, reader-visible field, and folding that into a feature diff is
-// how it ships unseen.
-function decidingTierEntry(entries, countryState) {
+// What it lands on, per state, and why keeping it is mechanical rather
+// than a preference: on a wrong-type read a route really does carry that
+// state, so clause 1 fires; on its partial-read twin clauses 1 and 2 miss
+// by construction (no route carries a composed token, and no sibling can
+// hold the softer band or it would have won the composition) and clause 3
+// lands on a read, refusing row; on not-enough every route carries the
+// state; on no-exchange-rate a route carries it. In all four the chain
+// lands on a read row that is part of the claim being made — never the
+// arbitrary first row the note above this function's caller records.
+function noMarginFallbackEntry(entries, countryState) {
   const exact = entries.find((e) => e.state === countryState);
   const sameBand = entries.find((e) => STATE_BAND[e.state] === STATE_BAND[countryState]);
   const deciding = entries.reduce(
@@ -546,8 +573,7 @@ export function decidingEntry(entries, countryState) {
 // THE BAR IS THE ONE AND ONLY CONVERSION THIS FUNCTION PERFORMS, and
 // `status: "unavailable"` is exactly the case where it returns null.
 // Nothing else sets that status.
-function composeReaderMargin(entries, countryState, input, fxRates) {
-  const chosen = decidingEntry(entries, countryState);
+function composeReaderMargin(chosen, input, fxRates) {
   if (!chosen) return null;
   const bar = ROUTE_BARS[chosen.row.route_key];
   const converted = !!chosen.result.gate2.comparable.converted;
@@ -692,30 +718,23 @@ export function buildReaderVerdictRows(store, input) {
         : overallState === S_NOT_ENOUGH
           ? notEnoughCauseSummary(entries)
           : null;
-    const readerMargin = composeReaderMargin(entries, overallState, input, store.fxRates);
-    // THE BADGE AND THE NAMED BAR CAN BE DIFFERENT ROUTES, and where they
-    // differ the badge is HIDDEN. Until the margin landed, the headline
-    // named no route, so the badge beside it implied nothing in
-    // particular; the moment the sentence
-    // says "on D7 Visa income threshold", a tier sitting next to it reads
-    // as THAT bar's. decidingTier() takes the first entry in data order
-    // whose state matches; decidingEntry() takes the nearest bar. On the
-    // tied countries, and wherever the nearest below bar is not the first
-    // below bar, those are different rows.
+    const readerMargin = composeReaderMargin(deciding, input, store.fxRates);
+    // THE BADGE AND THE NAMED BAR ARE NOW THE SAME ROUTE, by construction:
+    // `deciding` above is the entry the margin names, and the tier below is
+    // read off that same entry. The build this replaces could name one
+    // route in the sentence and show another route's tier beside it, and
+    // hid the badge where it detected that — a render branch that printed
+    // "confidence not shown" to a reader. There is nothing left to detect,
+    // so there is nothing left to hide, and the flag that did it is gone
+    // rather than left behind as a constant-false field that would tell a
+    // later reader divergence is still possible.
     //
-    // Computed here, once, because neither render site can see a route key
-    // — they hold a verdict row. Carried as its own top-level
-    // `reader_`-prefixed key rather than as an eleventh key inside
-    // `reader_margin`, whose ten keys are specified verbatim and not this
-    // build's to widen; the superset rule above licenses exactly this.
-    //
-    // Only ever true where a tier would otherwise have RENDERED: with no
-    // tier on file the badge is already absent and already means "no tier
-    // exists", which is the correct thing for it to mean.
-    const tierRow = decidingTierEntry(entries, overallState).row;
-    const readerConfidenceSuppressed = !!(
-      tierRow.confidence && readerMargin && tierRow.route_key !== readerMargin.route_key
-    );
+    // THE ARGUMENT THAT OUTLIVES THE MECHANISM, kept because the next
+    // person to consider hiding a badge should meet it rather than
+    // rediscover it: an absent confidence badge on these surfaces already
+    // means "no tier exists". If a second cause of absence is ever
+    // introduced, it needs its own words on screen — one absence cannot
+    // carry two meanings where the reader cannot tell which is which.
     rows.push({
       persona_id: READER_ID,
       location_id: null,
@@ -723,7 +742,7 @@ export function buildReaderVerdictRows(store, input) {
       scope: "country",
       overall_band: STATE_BAND[overallState],
       overall_state: overallState,
-      confidence_tier: decidingTier(entries, overallState),
+      confidence_tier: decidingTier(deciding, entries, overallState),
       deciding_group_kind: "route",
       // Read by stateHeadline()/readerStateShort() to pick which text an
       // existing token renders. Despite the name, carries three different
@@ -742,10 +761,6 @@ export function buildReaderVerdictRows(store, input) {
       // from — per-route reader margins are outcome 3 and are not built
       // here; the socket for them is routes_detail's `reader_reading`.
       reader_margin: readerMargin,
-      // See the long note above the row: the tier on file is another
-      // route's, so the badge is suppressed and the surfaces say so rather
-      // than going silent (an absent badge already means "no tier exists").
-      reader_confidence_suppressed: readerConfidenceSuppressed,
       companion_disclosure: null,
       cadence: null,
       cadence_burden: null,

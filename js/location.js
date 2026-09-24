@@ -10,6 +10,7 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, FIT_INDEX_DEFAULT_WEIGHTING_LINE,
   FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED, buildFitHeadline, loadFxRates,
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
+  verdictConfidenceBadgeSuppressed,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
   READER_ID, hasReaderWeights, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
@@ -292,7 +293,13 @@ function buildVerdictBlock(store, loc, country, persona) {
     const value = idx ? idx.value : null;
     if (readerVerdict) {
       const visual = bandVisual(readerVerdict.overall_band);
-      const stateText = stateHeadline(readerVerdict.overall_state, readerVerdict.reader_bar_kind);
+      // Third argument is the row's own `reader_margin` — my number, the
+      // bar, and by how much, stated inside the state's own sentence. Null on every persona row and on every reader row whose
+      // state ran no comparison, and the sentence is then byte-identical
+      // to what shipped.
+      const stateText = stateHeadline(
+        readerVerdict.overall_state, readerVerdict.reader_bar_kind, readerVerdict.reader_margin
+      );
       // The same no-bare-no instead-line every other verdict branch on
       // this page carries, on the same gate: two pointers to content
       // already on this page, zero new facts.
@@ -301,8 +308,18 @@ function buildVerdictBlock(store, loc, country, persona) {
         : "";
       // Never shown for a data-gap band — that band already says "not
       // enough to judge", so a tier badge there would imply a tier exists.
+      //
+      // And, added by the margin crossing: never shown as a TIER where the
+      // tier on file belongs to a different route from the bar the
+      // sentence just named. That case renders "confidence not shown"
+      // instead of nothing at all, because an empty badge slot on this
+      // page already means "no tier exists" (the line above) and one
+      // absence cannot carry both meanings.
       const tierBadge = readerVerdict.overall_band === "data_gap"
-        ? "" : verdictConfidenceBadge(readerVerdict.confidence_tier);
+        ? ""
+        : readerVerdict.reader_confidence_suppressed
+          ? verdictConfidenceBadgeSuppressed()
+          : verdictConfidenceBadge(readerVerdict.confidence_tier);
       // The reader's row is computed once for every location in this
       // country, not for this place specifically — the same disclosure a
       // persona's country-scope row carries, in the same words.

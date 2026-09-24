@@ -940,6 +940,57 @@ export const SCALE_ANCHOR_STRING =
 const READER_PARTIAL_READ_CLAUSE =
   " Some routes here couldn't be read against your figures at all, so this is a no on what was read — not on everything.";
 
+// THE CLAIM HALVES OF THE TWO PARTIAL-READ STATES THAT CARRY A MARGIN,
+// split out by the margin work and NOT reworded: the shipped strings below
+// are still literally `claim + clause`, so nothing a caller sees moves by a
+// byte. The split exists because the fixed order is claim → ledger →
+// partial-read clause LAST, and a single concatenated constant has nowhere
+// to put the ledger.
+// One definition each, so the claim and the shipped sentence cannot drift.
+// READER_WRONG_TYPE_SOME_UNREAD is deliberately NOT split: no comparison
+// ran on it, so it carries no margin and needs no seam.
+const READER_BELOW_SOME_UNREAD_CLAIM =
+  "Below the income bar on every route here the site could read.";
+// The same split for READER_ABOVE_BAR, for the same reason and with the
+// same guarantee: its shipped value below is still exactly these two
+// halves concatenated, and the ledger goes BETWEEN them.
+const READER_ABOVE_BAR_CLAIM = "Above the bar this route sets.";
+const READER_ABOVE_BAR_TAIL = " The other gates weren't read for you.";
+// And the same split for the at-the-line pair, whose shipped values are
+// likewise still exactly opener + tail. The ledger goes between them, and
+// the two tails are the only thing that differs
+// between the plain and the converted reading — so the opener is written
+// once and the pair cannot drift apart at the front.
+const READER_AT_LINE_OPENER = "Right at the line.";
+const READER_AT_LINE_TAIL =
+  " Where you're within about a tenth of a bar either way, the site says “right at the line” rather than yes or no — these figures are dated snapshots, and a rule can move by more than that.";
+const READER_AT_LINE_CONVERTED_TAIL =
+  " This route's bar was converted into your currency at the rate on file, and that rate is why the answer can't be tighter — within about a tenth of a bar either way, the site says “right at the line” rather than yes or no.";
+// AUTHORED JOIN, FLAGGED NOT SMUGGLED — the same disclosure, and the same
+// kind of join, this file's own READER_AT_LINE note already makes for the
+// sentence it was built from. The defect it closes: a row that sits at the
+// line on a CONDITIONAL bar dropped the condition entirely, because
+// js/reader-lens.js's readerStateForRow() branched on `result.conditional`
+// only on the `above` path. Three real rows reach it — Thailand's three
+// LTR reduced-bar routes at USD 40,000/year, whose `unit` carries the
+// CONDITIONAL token.
+//
+// Both halves are transported word for word from strings already on this
+// page: "Right at the line" is READER_AT_LINE's own opener, and
+// "— but only with conditions this route sets in its own words" is
+// READER_ABOVE_CONDITIONAL's own second clause. Only the join is mine.
+// NO NEW STATE TOKEN, no new band, no new legend row: READER_AT_LINE keeps
+// all three and only the TEXT varies, by the same carried-summary
+// mechanism READER_BELOW_VARIANTS and the converted reading already use.
+// No specified string existed for this case — the defect was found after
+// the wording was set — so this is the one piece of copy here that is not
+// transported from a ratified one. Listed as such, and a single constant
+// to replace.
+const READER_AT_LINE_OPENER_CONDITIONAL =
+  "Right at the line — but only with conditions this route sets in its own words.";
+const READER_NONE_CLEARS_SOME_UNREAD_CLAIM =
+  "No residency route the site could read here clears — some set a bar above your figure, and some don't take this kind of income.";
+
 export const STATE_HEADLINE = {
   QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
   QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
@@ -969,12 +1020,12 @@ export const STATE_HEADLINE = {
   // same route, and it survived every gate because it flatters rather than
   // closing a door. A deletion, not a rewording: the sentence is true of
   // either bar kind without those three words.
-  READER_ABOVE_BAR: "Above the bar this route sets. The other gates weren't read for you.",
+  READER_ABOVE_BAR: READER_ABOVE_BAR_CLAIM + READER_ABOVE_BAR_TAIL,
   // AUTHORED JOIN, flagged rather than smuggled: §6.3 specifies "v1's own
   // chip text, verbatim: 'Right at the line' + the v1 band sentence's
   // first clause" and does not write the joined sentence. Both halves are
   // transported word for word; only the ". " between them is mine.
-  READER_AT_LINE: "Right at the line. Where you're within about a tenth of a bar either way, the site says \u201cright at the line\u201d rather than yes or no — these figures are dated snapshots, and a rule can move by more than that.",
+  READER_AT_LINE: READER_AT_LINE_OPENER + READER_AT_LINE_TAIL,
   READER_ABOVE_CONDITIONAL: "Above the bar — but only with conditions this route sets in its own words.",
   // The kind-aware variants live in READER_BELOW_VARIANTS below; this
   // entry is the all-income reading, kept verbatim because it is true and
@@ -1072,12 +1123,12 @@ export const STATE_HEADLINE = {
   // THE SENTENCE THE DEFECT WAS FOUND ON. Kept as the all-income reading;
   // the capital and mixed readings are in READER_BELOW_VARIANTS below.
   READER_BELOW_SOME_UNREAD:
-    "Below the income bar on every route here the site could read." + READER_PARTIAL_READ_CLAUSE,
+    READER_BELOW_SOME_UNREAD_CLAIM + READER_PARTIAL_READ_CLAUSE,
   READER_WRONG_TYPE_SOME_UNREAD:
     "Not this kind of income — no route here the site could read takes it as the qualifying kind." + READER_PARTIAL_READ_CLAUSE,
   // "on income" DELETED from this lead too, same reason as READER_NONE_CLEARS.
   READER_NONE_CLEARS_SOME_UNREAD:
-    "No residency route the site could read here clears — some set a bar above your figure, and some don't take this kind of income." + READER_PARTIAL_READ_CLAUSE,
+    READER_NONE_CLEARS_SOME_UNREAD_CLAIM + READER_PARTIAL_READ_CLAUSE,
   // ---------------------------------------------------------------------
   // THE ENGINE'S FOUR NEW STATES. Not reader states and not a fifth
   // vocabulary: these are engine tokens that the composition fix and the
@@ -1158,12 +1209,31 @@ const READER_BELOW_VARIANTS = {
     capital: "Below the bar every route here sets — on capital, not income.",
     mixed: "Below the bar every route here sets — some of those bars measure income, some measure capital.",
   },
+  // CLAIM ONLY as of the margin work — the three values
+  // below no longer carry READER_PARTIAL_READ_CLAUSE inside them.
+  // stateHeadline() appends it, from READER_STATE_TAIL, AFTER the margin
+  // ledger, which is the fixed order: claim → ledger → partial-read clause
+  // last. A caller with no margin gets the identical
+  // sentence it always got; the clause simply arrives one line further out.
   READER_BELOW_SOME_UNREAD: {
     capitalWithPhrase: (phrase) =>
-      `Below the bar on every route here the site could read — that bar is ${phrase}, not an income one.` + READER_PARTIAL_READ_CLAUSE,
-    capital: "Below the bar on every route here the site could read — on capital, not income." + READER_PARTIAL_READ_CLAUSE,
-    mixed: "Below the bar on every route here the site could read — some of those bars measure income, some measure capital." + READER_PARTIAL_READ_CLAUSE,
+      `Below the bar on every route here the site could read — that bar is ${phrase}, not an income one.`,
+    capital: "Below the bar on every route here the site could read — on capital, not income.",
+    mixed: "Below the bar on every route here the site could read — some of those bars measure income, some measure capital.",
   },
+};
+
+// Which reader states put a trailing clause AFTER the margin ledger, and
+// what it is. Two different clauses, one mechanism: READER_ABOVE_BAR's own
+// second sentence, and the partial-read clause the two margin-bearing
+// `_SOME_UNREAD` states carry. Every other state's tail is empty, so
+// `claim + ledger + tail` reduces to the shipped string exactly when no
+// margin is passed — which is what keeps all eight persona surfaces
+// byte-identical.
+const READER_STATE_TAIL = {
+  READER_ABOVE_BAR: READER_ABOVE_BAR_TAIL,
+  READER_BELOW_SOME_UNREAD: READER_PARTIAL_READ_CLAUSE,
+  READER_NONE_CLEARS_SOME_UNREAD: READER_PARTIAL_READ_CLAUSE,
 };
 
 // The short twin, same three readings. It renders as a pin's accessible
@@ -1188,7 +1258,7 @@ const READER_BELOW_SHORT_VARIANTS = {
 // shipped sentence's "dated snapshots" clause on purpose: the rate is
 // named as THE reason, and two reasons in one headline reads as hedging.
 const READER_AT_LINE_CONVERTED =
-  "Right at the line. This route's bar was converted into your currency at the rate on file, and that rate is why the answer can't be tighter — within about a tenth of a bar either way, the site says “right at the line” rather than yes or no.";
+  READER_AT_LINE_OPENER + READER_AT_LINE_CONVERTED_TAIL;
 
 // Added by the conversion crossing. READER_NOT_ENOUGH's sentence
 // used to be one cause-neutral string (see the long SUPERSEDED note on
@@ -1242,6 +1312,212 @@ function composeNotEnoughSentence(causes) {
   return `${READER_NOT_ENOUGH_LEAD} ${clauses.join("; ")}.`;
 }
 
+// ---------------------------------------------------------------------
+// THE MARGIN LEDGER. What it answers, in the reader's own terms: "I put in
+// my income, and the map tells me, for every country, whether a route opens
+// for me and by how much." Three numbers in one order — the reader's own
+// figure, the bar, and the distance between them — reading off the
+// `reader_margin` sub-object js/reader-lens.js composes.
+//
+// EVERY NUMBER HERE ARRIVES ON THE ROW, ALREADY ROUNDED. This layer formats
+// and orders; it does not add, subtract, convert or round. The rule is that
+// the figures carried are the figures displayed, so no surface can round
+// differently from another, and the difference is the subtraction of the
+// two rounded integers, done in the composer, so the three numbers on
+// screen add up.
+// ---------------------------------------------------------------------
+
+// The figure rule: reader's chosen currency, symbol-prefixed, thousands
+// separator, no decimals, no "≈". OWN_NUMBERS_CURRENCIES is ["USD","EUR"]
+// and loadOwnNumbers() rejects anything else, so these two are the whole
+// domain — an unknown code falls back to the code itself rather than
+// guessing a symbol.
+const MARGIN_SYMBOL = { USD: "$", EUR: "€" };
+function marginMoney(amount, currency) {
+  const symbol = MARGIN_SYMBOL[currency] || (currency + " ");
+  return symbol + Math.abs(amount).toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+// Rule 2: the period is the BAR's, spelled in prose, and a capital bar has
+// none (`period: null` on the row is the whole distinction — no second
+// field says it twice).
+function marginPeriodSuffix(margin) {
+  return margin.period ? ` a ${margin.period}` : "";
+}
+// A1 rule 5: "about" hedges the BAR figure and only the bar figure, and
+// only when the row says a rate was used. The reader's own figure is never
+// round-tripped through a rate, and the difference is the exact
+// subtraction of the two integers shown — hedging either would tell the
+// reader the arithmetic in front of them might not hold.
+function marginBarFigure(margin) {
+  return (margin.converted ? "about " : "") + marginMoney(margin.bar_figure, margin.currency);
+}
+// A1 rule 3: the row's `difference` is signed; the sentence prints its
+// absolute value and lets the direction word carry the sign.
+function marginDifference(margin) {
+  return marginMoney(margin.difference, margin.currency);
+}
+
+// "THE NEAREST" IS RETIRED, and these four clauses are what replaced it.
+// Measured: Costa Rica's two income bars are both €3,500 and Thailand's six are 80,000 ×3 / 40,000 ×3, so on
+// 2 of the 5 read countries the named bar is one of several identical
+// ones and a superlative would imply a uniqueness the data lacks. These
+// four are true under a tie and true when unique, with no branch and no
+// extra field. Which one a state gets is its entry in
+// READER_MARGIN_CLOSING below.
+const READER_MARGIN_CLOSER = {
+  plain: " — no bar here is closer.",
+  partial: " — no bar the site could read here is closer.",
+  noneClears: " — no bar above your figure here is closer.",
+  noneClearsPartial: " — no bar above your figure that the site could read is closer.",
+};
+
+// The nine margin-bearing keys, and the closing sentence each one takes.
+// A state absent from this table renders NO ledger even if a margin
+// somehow reached it — the refusal states (READER_WRONG_TYPE,
+// READER_NOT_ENOUGH, UNCERTAIN_FX_UNAVAILABLE and the other refusals) are
+// absent on purpose, and the composer's own candidate table already gives
+// every one of them an empty candidate set, so the two halves agree by
+// construction rather than by anyone keeping a list in sync.
+const READER_MARGIN_CLOSING = {
+  READER_ABOVE_BAR: "over",
+  READER_ABOVE_CONDITIONAL: "over",
+  READER_AT_LINE: "atLine",
+  READER_BELOW_BAR: "plain",
+  READER_BELOW_SOME_UNREAD: "partial",
+  READER_NONE_CLEARS: "noneClears",
+  READER_NONE_CLEARS_SOME_UNREAD: "noneClearsPartial",
+};
+
+// THE SECOND REFUSAL'S STRING: a band exists but the bar cannot be
+// expressed in the reader's currency. It replaces the WHOLE ledger — the state's own
+// sentence, its band and its partial-read clause are untouched. Never a
+// placeholder, a dash or a zero: the render layer must not have a number
+// to print. Opens with a space, same convention as the partial-read clause.
+function readerMarginUnavailableClause(label) {
+  return ` By how much isn't shown here: the bar on ${label} is stated in another currency,`
+    + ` and the site has no exchange rate on file it can convert with today. It won't guess one.`;
+}
+
+// The ledger itself, in the ruled order: my number, the bar, and by how
+// much. Returns "" when there is no margin to state, which is what makes
+// every persona surface byte-identical to what shipped.
+//
+// "Your income:" / "Your capital:" is selected by `period`, not by a
+// separate field: a reader who entered BOTH an income and a capital figure
+// would not know which of their own two numbers a bare "Yours:" was
+// showing. "Capital" is the reader's own word — the box asks for it in
+// those words.
+function readerMarginLedger(state, margin) {
+  if (!margin) return "";
+  const closingKey = READER_MARGIN_CLOSING[state];
+  if (!closingKey) return "";
+  if (margin.status === "unavailable") return readerMarginUnavailableClause(margin.threshold_label);
+  const own = margin.period ? "Your income" : "Your capital";
+  const figures = ` ${own}: ${marginMoney(margin.reader_figure, margin.currency)}${marginPeriodSuffix(margin)}.`
+    + ` The bar: ${marginBarFigure(margin)}, on ${margin.threshold_label}.`;
+  let closing;
+  if (closingKey === "over") {
+    closing = `You're ${marginDifference(margin)} over.`;
+  } else if (closingKey === "atLine") {
+    // The direction rule: difference === 0 implies direction "exact",
+    // which is what makes "by $0" structurally
+    // impossible rather than avoided by wording. "under" at the line and
+    // "short" on the failing states is deliberate — at-the-line is
+    // explicitly not a no, so it must not borrow the no's word.
+    closing = margin.direction === "exact"
+      ? "The same figure."
+      : `You're ${marginDifference(margin)} ${margin.direction === "over" ? "over" : "under"}.`;
+  } else {
+    closing = `You're ${marginDifference(margin)} short${READER_MARGIN_CLOSER[closingKey]}`;
+  }
+  return `${figures} ${closing}`;
+}
+
+// The claim half of a reader state — the shipped sentence with its trailing
+// clause (if any) held back, so the ledger can go between them. For every
+// non-reader state, and for a reader state with no summary, this is just
+// the shipped string.
+function readerStateClaim(state, barKind) {
+  const variants = barKind && READER_BELOW_VARIANTS[state];
+  if (variants && barKind.kind === "mixed") return variants.mixed;
+  if (variants && barKind.kind === "capital") {
+    return barKind.phrase ? variants.capitalWithPhrase(barKind.phrase) : variants.capital;
+  }
+  if (state === "READER_ABOVE_BAR") return READER_ABOVE_BAR_CLAIM;
+  if (state === "READER_BELOW_SOME_UNREAD") return READER_BELOW_SOME_UNREAD_CLAIM;
+  if (state === "READER_NONE_CLEARS_SOME_UNREAD") return READER_NONE_CLEARS_SOME_UNREAD_CLAIM;
+  return STATE_HEADLINE[state] || state;
+}
+
+// The at-the-line reading, composed rather than tabulated: opener × tail is
+// 2 × 2 and a table of four would be four places for one word to go stale.
+// The opener carries whether the deciding bar attaches CONDITIONS (Cap's
+// fold-in), the tail carries whether the comparison was CONVERTED (the
+// conversion crossing's own reading), and the ledger goes between them —
+// which is exactly the shape the two specified sentences are written in.
+function readerAtLineHeadline(barKind, margin) {
+  const opener = barKind && barKind.conditional
+    ? READER_AT_LINE_OPENER_CONDITIONAL
+    : READER_AT_LINE_OPENER;
+  const tail = barKind && barKind.converted ? READER_AT_LINE_CONVERTED_TAIL : READER_AT_LINE_TAIL;
+  return opener + readerMarginLedger("READER_AT_LINE", margin) + tail;
+}
+
+// `{MARGIN}` for the short register, by the same three figure rules the
+// long one uses: the figure, the bar's period in prose, and "about" when a
+// rate was used — nothing else. No route name, no rate, no date, no source.
+function shortMarginText(margin) {
+  return (margin.converted ? "about " : "")
+    + marginMoney(margin.difference, margin.currency)
+    + marginPeriodSuffix(margin);
+}
+
+// A5's six short forms, written out rather than composed: three of them
+// insert the distance BEFORE a trailing clause (", with conditions",
+// ", some unread") and three append it, so a decomposition would be a
+// second mechanism buying nothing. Each is its specified line verbatim.
+const READER_SHORT_WITH_MARGIN = {
+  READER_ABOVE_BAR: (m) => `above the bar, by ${m}`,
+  READER_ABOVE_CONDITIONAL: (m) => `above the bar by ${m}, with conditions`,
+  READER_BELOW_BAR: (m) => `below the income bar, at least ${m} short`,
+  READER_BELOW_SOME_UNREAD: (m) => `below the bar on the routes that could be read, at least ${m} short, some unread`,
+  READER_NONE_CLEARS: (m) => `no route clears, at least ${m} short of the bars above your figure`,
+  READER_NONE_CLEARS_SOME_UNREAD: (m) => `no readable route clears, at least ${m} short of the bars above your figure, some unread`,
+};
+// "at least … short" rather than "short of the nearest" is A2's repair
+// carried into the short register: it is true under a tie, true when
+// unique, and in fact the stronger claim — the named bar is the smallest
+// shortfall, so every other bar is further.
+const READER_BELOW_SHORT_WITH_MARGIN = {
+  READER_BELOW_BAR: {
+    capital: (m) => `below the bar, on capital not income, at least ${m} short`,
+    mixed: (m) => `below the bar, on income and on capital, at least ${m} short`,
+  },
+};
+
+// Returns the short form WITH the distance in it, or null where there is
+// no distance to state — in which case readerStateShort() falls back to
+// the shipped string, unchanged.
+function readerShortWithMargin(state, barKind, margin) {
+  if (!margin || margin.status === "unavailable") return null;
+  if (state === "READER_AT_LINE") {
+    // The three at-the-line forms. The conditional suffix is NOT specified
+    // copy — see READER_AT_LINE_OPENER_CONDITIONAL's own note; it is here
+    // because this string is a pin's accessible name, and stating the
+    // condition in the tooltip while dropping it from the screen-reader
+    // label is exactly the asymmetry this short table exists to prevent.
+    const conditions = barKind && barKind.conditional ? ", with conditions" : "";
+    if (margin.direction === "exact") return `right at the line, exactly on the bar${conditions}`;
+    return `right at the line, ${shortMarginText(margin)} ${margin.direction === "over" ? "over" : "under"}${conditions}`;
+  }
+  const kindVariants = barKind && READER_BELOW_SHORT_WITH_MARGIN[state];
+  if (kindVariants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
+    return kindVariants[barKind.kind](shortMarginText(margin));
+  }
+  const form = READER_SHORT_WITH_MARGIN[state];
+  return form ? form(shortMarginText(margin)) : null;
+}
+
 // The one lookup every consumer uses. Kept as a function rather than a
 // seventh object key because the seventh case's key is `null`, and the
 // only way an object literal can hold it is by string coercion.
@@ -1249,26 +1525,34 @@ function composeNotEnoughSentence(causes) {
 // (fail-visible: a new engine state should look wrong on screen, not
 // silently borrow another state's sentence).
 //
-// `barKind` is the reader row's own `reader_bar_kind` summary and is
-// OPTIONAL: every existing `stateHeadline(state)` call keeps working
-// unchanged and keeps getting the all-income reading, which is the
-// sentence that shipped. Only a caller holding a reader row can select a
-// variant, and only a reader row can carry one.
-export function stateHeadline(state, barKind) {
+// `barKind` is the reader row's own `reader_bar_kind` summary and `margin`
+// its `reader_margin` sub-object. BOTH ARE OPTIONAL: every existing
+// `stateHeadline(state)` call keeps working unchanged and keeps getting
+// exactly the sentence that shipped — only a caller holding a reader row
+// can pass either, and only a reader row can carry one.
+export function stateHeadline(state, barKind, margin) {
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
-  if (state === "READER_AT_LINE" && barKind && barKind.converted) return READER_AT_LINE_CONVERTED;
+  if (state === "READER_AT_LINE") return readerAtLineHeadline(barKind, margin);
   if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughSentence(barKind);
-  const variants = barKind && READER_BELOW_VARIANTS[state];
-  if (variants && barKind.kind === "mixed") return variants.mixed;
-  if (variants && barKind.kind === "capital") {
-    return barKind.phrase ? variants.capitalWithPhrase(barKind.phrase) : variants.capital;
-  }
-  return STATE_HEADLINE[state] || state;
+  return readerStateClaim(state, barKind)
+    + readerMarginLedger(state, margin)
+    + (READER_STATE_TAIL[state] || "");
 }
 
-// Same contract for the compact form: optional second argument, identical
-// fallback, so a caller without the summary gets exactly what it got before.
-export function readerStateShort(state, barKind) {
+// Same contract for the compact form: optional extra arguments, identical
+// fallback, so a caller without them gets exactly what it got before.
+//
+// A5: the short register carries DIRECTION AND DISTANCE and no more — no
+// route name, no second and third figure. These strings are a cluster-knot
+// pin's accessible name, announced in a queue of up to twelve, and three
+// figures × twelve pins is a wall rather than a disclosure. The hedge sits
+// on the distance here, not on a bar figure, because no bar figure is on
+// screen and the distance is the only rate-derived number in the sentence
+// — an INTENTIONAL asymmetry with the long register (A1 rule 5), stated
+// here so nobody later "harmonises" it.
+export function readerStateShort(state, barKind, margin) {
+  const withMargin = readerShortWithMargin(state, barKind, margin);
+  if (withMargin) return withMargin;
   const variants = barKind && READER_BELOW_SHORT_VARIANTS[state];
   if (variants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
     return variants[barKind.kind];
@@ -2172,6 +2456,33 @@ export function verdictConfidenceBadge(tier) {
   const cls = tier === "High" ? "badge-high" : tier === "Medium" ? "badge-medium"
     : tier === "Speculative" ? "badge-speculative" : "badge-neutral";
   return `<span class="badge ${cls}" title="Sourcing confidence for the route(s) behind this verdict">${escapeHtml(label)}</span>`;
+}
+
+// THE SUPPRESSED FORM, and why it is a string rather than silence.
+// Where the confidence tier's route and the margin's named bar are
+// DIFFERENT routes, the badge is hidden. Something has to render in its
+// place, and the reason is not taste: an absent badge already has a
+// meaning on this site — verdictConfidenceBadge() above
+// returns "" for no tier, and both the location page and the map skip the
+// badge on a data_gap band precisely because "a tier badge there would
+// imply a tier exists". Silence here would make one absence mean both
+// "no tier exists" and "a tier exists and is being withheld", on surfaces
+// where the reader cannot tell which. The perspective-disclosure law names
+// this exactly: a control's promise is a claim, and so is its
+// disappearance.
+//
+// NOT the existing fallback wording "confidence not stated" three lines
+// up. The tier IS stated — it simply is not this bar's — and reusing that
+// phrase would make a third meaning share a second string.
+//
+// No new CSS: badge-neutral is the class this file already uses for a tier
+// it has no colour for.
+export const READER_CONFIDENCE_NOT_SHOWN = "confidence not shown";
+const READER_CONFIDENCE_NOT_SHOWN_REASON =
+  "The confidence tier on file is another route's, not the bar named here — so it isn't shown against this figure.";
+export function verdictConfidenceBadgeSuppressed() {
+  return `<span class="badge badge-neutral" title="${escapeHtml(READER_CONFIDENCE_NOT_SHOWN_REASON)}">`
+    + `${escapeHtml(READER_CONFIDENCE_NOT_SHOWN)}</span>`;
 }
 
 // Perspective-disclosure law applied to the two table

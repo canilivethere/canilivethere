@@ -6,7 +6,8 @@ import {
   renderFooter, getActivePersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, stateHeadline,
-  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
+  READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge, verdictConfidenceBadgeSuppressed,
+  CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
   READER_ID, hasReaderWeights, loadViewIndex, saveViewIndex, personaPossessiveLabel,
   READER_BASIS_DECLARED_LINE,
@@ -654,14 +655,24 @@ function buildVerdictHtml(store, row, persona) {
     // answers exactly what" doctrine app-shared.js's own STATE_HEADLINE
     // comment cites).
     const visual = bandVisual(row.engineVerdict.overall_band);
-    // Second argument is the reader row's own bar-kind summary, undefined
-    // on every persona row. See stateHeadline()'s own note.
-    const stateText = stateHeadline(row.engineVerdict.overall_state, row.engineVerdict.reader_bar_kind);
+    // Second and third arguments are the reader row's own bar-kind summary
+    // and its margin, both undefined on every persona row. See
+    // stateHeadline()'s own note.
+    const stateText = stateHeadline(
+      row.engineVerdict.overall_state, row.engineVerdict.reader_bar_kind, row.engineVerdict.reader_margin
+    );
     // Sourcing-confidence tier badge, same skip-on-data-gap rule as
     // location.js's own verdict block (a data-gap band already says "not
-    // enough to judge" — a tier badge there would wrongly imply one exists).
+    // enough to judge" — a tier badge there would wrongly imply one exists)
+    // — and the same margin-crossing suppression: where the tier on file is
+    // a different route from the bar the sentence names, the slot says
+    // "confidence not shown" rather than going empty, which here already
+    // means "no tier exists".
     const tierBadge = row.engineVerdict.overall_band === "data_gap"
-      ? "" : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
+      ? ""
+      : row.engineVerdict.reader_confidence_suppressed
+        ? verdictConfidenceBadgeSuppressed()
+        : verdictConfidenceBadge(row.engineVerdict.confidence_tier);
     // Provenance label, same fix as above: this is the rule-derived
     // branch — the majority case, 5 of 8 personas at every location.
     // Part 24.3 (Lists table): split pill only, no added prose paragraph

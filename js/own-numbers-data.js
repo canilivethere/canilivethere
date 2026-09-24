@@ -517,6 +517,28 @@ export function evaluateRow(row, input, fxRates) {
   }
 
   result.bucket = 1;
+  // CARRIED, not discarded — the margin work needs it. Until this line, `result.gate2` was set ONLY on the refusal path above, so on a
+  // row that actually produced a comparison the two figures bandFor()
+  // reads (`readerAmount`, `threshold`, plus `converted`/`rate`/
+  // `rateAsOf`/`rateSource`) were computed and thrown away, and the row
+  // kept nothing but the three-value band. The reader's margin needs that
+  // same pair — my number, the bar, and by how much — so the gate's own
+  // result rides the row instead of a second caller running
+  // the gates again to get it back.
+  //
+  // NOT A NEW COMPUTATION AND NOT A NEW NUMBER: this is the object gate2()
+  // already returned on this call, stored instead of dropped. bandFor()
+  // below still reads the same pair off the same object.
+  //
+  // ONE EXISTING CONSUMER STARTS WORKING BECAUSE OF THIS LINE, named here
+  // rather than left to be discovered: js/reader-lens.js's
+  // atLineConversionSummary() tests `gate2.comparable.converted`, which
+  // could never be true while gate2 was null on every successful row — so
+  // READER_AT_LINE_CONVERTED (app-shared.js) has been unreachable since
+  // the conversion crossing shipped it. It becomes reachable here. That is
+  // that string's own shipped intent, not a behaviour this build invented,
+  // but it IS a visible change and it is flagged for the gate.
+  result.gate2 = g2;
   if (result.amountChipSuppressed) return result;
   result.amountBand = bandFor(g2.comparable.readerAmount, g2.comparable.threshold);
   return result;

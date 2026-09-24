@@ -46,6 +46,11 @@ import { resolveVerdict } from "./data.js";
 import { bandVisual, indexToColor, isGapValue } from "./colors.js";
 import {
   READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarTable, ROUTE_BARS,
+  // Added by the margin crossing: the reader's own figure is normalised
+  // into the bar's period by the SAME toPeriod() Gate 2 used, and the bar
+  // is brought back into the reader's currency by the SAME convertAmount()
+  // — never a second arithmetic that could disagree with the band.
+  toPeriod, convertAmount,
 } from "./own-numbers-data.js";
 
 // ---------------------------------------------------------------------
@@ -219,6 +224,19 @@ export function readerStateForRow(result) {
   if (result.amountBand === "above") {
     return result.conditional ? S_ABOVE_CONDITIONAL : S_ABOVE;
   }
+  // AT THE LINE ON A CONDITIONAL BAR. This branch reads no
+  // `result.conditional` and must not start: there is no
+  // READER_AT_LINE_CONDITIONAL token, and inventing one would add a state,
+  // a band entry, a legend row and a short form to a crossing that is
+  // about a figure. Returning S_ABOVE_CONDITIONAL instead would be worse
+  // than the defect — it says "above the bar" about a row that is not.
+  //
+  // So the condition is carried the way every other per-state detail on
+  // this row is carried, through atLineConversionSummary() below onto
+  // `reader_bar_kind`, and app-shared.js's readerAtLineHeadline() swaps
+  // the OPENER. Same token, same band, same legend row; only the text
+  // varies. Reachable on three real rows: Thailand's three LTR
+  // reduced-bar routes (USD 40,000/year), whose `unit` carries CONDITIONAL.
   if (result.amountBand === "at") return S_AT_LINE;
   if (result.amountBand === "below") return S_BELOW;
   // Added by the conversion crossing: a currency mismatch that COULD have been converted
@@ -333,11 +351,39 @@ export function belowBarKindSummary(entries) {
 // exactly the routes the sentence is about. Returns null (the plain,
 // unchanged sentence renders) unless at least one at-the-line route's
 // deciding comparison was actually converted.
-export function atLineConversionSummary(entries) {
+// WIDENED BY THE MARGIN WORK, in two ways, both of them consequences
+// of the sentence now NAMING a route:
+//
+//   1. It reports `conditional` as well as `converted` — see
+//      readerStateForRow()'s own note for why the condition rides here
+//      rather than becoming a state.
+//   2. Both facts are read off the DECIDING entry where there is one,
+//      instead of off "any at-the-line route". That distinction did not
+//      exist while the sentence named no route; now that it says "this
+//      route's bar was converted" beside a named bar, an any-route reading
+//      would attach one route's property to another route's name.
+//      `deciding` is decidingEntry()'s answer — the one selector, passed
+//      in rather than recomputed, so there is no second call and no second
+//      rule.
+//
+// Falls back to the any-route reading when no deciding entry is given, so
+// the function stays total for a caller that holds only entries.
+export function atLineConversionSummary(entries, deciding) {
   const atLine = entries.filter((e) => e.state === S_AT_LINE);
   if (!atLine.length) return null;
-  const anyConverted = atLine.some((e) => e.result.gate2 && e.result.gate2.comparable && e.result.gate2.comparable.converted);
-  return anyConverted ? { converted: true } : null;
+  const read = (e) => ({
+    converted: !!(e.result.gate2 && e.result.gate2.comparable && e.result.gate2.comparable.converted),
+    conditional: !!e.result.conditional,
+  });
+  const summary = deciding && deciding.state === S_AT_LINE
+    ? read(deciding)
+    : {
+      converted: atLine.some((e) => read(e).converted),
+      conditional: atLine.some((e) => read(e).conditional),
+    };
+  // Null where there is nothing to vary, so the plain shipped sentence
+  // renders through the same no-summary path it always did.
+  return (summary.converted || summary.conditional) ? summary : null;
 }
 
 // Added by the conversion crossing. WHICH GATE(S) actually
@@ -405,20 +451,189 @@ function decidingTier(entries, countryState) {
   // composer used — never a `data_gap` route, which ranks last and can
   // only win when every route is data_gap, in which case `sameBand`
   // already matched it.
+  return decidingTierEntry(entries, countryState).row.confidence || null;
+}
+
+// The SAME selection, extracted so the badge-suppression check can compare
+// the tier's route against the margin's route without a second copy of
+// this chain drifting from the first. Byte-for-byte the expression
+// decidingTier() held a moment ago — no clause reordered, nothing added.
+//
+// DELIBERATELY NOT UNIFIED WITH decidingEntry() BELOW. Unifying the two is
+// the better end state and it is held for a pass of its own: it moves a
+// shipped, reader-visible field, and folding that into a feature diff is
+// how it ships unseen.
+function decidingTierEntry(entries, countryState) {
   const exact = entries.find((e) => e.state === countryState);
   const sameBand = entries.find((e) => STATE_BAND[e.state] === STATE_BAND[countryState]);
   const deciding = entries.reduce(
     (lo, e) => (BAND_RANK[STATE_BAND[e.state]] < BAND_RANK[STATE_BAND[lo.state]] ? e : lo),
     entries[0]
   );
-  const row = (exact || sameBand || deciding).row;
-  return row.confidence || null;
+  return exact || sameBand || deciding;
+}
+
+// ---------------------------------------------------------------------
+// THE MARGIN — the deciding route, and the figures the reader sees.
+// ---------------------------------------------------------------------
+
+// Exactly the routes the country's own sentence is about, by composed
+// state. The below-family's three composed states all summarise over the
+// READ-AND-BELOW routes, which is what makes "no bar above your figure here
+// is closer" literally true on a none-clears country: the wrong-type
+// refusals produced no figure and are not candidates. A state absent from
+// this table has an empty candidate set and therefore no margin — which is
+// every one of the refusal states, reached mechanically rather than by a
+// second list anyone has to keep in sync.
+const MARGIN_CANDIDATE_STATE = {
+  [S_ABOVE]: S_ABOVE,
+  [S_ABOVE_CONDITIONAL]: S_ABOVE_CONDITIONAL,
+  [S_AT_LINE]: S_AT_LINE,
+  [S_BELOW]: S_BELOW,
+  [S_BELOW_SOME_UNREAD]: S_BELOW,
+  [S_NONE_CLEARS]: S_BELOW,
+  [S_NONE_CLEARS_SOME_UNREAD]: S_BELOW,
+};
+
+// THE ONE SELECTOR FOR THE MARGIN, named once — nothing else anywhere may
+// pick the margin's route. Three clauses in order: the candidate set above;
+// the smallest RELATIVE distance from the bar; ties broken by data order.
+//
+// WHY RELATIVE AND NOT ABSOLUTE MONEY, measured: within one country every income bar shares one currency
+// and one period, so the reader's amount is constant across income
+// candidates and the two rankings give the identical answer — nothing is
+// lost. Across INSTRUMENTS they diverge and only relative is sound:
+// Guatemala carries a USD 100,000 capital bar beside two USD/month income
+// bars, and "$400 a month short" versus "$100,000 short" has no absolute
+// ordering at all.
+//
+// TIES ARE THE COMMON CASE, NOT AN EDGE CASE, which is why the tiebreak is
+// named rather than left to the sort: Costa Rica's two income bars are
+// both €3,500, and Thailand's six are 80,000 ×3 and 40,000 ×3. The strict
+// `<` below is the tiebreak — the first candidate in data order wins and a
+// later equal never displaces it.
+//
+// Empty candidate set → null → `reader_margin: null` → no clause renders.
+export function decidingEntry(entries, countryState) {
+  const want = MARGIN_CANDIDATE_STATE[countryState];
+  if (!want) return null;
+  const candidates = entries.filter(
+    (e) => e.state === want && e.result.gate2 && e.result.gate2.comparable
+  );
+  if (!candidates.length) return null;
+  let best = null;
+  let bestDistance = Infinity;
+  for (const e of candidates) {
+    const c = e.result.gate2.comparable;
+    const distance = Math.abs(c.readerAmount - c.threshold) / c.threshold;
+    if (distance < bestDistance) {
+      best = e;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+// The margin's ten-key sub-object, composed once per country row.
+//
+// THE READER'S FIGURE IS NEVER ROUND-TRIPPED THROUGH A RATE.
+// `gate2.comparable.readerAmount` is the reader's figure converted INTO
+// the bar's currency; converting it back would show a reader their own
+// typed number distorted by two rate hops. So the reader's figure is
+// re-read from the input and only normalised into the bar's PERIOD, by the
+// same toPeriod() Gate 2 used.
+//
+// THE BAR IS THE ONE AND ONLY CONVERSION THIS FUNCTION PERFORMS, and
+// `status: "unavailable"` is exactly the case where it returns null.
+// Nothing else sets that status.
+function composeReaderMargin(entries, countryState, input, fxRates) {
+  const chosen = decidingEntry(entries, countryState);
+  if (!chosen) return null;
+  const bar = ROUTE_BARS[chosen.row.route_key];
+  const converted = !!chosen.result.gate2.comparable.converted;
+
+  // Fixed key order, kept so a diff of two rows lines up.
+  const margin = {
+    status: "ok",
+    route_key: chosen.row.route_key,
+    threshold_label: chosen.row.threshold_label,
+    direction: null,
+    reader_figure: null,
+    bar_figure: null,
+    difference: null,
+    currency: input.currency,
+    period: bar.period,
+    converted,
+  };
+
+  const rawReader = bar.kind === "capital"
+    ? (input.property_capital ? input.property_capital.amount : null)
+    : toPeriod(input.amount, input.period, bar.period);
+
+  let rawBar = chosen.row.value_num_low;
+  if (input.currency !== bar.currency) {
+    const back = convertAmount(fxRates, chosen.row.value_num_low, bar.currency, input.currency);
+    if (!back) {
+      // The second refusal: a band exists and the amount cannot be
+      // expressed in the reader's currency. Every figure null — never a
+      // zero and never a placeholder, so the render layer cannot have a
+      // number to print. Period goes null with them: with no figures there
+      // is nothing for a period to qualify.
+      return { ...margin, status: "unavailable", period: null, converted: true };
+    }
+    rawBar = back.amount;
+  }
+  if (!Number.isFinite(rawReader) || !Number.isFinite(rawBar)) {
+    return { ...margin, status: "unavailable", period: null, converted: true };
+  }
+
+  // The three arithmetic rules, all three in these four lines:
+  // (a) the figures carried ARE the figures displayed — rounded here,
+  //     once, so no surface can round differently from another;
+  // (b) the difference is the subtraction of the two ROUNDED integers, so
+  //     a reader who subtracts what is on screen gets what is on screen;
+  // (c) direction derives from those same integers, which is what makes
+  //     "by $0" structurally impossible rather than avoided by wording.
+  const readerFigure = Math.round(rawReader);
+  const barFigure = Math.round(rawBar);
+  const difference = readerFigure - barFigure;
+  margin.reader_figure = readerFigure;
+  margin.bar_figure = barFigure;
+  margin.difference = difference;
+  margin.direction = difference > 0 ? "over" : difference < 0 ? "under" : "exact";
+  return margin;
 }
 
 // Build the reader's verdict rows: one per country in the read set, in
-// the engine's own row shape — the same thirteen keys every row in
-// derived/verdicts.jsonl carries, no more and no fewer, so every consumer
-// sees only fields it already knows.
+// the engine's own row shape.
+//
+// THE ROW'S CONTRACT, restated because the sentence that stood here was
+// FALSE, not merely tight. It claimed "the same thirteen keys every row in
+// derived/verdicts.jsonl carries, no more and no fewer". Measured: that
+// file carries 13 keys, on one single key set across all 472 rows — and the
+// literal below already pushed 14, and had since the conversion work added
+// `reader_bar_kind`. A rule with a silent exception is not a rule, so it is
+// replaced rather than excepted:
+//
+//   The reader's row carries EVERY key derived/verdicts.jsonl carries,
+//   with the same name, the same type and the same meaning — so every
+//   existing consumer sees only fields it already knows. It may carry
+//   ADDITIONAL keys, and every additional key is prefixed `reader_`.
+//   Nothing iterates this row's keys, so an unprefixed consumer never
+//   meets one.
+//
+// The middle clause is what the old rule was actually protecting and it
+// survives intact. The "no more and no fewer" half was protecting nothing:
+// it is safe precisely BECAUSE no consumer iterates or spreads a verdict
+// row's keys — grepped across js/ for Object.keys()/Object.entries() on a
+// verdict, `...verdict`, `...engineVerdict`, `...readerVerdict` and
+// `for (const k in`: zero matches. If that ever stops being true, this
+// rule is the thing to re-open.
+//
+// Two things the superset does NOT license: never a key that shadows an
+// engine key with a different meaning (the prefix exists for that), and
+// nothing here reaches derived/verdicts.jsonl — this row is composed in
+// the browser and exported nowhere, which is why `generated_at` is null.
 //
 // Countries OUTSIDE the read set get NO ROW, deliberately — the rule that
 // an unread country carries no verdict, executed by absence rather than
@@ -464,13 +679,43 @@ export function buildReaderVerdictRows(store, input) {
     // READER_NOT_ENOUGH (which of the three causes are actually present,
     // composed per country since S_NOT_ENOUGH only ever names a country
     // where EVERY route landed it).
+    //
+    // Widened again by the margin crossing: the at-the-line summary is now
+    // read off the DECIDING entry, because the sentence beside it names
+    // that route. One decidingEntry() call, its answer passed to both
+    // consumers — never two calls that could disagree.
+    const deciding = decidingEntry(entries, overallState);
     const readerBarKind = (overallState === S_BELOW || overallState === S_BELOW_SOME_UNREAD)
       ? belowBarKindSummary(entries)
       : overallState === S_AT_LINE
-        ? atLineConversionSummary(entries)
+        ? atLineConversionSummary(entries, deciding)
         : overallState === S_NOT_ENOUGH
           ? notEnoughCauseSummary(entries)
           : null;
+    const readerMargin = composeReaderMargin(entries, overallState, input, store.fxRates);
+    // THE BADGE AND THE NAMED BAR CAN BE DIFFERENT ROUTES, and where they
+    // differ the badge is HIDDEN. Until the margin landed, the headline
+    // named no route, so the badge beside it implied nothing in
+    // particular; the moment the sentence
+    // says "on D7 Visa income threshold", a tier sitting next to it reads
+    // as THAT bar's. decidingTier() takes the first entry in data order
+    // whose state matches; decidingEntry() takes the nearest bar. On the
+    // tied countries, and wherever the nearest below bar is not the first
+    // below bar, those are different rows.
+    //
+    // Computed here, once, because neither render site can see a route key
+    // — they hold a verdict row. Carried as its own top-level
+    // `reader_`-prefixed key rather than as an eleventh key inside
+    // `reader_margin`, whose ten keys are specified verbatim and not this
+    // build's to widen; the superset rule above licenses exactly this.
+    //
+    // Only ever true where a tier would otherwise have RENDERED: with no
+    // tier on file the badge is already absent and already means "no tier
+    // exists", which is the correct thing for it to mean.
+    const tierRow = decidingTierEntry(entries, overallState).row;
+    const readerConfidenceSuppressed = !!(
+      tierRow.confidence && readerMargin && tierRow.route_key !== readerMargin.route_key
+    );
     rows.push({
       persona_id: READER_ID,
       location_id: null,
@@ -487,6 +732,20 @@ export function buildReaderVerdictRows(store, input) {
       // { hasA, hasB, hasC } for S_NOT_ENOUGH. Null on every row whose
       // state carries no summary — most of them, by construction.
       reader_bar_kind: readerBarKind,
+      // THE MARGIN — my number, the bar, and by how much. One sub-object,
+      // ten keys — not five top-level fields (js/map.js copies reader fields onto pinEntries one scalar
+      // at a time, and ten of those is ten chances to forget one), not
+      // inside `routes_detail` (a JSON string by design), not a fourth
+      // shape behind `reader_bar_kind`'s one name. Null where no margin
+      // applies at all; `status: "unavailable"` where one applies and
+      // could not be expressed. Per COUNTRY, naming the route it came
+      // from — per-route reader margins are outcome 3 and are not built
+      // here; the socket for them is routes_detail's `reader_reading`.
+      reader_margin: readerMargin,
+      // See the long note above the row: the tier on file is another
+      // route's, so the badge is suppressed and the surfaces say so rather
+      // than going silent (an absent badge already means "no tier exists").
+      reader_confidence_suppressed: readerConfidenceSuppressed,
       companion_disclosure: null,
       cadence: null,
       cadence_burden: null,

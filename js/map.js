@@ -10,7 +10,7 @@ import {
   loadViewIndex, saveViewIndex, wireCornerLensInPlace,
   READER_BASIS_DECLARED_LINE,
   READER_STATE_SHORT, readerStateShort, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
-  READER_LABEL_READ_PREFIX,
+  READER_LABEL_READ_PREFIX, READER_CONFIDENCE_NOT_SHOWN,
 } from "./app-shared.js";
 import {
   applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readerPinPaint,
@@ -21,8 +21,20 @@ import {
 // the hover tooltip specifically (showTip() sets .textContent, which
 // cannot carry a styled <span>). Same skip rules: no tier, or a data-gap
 // band (already says "not enough to judge"), renders nothing.
-function verdictConfidenceSuffix(tier, overallBand) {
+//
+// `suppressed` is the margin crossing's third state: a tier exists, and it
+// belongs to a different route from the bar the sentence beside it just
+// named, so it is hidden. It renders the same three words the badge slot
+// renders on the other two surfaces rather than nothing, for the reason
+// that holds there too — on this surface an empty suffix already means
+// "no tier exists" (the line above), and one absence cannot carry both
+// meanings. The badge's reason clause has no home here: showTip() sets
+// .textContent, so there is no title attribute to hang it on. That is the
+// honest minimum — it distinguishes withheld from absent, which silence
+// does not.
+function verdictConfidenceSuffix(tier, overallBand, suppressed) {
   if (!tier || overallBand === "data_gap") return "";
+  if (suppressed) return ` — ${READER_CONFIDENCE_NOT_SHOWN}`;
   return ` — ${CONF_LABEL[tier] || tier}`;
 }
 import { WORLD_VIEWBOX, COUNTRY_PATHS, PROJECTION } from "./worldmap-data.js";
@@ -1037,6 +1049,11 @@ function renderMap(store, lenses) {
     let verdictState = null;
     let verdictKind = null;
     let readerBarKind = null;
+    // One object, not ten scalars — the reason this shape was chosen over
+    // ten top-level fields is exactly this plumbing path: ten fields would
+    // be ten new lines here and ten chances to forget one,
+    // which is how a pin label ends up with a currency and no period.
+    let readerMargin = null;
     // Part 30.8 (score-driven pin draw order): set
     // alongside `fill` in every branch below. `isRampColored` is true only
     // when the FINAL rendered fill is a scoreToColor()/indexToColor() call
@@ -1262,6 +1279,11 @@ function renderMap(store, lenses) {
       // The bar-kind summary rides with the state so the PIN's accessible
       // name can carry the same correction the tooltip sentence does.
       readerBarKind = paint.verdict ? paint.verdict.reader_bar_kind : null;
+      // Same line, same reason, for the margin: the PIN's accessible name
+      // carries the distance the tooltip sentence carries, so a
+      // screen-reader reader inside a cluster knot is not the only reader
+      // told only the direction.
+      readerMargin = paint.verdict ? paint.verdict.reader_margin : null;
       // THE TOOLTIP BRANCHES ON `read`, NOT ON "REACHED AN ANSWER" — the
       // overlay reaching the words as well as the paint. Under it a
       // data_gap read carries a MARK (in the gap colour), so it is a pin
@@ -1272,7 +1294,12 @@ function renderMap(store, lenses) {
       // carry an unplaced-copy placeholder: it needed one only while the
       // pin was silent about the read, and it is not anymore.
       if (paint.read) {
-        const stateText = stateHeadline(readerVerdict.overall_state, readerVerdict.reader_bar_kind);
+        // Third argument is the row's own `reader_margin` — the FIRST of
+        // the three surfaces Cap named for "my number, the bar, and by how
+        // much", in the state's own sentence rather than a line of its own.
+        const stateText = stateHeadline(
+          readerVerdict.overall_state, readerVerdict.reader_bar_kind, readerVerdict.reader_margin
+        );
         // The same no-bare-no instead-line every other verdict branch in
         // this file carries — now on `bandEliminated`, because the pin's
         // own `eliminated` is false on every reader pin by construction
@@ -1282,7 +1309,10 @@ function renderMap(store, lenses) {
         const insteadLine = paint.bandEliminated
           ? `\nVisiting short-term is a separate question — open this place's page for the short-stay rules.`
           : "";
-        const confSuffix = verdictConfidenceSuffix(readerVerdict.confidence_tier, readerVerdict.overall_band);
+        const confSuffix = verdictConfidenceSuffix(
+          readerVerdict.confidence_tier, readerVerdict.overall_band,
+          readerVerdict.reader_confidence_suppressed
+        );
         // The SECOND of the three surfaces this sentence is specified
         // for: its own line after the headline line. The doubt against it
         // is recorded rather than quietly resolved — this makes a compact
@@ -1389,7 +1419,7 @@ function renderMap(store, lenses) {
     const redFlagCount = (store.factsByLocation.get(loc.location_id) || [])
       .filter((f) => sectionForFact(f) === "redflags" && f.value_raw !== "[GAP]").length;
 
-    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState, readerBarKind, verdictState, verdictKind });
+    pinEntries.push({ loc, country, cx, cy, fill, tooltip, eliminated, gap, faded, redFlagCount, handChecked, isRampColored, rampValue, rampKind, markBand, readerState, readerBarKind, readerMargin, verdictState, verdictKind });
   }
 
   const wrap = document.createElement("div");
@@ -1652,7 +1682,7 @@ function renderMap(store, lenses) {
   // country. READER_STATE_SHORT is asserted against STATE_HEADLINE's
   // reader keys at module load (app-shared.js), so a lookup that comes
   // back undefined here is impossible rather than merely unlikely.
-  const readerShort = (entry) => (entry.readerState ? readerStateShort(entry.readerState, entry.readerBarKind) : null);
+  const readerShort = (entry) => (entry.readerState ? readerStateShort(entry.readerState, entry.readerBarKind, entry.readerMargin) : null);
   // Both forms of the pin label.
   function soloAriaLabel(entry) {
     const base = `${entry.loc.display_name}, ${entry.country.name}`;

@@ -45,7 +45,7 @@
 //      reader is asked for anything.
 
 import { escapeHtml } from "./app-shared.js";
-import { assertRouteBarTable, convertAmount } from "./own-numbers-data.js";
+import { assertRouteBarTable, convertAmount, countRoutesWithNoTypeRecord } from "./own-numbers-data.js";
 
 // ---------------------------------------------------------------------
 // Copy table. The wording is the spec's, not this file's: none of these
@@ -138,11 +138,36 @@ const FIELD_C_OPTIONS = [
   { value: "local_active", label: "Work or a business inside the country" },
   { value: "unspecified", label: "A mix, or I'd rather not say" },
 ];
-// The fourth option's own inline note, rendered the moment it is
-// selected: placeholder-honesty for a near-empty dimension, at the point
-// of the ask rather than after the answer.
-const LOCAL_ACTIVE_NOTE =
-  "Only one of the routes this box reads has recorded how income earned inside the country is treated. The rest below show what they do say, and say nothing about this.";
+// The income-type gap note, rendered at the point of the ask the moment
+// a kind is selected that at least one route the box reads has no record
+// of. The wording is the spec's, not this file's: verbatim, and not to
+// be edited here.
+//
+// SUPERSEDES a local-active-only note that had gone FALSE ON SCREEN.
+// The sentence quoted next is that FALSE text, reproduced only so it can
+// be recognised and never restored: it is bound to no constant, no code
+// path can select it, and nothing renders it.
+//   FALSE, RETIRED: "Only one of the routes this box reads has recorded
+//   how income earned inside the country is treated. The rest below show
+//   what they do say, and say nothing about this."
+// Three defects, and the repair answers all three rather than rewording
+// around them:
+//   1. It hard-coded a count with no truth condition, so the data
+//      outgrew it silently — three routes carry a local-active record by
+//      the time it was caught, not one.
+//   2. "The rest below" pointed at a per-route list that renders
+//      NOWHERE (js/reader-lens.js's routes_detail: "NOTHING RENDERS THIS
+//      TODAY"). No pointer is reintroduced here; one may be added the
+//      day a per-route surface exists, and not before.
+//   3. The same silence is owed on all four kinds, not just this one.
+//
+// NO QUANTIFIER, deliberately: "most" was drafted and rejected upstream
+// because it is false for passive once the coarse `accepts_passive_income`
+// rows count as records — a word false on a quarter of the grid is the
+// same defect as the number it would replace.
+const INCOME_TYPE_GAP_NOTE =
+  "Not every route this box reads has recorded how this kind of income is treated. "
+  + "Each one says what it does record, or says it isn't on file yet — and a gap is not a no.";
 
 // Field D — property capital, optional and collapsed by default.
 const FIELD_D_CHECKBOX = "I also have capital I could put into property";
@@ -268,6 +293,16 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   // exercise (both currencies left in CURRENCY_OPTIONS), so that's the
   // one pair checked here.
   const fxAvailable = convertAmount(store.fxRates, 1, "EUR", "USD") !== null;
+
+  // Also computed once per render, not per keystroke: for each kind the
+  // reader can pick, whether ANY route the box reads has no record of it.
+  // Read off the engine's own gate 1 (countRoutesWithNoTypeRecord), so
+  // the note and the answers it precedes cannot disagree about what "no
+  // record" means. The count itself is never rendered and must not be.
+  const typeGapByType = {};
+  for (const opt of FIELD_C_OPTIONS) {
+    typeGapByType[opt.value] = countRoutesWithNoTypeRecord(allRoutes, opt.value) > 0;
+  }
   const currencyNoteText = fxAvailable
     ? OWN_CURRENCY_NOTE_BASE
     : `${OWN_CURRENCY_NOTE_BASE} ${OWN_CURRENCY_NOTE_FX_DOWN}`;
@@ -301,7 +336,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
       <fieldset class="door-question own-field">
         <legend>${escapeHtml(FIELD_C_LABEL)}</legend>
         <div class="priority-choices own-choices-column">${radioGroupHtml("own-type", FIELD_C_OPTIONS, saved && saved.income_type)}</div>
-        <p class="own-field-note" id="own-local-note" hidden>${escapeHtml(LOCAL_ACTIVE_NOTE)}</p>
+        <p class="own-field-note" id="own-type-gap-note" hidden>${escapeHtml(INCOME_TYPE_GAP_NOTE)}</p>
       </fieldset>
 
       <div class="own-field">
@@ -330,7 +365,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   const propToggle = container.querySelector("#own-property-toggle");
   const propGroup = container.querySelector("#own-property-group");
   const propAmount = container.querySelector("#own-property-amount");
-  const localNote = container.querySelector("#own-local-note");
+  const typeGapNote = container.querySelector("#own-type-gap-note");
   const propertyNote = container.querySelector("#own-property-note");
 
   // Readers type "2,400" and "2 400". Stripping separators at PARSE time
@@ -358,7 +393,13 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
 
   const sync = () => {
     const propertyIncomplete = propToggle.checked && !parseAmount(propAmount);
-    localNote.hidden = checkedValue("own-type") !== "local_active";
+    // THE NOTE'S TRUTH CONDITION, not a hard-coded option. It renders
+    // while at least one route the box reads has no record of the kind
+    // selected, and the day a kind reaches full coverage it stops
+    // rendering instead of going stale — which is exactly how the string
+    // it replaces became false.
+    const selectedType = checkedValue("own-type");
+    typeGapNote.hidden = !(selectedType && typeGapByType[selectedType]);
     // The currency note is no longer selection-dependent (§5a of the
     // conversion crossing's wording deck): it is the box's own promise,
     // set once above at render time. Nothing here toggles it any more.

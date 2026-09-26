@@ -344,6 +344,44 @@ export function belowBarKindSummary(entries) {
   return { kind, phrase: phrases.size === 1 ? [...phrases][0] : null };
 }
 
+// WHETHER A ROUTE THE SITE COULD NOT READ ACTUALLY TAKES THE READER'S
+// KIND OF INCOME — the one fact the composed wrong-type sentence needs
+// and never had, found the same way belowBarKindSummary() above finds
+// its own, and for the same reason: composeCountryState() takes state
+// tokens and nothing else, and both populations hand it the identical
+// multiset (READER_WRONG_TYPE plus READER_NOT_ENOUGH), so no wording can
+// reach this.
+//
+// THE COLLAPSE UNDERNEATH IT. READER_NOT_ENOUGH carries two different
+// facts: "this route takes your kind of income, its bar could not be
+// read" (failed at gate 2, on barKind) and "nothing on file about
+// whether this route takes your kind" (gate 1, typeState "absent").
+// `result.typeState` tells them apart and is computed on every row — it
+// is simply discarded at the composer's door. This function is that
+// fact, summarised over exactly the routes the sentence is about.
+//
+// Measured against the real engine over the 1,350-cell grid, re-run by
+// this build: 126 cells reach READER_WRONG_TYPE_SOME_UNREAD; 54 of them
+// — every TH remote-active cell, at every amount, both currencies, with
+// capital and without — have an unread route that DOES take the reader's
+// income kind, and were being told nothing here does.
+//
+// "partial" MUST NOT COUNT, and that is a decided boundary, not an
+// inference left to the next reader: `supplementary_only` reads "Counts
+// this kind of income, but not on its own", which is not "takes this
+// kind of income". Folding it in would make the first sentence of the
+// string this selects false.
+//
+// Returns null on every other shape — so the honest population carries
+// no summary and renders the shipped sentence byte-identically — or
+// { acceptingUnread: true }.
+export function wrongTypeUnreadSummary(entries) {
+  const acceptingUnread = entries.some((e) =>
+    STATE_BAND[e.state] === "data_gap"
+    && (e.result.typeState === "ok" || e.result.typeState === "coarse_yes"));
+  return acceptingUnread ? { acceptingUnread: true } : null;
+}
+
 // Added by the conversion crossing. WHETHER THE "AT THE LINE"
 // READING WAS A CONVERTED COMPARISON — the one fact
 // app-shared.js's READER_AT_LINE variant sentence needs, found the same
@@ -717,7 +755,13 @@ export function buildReaderVerdictRows(store, input) {
         ? atLineConversionSummary(entries, deciding)
         : overallState === S_NOT_ENOUGH
           ? notEnoughCauseSummary(entries)
-          : null;
+          // Widened again by the wrong-type split: a fourth shape on the
+          // same field, same mechanism, same rule — { acceptingUnread }
+          // where an unread route takes the reader's income kind, null
+          // where none does (and the shipped sentence renders unchanged).
+          : overallState === S_WRONG_TYPE_SOME_UNREAD
+            ? wrongTypeUnreadSummary(entries)
+            : null;
     const readerMargin = composeReaderMargin(deciding, input, store.fxRates);
     // THE BADGE AND THE NAMED BAR ARE NOW THE SAME ROUTE, by construction:
     // `deciding` above is the entry the margin names, and the tier below is
@@ -748,8 +792,12 @@ export function buildReaderVerdictRows(store, input) {
       // existing token renders. Despite the name, carries three different
       // shapes now, one per state that needs one: { kind, phrase } for
       // S_BELOW/S_BELOW_SOME_UNREAD, { converted } for S_AT_LINE,
-      // { hasA, hasB, hasC } for S_NOT_ENOUGH. Null on every row whose
-      // state carries no summary — most of them, by construction.
+      // { hasA, hasB, hasC } for S_NOT_ENOUGH, { acceptingUnread } for
+      // S_WRONG_TYPE_SOME_UNREAD. Null on every row whose state carries
+      // no summary — most of them, by construction. FOUR shapes behind
+      // one name is now the honest count and the name has drifted off
+      // what it holds; renaming the field is a schema change and is
+      // deliberately not taken here, inside a copy repair.
       reader_bar_kind: readerBarKind,
       // THE MARGIN — my number, the bar, and by how much. One sub-object,
       // ten keys — not five top-level fields (js/map.js copies reader fields onto pinEntries one scalar

@@ -940,6 +940,34 @@ export const SCALE_ANCHOR_STRING =
 const READER_PARTIAL_READ_CLAUSE =
   " Some routes here couldn't be read against your figures at all, so this is a no on what was read — not on everything.";
 
+// THE SPLIT-OFF POPULATION OF READER_WRONG_TYPE_SOME_UNREAD — same state
+// token, same band, a different CLAIM. Rendered only where at least one
+// route that could NOT be read does take the reader's kind of income
+// (js/reader-lens.js's wrongTypeUnreadSummary()). The wording is the
+// spec's, not this file's: taken verbatim, and not to be edited here.
+//
+// A CONSTANT AND NOT A STATE_HEADLINE KEY, deliberately: it is a text
+// selected behind an existing token, exactly as READER_BELOW_VARIANTS and
+// READER_AT_LINE_OPENER_CONDITIONAL are, so it must not appear in the
+// table whose keys ARE the vocabulary (and whose READER_ keys the short
+// -form assertion cross-checks).
+//
+// READER_PARTIAL_READ_CLAUSE MUST NOT APPEND TO IT, and the reason is
+// not style: in the honest population the clause is the thing that makes
+// the headline's "could read" qualifier land, while here it would be an
+// anaesthetic — "a no on what was read, not on everything" invites the
+// reader to treat the unread remainder as unknown, when the site knows
+// those unread routes accept exactly the income they entered. Both of
+// the clause's halves are already carried, more specifically, by the two
+// sentences here.
+const READER_WRONG_TYPE_ACCEPTING_UNREAD =
+  "Routes here do take this kind of income — none of those could be read against your figures. "
+  + "Where a route here could be read, it rules this kind out.";
+// Its short-register twin (the spec's own short form, verbatim), for
+// the cluster-knot pin's accessible name.
+const READER_WRONG_TYPE_ACCEPTING_UNREAD_SHORT =
+  "routes here take this kind of income, none of them readable";
+
 // THE CLAIM HALVES OF THE TWO PARTIAL-READ STATES THAT CARRY A MARGIN,
 // split out by the margin work and NOT reworded: the shipped strings below
 // are still literally `claim + clause`, so nothing a caller sees moves by a
@@ -1124,6 +1152,15 @@ export const STATE_HEADLINE = {
   // the capital and mixed readings are in READER_BELOW_VARIANTS below.
   READER_BELOW_SOME_UNREAD:
     READER_BELOW_SOME_UNREAD_CLAIM + READER_PARTIAL_READ_CLAUSE,
+  // BYTE-FOR-BYTE UNCHANGED, and that is a ruling rather than an
+  // omission. Measured over the 1,350-cell reader grid this
+  // sentence is TRUE on 72 of the 126 cells that reach this state (GT and
+  // CR, local-active) and FALSE on the other 54 (TH remote-active, 100%
+  // of its cells) — and what separates the two populations is not a word
+  // in the sentence but a fact the composer never receives. The false
+  // population is split off by SELECTOR, in stateHeadline() below, onto
+  // READER_WRONG_TYPE_ACCEPTING_UNREAD above. Rewriting a sentence that
+  // is true everywhere it still fires would not be a repair.
   READER_WRONG_TYPE_SOME_UNREAD:
     "Not this kind of income — no route here the site could read takes it as the qualifying kind." + READER_PARTIAL_READ_CLAUSE,
   // "on income" DELETED from this lead too, same reason as READER_NONE_CLEARS.
@@ -1534,6 +1571,24 @@ export function stateHeadline(state, barKind, margin) {
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
   if (state === "READER_AT_LINE") return readerAtLineHeadline(barKind, margin);
   if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughSentence(barKind);
+  // THE ONE STATE WHOSE TEXT TURNS ON A FACT ABOUT THE ROUTES IT DID NOT
+  // READ. Same token, same band, same legend row, no registry churn — the
+  // governing precedent is belowBarKindSummary() in js/reader-lens.js,
+  // whose own note states the boundary as a ruling ("NO NEW STATE TOKEN
+  // … Only the TEXT behind an existing token varies, selected by this
+  // summary"), and which likewise varies WHAT THE SENTENCE CLAIMS — which
+  // instrument the reader was measured against — not merely how it is
+  // phrased. The objection to this cheaper route was raised in the spec
+  // and weighed, not overlooked: two different claims behind one token,
+  // where readerAtLineHeadline() is only two phrasings of one claim.
+  // belowBarKindSummary() answers it, because "below the income bar" and
+  // "below a capital bar" are two claims too and that was ruled the right
+  // shape. NOTE THE ASYMMETRY, so nobody
+  // "harmonises" it later: the clause is appended to one of these two
+  // sentences and never to the other (see the constant's own note).
+  if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
+    return READER_WRONG_TYPE_ACCEPTING_UNREAD;
+  }
   return readerStateClaim(state, barKind)
     + readerMarginLedger(state, margin)
     + (READER_STATE_TAIL[state] || "");
@@ -1553,6 +1608,12 @@ export function stateHeadline(state, barKind, margin) {
 export function readerStateShort(state, barKind, margin) {
   const withMargin = readerShortWithMargin(state, barKind, margin);
   if (withMargin) return withMargin;
+  // Same split as stateHeadline()'s: a pin whose tooltip says the unread
+  // routes take this income must not have an accessible name saying
+  // nothing here does.
+  if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
+    return READER_WRONG_TYPE_ACCEPTING_UNREAD_SHORT;
+  }
   const variants = barKind && READER_BELOW_SHORT_VARIANTS[state];
   if (variants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
     return variants[barKind.kind];

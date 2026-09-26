@@ -386,6 +386,29 @@ function gate1(row, input) {
   return { typeState: "absent" };
 }
 
+// DOES THIS ROUTE CARRY NO RECORD AT ALL OF THE READER'S INCOME KIND?
+// The truth condition for the income-type gap note in js/own-numbers.js,
+// and it ASKS GATE 1 rather than re-reading the fields, so "no record"
+// on screen and "no record" in the engine cannot drift apart. The coarse
+// passive fallback is therefore included for free and correctly: a row
+// answered by `accepts_passive_income` HAS a record and is not a gap.
+//
+// "unspecified" runs no type gate at all (gate 1 returns "ungated"), so
+// this is false for every row there and the note stays hidden — right,
+// because there is no "this kind" for the record to be silent about.
+export function hasNoIncomeTypeRecord(row, incomeType) {
+  return gate1(row, { income_type: incomeType }).typeState === "absent";
+}
+
+// How many of the routes the box reads have no record of this kind.
+// The note renders on >= 1 and retires itself at 0; nothing renders the
+// number, and nothing may — the string this serves replaced a
+// hand-maintained count that the data outgrew, and a no-count boundary
+// rule stands over the sentence either way.
+export function countRoutesWithNoTypeRecord(allRouteRows, incomeType) {
+  return sliceRoutes(allRouteRows).filter((r) => hasNoIncomeTypeRecord(r, incomeType)).length;
+}
+
 // Gate 2 — is the bar comparable to what the reader entered?
 // Three independent conditions, all of which must hold; each failure has
 // its own rendered reason, and none is a silent skip.

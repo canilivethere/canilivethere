@@ -45,7 +45,7 @@ import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 import { resolveVerdict } from "./data.js";
 import { bandVisual, indexToColor, isGapValue } from "./colors.js";
 import {
-  READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarTable, ROUTE_BARS,
+  READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarFields, barForRow,
   // Added by the margin crossing: the reader's own figure is normalised
   // into the bar's period by the SAME toPeriod() Gate 2 used, and the bar
   // is brought back into the reader's currency by the SAME convertAmount()
@@ -325,23 +325,67 @@ export function composeCountryState(routeStates) {
 // varies, selected by this summary.
 //
 // Returns null when no route was read-and-below (so every non-below
-// state is untouched), otherwise { kind, phrase }:
+// state is untouched), otherwise { kind, phraseKey }:
 //   kind "income"  - every below route measured income. The shipped
 //                    sentence is already true; it is kept verbatim.
 //   kind "capital" - every below route measured capital.
 //   kind "mixed"   - both, and the sentence may name neither instrument.
-// `phrase` is set only where every below-capital route shares ONE
-// barPhrase, which is what makes the singular "that bar" safe: the four
-// phrases in ROUTE_BARS are pairwise distinct, so two capital routes read
-// and below necessarily differ and the phrase falls away to null.
+// `phraseKey` is the below-capital bar's own `property_rule`, and it is
+// carried as a KEY rather than as words: app-shared.js's
+// CAPITAL_BAR_PHRASE turns it into English beside the other reader
+// strings, so no sentence about an instrument lives in a data module.
+//
+// THE SINGULAR "that bar" IS GUARDED ON THE COUNT OF ROUTES, NOT ON THE
+// PHRASES BEING DISTINCT. It used to be the other way round, and the
+// claim it rested on — "the four phrases are pairwise distinct, so two
+// capital routes read and below necessarily differ and the phrase falls
+// away" — was a true property of a hand table and cannot survive a
+// key-shaped vocabulary: two routes can now share one key, and a naive
+// port would print one instrument's word over another's bar (measured:
+// a below-set of {DTV, WGC} drops one null, leaves one phrase, and calls
+// a bank balance a total-assets test). So the guard counts the routes the
+// sentence is about. Measured: no capital route reaches a band at all
+// while every row's `property_rule` is "unstated", so the
+// below-capital set holds at most one route on today's data — the guard is
+// what makes the singular a property of the sentence rather than a
+// property of the data.
 export function belowBarKindSummary(entries) {
   const below = entries.filter((e) => e.state === S_BELOW);
   if (!below.length) return null;
   const kinds = new Set(below.map((e) => e.result.barKind));
   const kind = kinds.size > 1 ? "mixed" : [...kinds][0];
-  if (kind !== "capital") return { kind, phrase: null };
-  const phrases = new Set(below.map((e) => (ROUTE_BARS[e.row.route_key] || {}).barPhrase).filter(Boolean));
-  return { kind, phrase: phrases.size === 1 ? [...phrases][0] : null };
+  if (kind !== "capital") return { kind, phraseKey: null };
+  return { kind, phraseKey: below.length === 1 ? (barForRow(below[0].row) || {}).propertyRule ?? null : null };
+}
+
+// WHICH KIND OF BAR THE ABOVE-THE-BAR CLAIM IS ABOUT, and what that bar
+// asks the money to do. Same mechanism as belowBarKindSummary() above: one
+// existing token, two readings, selected by a summary carried beside the
+// state — no new state, no new band, no schema change.
+//
+// WHY IT EXISTS. "Above the bar this route sets" is true of an income bar,
+// which is met by earning the figure. A capital bar on these rows is
+// compared against a figure the reader HOLDS, and where the route asks for
+// that amount to be put into something, holding it is not meeting it — so
+// the same sentence carries a different claim, and the shipped one
+// overstates what the reader has done.
+//
+// READ OFF THE DECIDING ENTRY, not off the set: the sentence says "this
+// route" and the margin beside it names that same route, so the two must be
+// the same row. Returns null on an income bar — the shipped sentence then
+// renders through the same no-summary path it always did — and null when no
+// route is above at all.
+//
+// `condition` is the deciding row's own `capital_instrument_condition`,
+// carried as the exported key and never as words; app-shared.js turns it
+// into English where the rest of the reader's sentences live.
+export function aboveBarKindSummary(entries, deciding) {
+  const above = entries.filter((e) => e.state === S_ABOVE);
+  if (!above.length) return null;
+  const chosen = deciding && deciding.state === S_ABOVE ? deciding : above[0];
+  const bar = barForRow(chosen.row);
+  if (!bar || bar.kind !== "capital") return null;
+  return { kind: "capital", condition: chosen.row.capital_instrument_condition || null };
 }
 
 // WHETHER A ROUTE THE SITE COULD NOT READ ACTUALLY TAKES THE READER'S
@@ -436,7 +480,12 @@ export function atLineConversionSummary(entries, deciding) {
 // A, B, C are own-numbers-data.js's own three causes:
 //   A - gate1() fell to typeState "absent"
 //   B - gate2's bar-kind mismatch (kind_mismatch / property_bank_balance /
-//       property_total_assets)
+//       property_total_assets / property_rule_unstated — the last added
+//       with the guard that refuses a capital bar whose `property_rule`
+//       no source has stated; it is the same cause, "the
+//       bar here measures capital and your figure could not be read
+//       against it", and it must stay in this list or a country whose only
+//       capital refusal is that one composes a sentence naming no cause)
 //   C - gate2's no_number
 // All three false is the one combination measured structurally
 // unreachable on today's data (no row is not_stated_by_source, no row
@@ -449,7 +498,8 @@ export function notEnoughCauseSummary(entries) {
   for (const e of entries) {
     const r = e.result;
     if (r.typeState === "absent") hasA = true;
-    if (r.gate2 && (r.gate2.reason === "kind_mismatch" || r.gate2.reason === "property_bank_balance" || r.gate2.reason === "property_total_assets")) hasB = true;
+    if (r.gate2 && (r.gate2.reason === "kind_mismatch" || r.gate2.reason === "property_bank_balance"
+      || r.gate2.reason === "property_total_assets" || r.gate2.reason === "property_rule_unstated")) hasB = true;
     if (r.gate2 && r.gate2.reason === "no_number") hasC = true;
   }
   return { hasA, hasB, hasC };
@@ -613,7 +663,7 @@ export function decidingEntry(entries, countryState) {
 // Nothing else sets that status.
 function composeReaderMargin(chosen, input, fxRates) {
   if (!chosen) return null;
-  const bar = ROUTE_BARS[chosen.row.route_key];
+  const bar = barForRow(chosen.row);
   const converted = !!chosen.result.gate2.comparable.converted;
 
   // Fixed key order, kept so a diff of two rows lines up.
@@ -712,11 +762,11 @@ export function buildReaderVerdictRows(store, input) {
   if (input.duration_band === "visit") return [];
 
   const allRoutes = [].concat(...[...store.visaRoutesByCountry.values()]);
-  // The box refuses wholesale rather than answering partially off a stale
-  // lookup key — the same assertion the box's own render half runs, for
-  // the same reason, applied to the composer so the two can never
-  // disagree about whether the table is sound.
-  if (!assertRouteBarTable(allRoutes).ok) return [];
+  // The box refuses wholesale rather than answering partially off half an
+  // export — the same assertion the box's own render half runs, for the
+  // same reason, applied to the composer so the two can never disagree
+  // about whether the rows carry their bars.
+  if (!assertRouteBarFields(allRoutes).ok) return [];
   const slice = sliceRoutes(allRoutes);
 
   const rows = [];
@@ -751,6 +801,12 @@ export function buildReaderVerdictRows(store, input) {
     const deciding = decidingEntry(entries, overallState);
     const readerBarKind = (overallState === S_BELOW || overallState === S_BELOW_SOME_UNREAD)
       ? belowBarKindSummary(entries)
+      // Widened again by the capital comparison: READER_ABOVE_BAR
+      // carries a summary on this same field, same mechanism, same rule —
+      // { kind: "capital", condition } where the deciding bar measures
+      // capital, null where it measures income.
+      : overallState === S_ABOVE
+        ? aboveBarKindSummary(entries, deciding)
       : overallState === S_AT_LINE
         ? atLineConversionSummary(entries, deciding)
         : overallState === S_NOT_ENOUGH
@@ -790,7 +846,7 @@ export function buildReaderVerdictRows(store, input) {
       deciding_group_kind: "route",
       // Read by stateHeadline()/readerStateShort() to pick which text an
       // existing token renders. Despite the name, carries three different
-      // shapes now, one per state that needs one: { kind, phrase } for
+      // shapes now, one per state that needs one: { kind, phraseKey } for
       // S_BELOW/S_BELOW_SOME_UNREAD, { converted } for S_AT_LINE,
       // { hasA, hasB, hasC } for S_NOT_ENOUGH, { acceptingUnread } for
       // S_WRONG_TYPE_SOME_UNREAD. Null on every row whose state carries

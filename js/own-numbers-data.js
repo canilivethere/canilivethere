@@ -1,7 +1,7 @@
 // CanILiveThere — the welcome box's engine, with no DOM in it.
 //
 // Built to the welcome-box spec and the ruled storage shape. This half
-// holds the route-bar lookup table, its load-time assertion, and the
+// holds the bar reader, its load-time assertion, and the
 // three gates — all pure functions over plain data, so the whole engine
 // is exercisable outside a browser and a later maintainer can change a
 // rule without reading a line of render code. Every reader-facing string
@@ -11,9 +11,10 @@
 //
 // Zero facts authored here. Every number, threshold, unit, condition and
 // route name that reaches a reader comes verbatim out of
-// derived/visa-routes.jsonl. ROUTE_BARS below is transcription of what
-// each row's own `unit` string already says in words — see the header
-// comment on that table.
+// derived/visa-routes.jsonl — including, since the retirement of the
+// route-bar lookup table, the four properties of each row's own bar:
+// `currency_code`, `period`, `bar_kind` and `property_rule`. There is no
+// longer any per-route fact transcribed in this file. See barForRow().
 
 import {
   OWN_NUMBERS_INCOME_TYPES, OWN_NUMBERS_CURRENCIES,
@@ -86,115 +87,69 @@ export const BAND = 0.10;
 export const COARSE_PASSIVE_FALLBACK = true;
 
 // ---------------------------------------------------------------------
-// The 20-row lookup table.
+// THE BAR, READ OFF THE ROW.
 //
-// `unit` in the corpus is free prose, not an enum — it is a display
-// string and a condition carrier, never a parse target. So currency,
-// period and bar-kind are transcribed here by hand, once, from what each
-// row's own `unit` (or, where there is no unit, its own
-// `income_threshold`/`threshold_label`) says in words. Twenty lines,
-// auditable at a glance, versus a regex over free prose that would
-// silently mis-read the first row somebody rewords.
+// This replaces the 20-row hand-transcribed route-bar lookup table this
+// file used to carry — twenty rows of currency, period and bar-kind
+// copied out of each route's free-prose `unit` string, plus two
+// capital-only fields. One rulebook: the export pipeline owns the rules
+// and exports them as data, and this file applies only what it is given.
+// A table of transcribed values standing where an export belongs is the
+// thing being retired, not the values themselves.
 //
-// This is a build artifact and it is knowingly technical debt: it will
-// rot the first time a route row's currency changes and nobody
-// re-checks it. assertRouteBarTable() below is the net — the box refuses
-// wholesale rather than answering partially off a stale key. The durable
-// fix is real `currency_code` / `period` / `bar_kind` fields on the route
-// rows themselves — a data-layer change, not a change here.
+// The export now belongs to the rows. Every route row in
+// derived/visa-routes.jsonl carries four always-emitted fields, and this
+// function is the whole of the browser's reading of them:
 //
-// kind:
-//   "income"  — the bar measures a flow of income (14 rows)
-//   "capital" — the bar measures a balance, a deposit or assets (4 rows)
-//   "none"    — the row states no single figure at all (2 rows)
-// period is only ever consulted for kind === "income"; it is null on
-// every other row because those bars are not per-anything.
-// currency is null on the one row that names no currency anywhere
-// (TH privilege states "None — one-time cash payment only"); nothing may
-// default it, and kind "none" means it is never consulted.
-// barPhrase / propertyRule are only meaningful for kind === "capital".
-export const ROUTE_BARS = {
-  // Crete — both €/month, from each row's own unit string.
-  "CR:route:digital-nomad-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-  "CR:route:financially-independent-person-fip-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-
-  // Spain — both €/month.
-  "ES:route:digital-nomad-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-  "ES:route:non-lucrative-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-
-  // Guatemala — two $/month income bars and one asset requirement
-  // ("USD (verifiable, from abroad)"), the single row in the whole slice
-  // a property-capital figure may be compared against.
-  "GT:route:digital-nomad-visa":
-    { currency: "USD", period: "month", kind: "income" },
-  "GT:route:investor-visa":
-    { currency: "USD", period: null, kind: "capital", barPhrase: "an asset requirement", propertyRule: "compare" },
-  "GT:route:rentista--pensionado-visa":
-    { currency: "USD", period: "month", kind: "income" },
-
-  // Portugal — both €/month.
-  "PT:route:d7-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-  "PT:route:d8-visa":
-    { currency: "EUR", period: "month", kind: "income" },
-
-  // Thailand — six LTR income bars at USD/year, three capital bars, and
-  // two rows with no single figure at all.
-  "TH:route:destination-thailand-visa":
-    { currency: "THB", period: null, kind: "capital", barPhrase: "a bank balance", propertyRule: "bank_balance" },
-  "TH:route:long-term-resident-ltr-visa--highly-skilled-professional":
-    { currency: "USD", period: "year", kind: "income" },
-  "TH:route:long-term-resident-ltr-visa--highly-skilled-professional--reduced-bar":
-    { currency: "USD", period: "year", kind: "income" },
-  "TH:route:long-term-resident-ltr-visa--wealthy-global-citizen":
-    { currency: "USD", period: null, kind: "capital", barPhrase: "a total-assets test", propertyRule: "total_assets" },
-  "TH:route:long-term-resident-ltr-visa--wealthy-pensioner":
-    { currency: "USD", period: "year", kind: "income" },
-  "TH:route:long-term-resident-ltr-visa--wealthy-pensioner--reduced-bar":
-    { currency: "USD", period: "year", kind: "income" },
-  "TH:route:long-term-resident-ltr-visa--work-from-thailand-professional":
-    { currency: "USD", period: "year", kind: "income" },
-  "TH:route:long-term-resident-ltr-visa--work-from-thailand-professional--reduced-bar":
-    { currency: "USD", period: "year", kind: "income" },
-  // Compound OR ("800,000 THB bank balance, OR 65,000 THB/month income,
-  // OR a combination") — no single machine-comparable figure, so no
-  // period and no bar kind to compare against.
-  "TH:route:non-immigrant-o-a-retirement-visa":
-    { currency: "THB", period: null, kind: "none" },
-  "TH:route:non-immigrant-o-x-retirement-visa":
-    { currency: "THB", period: null, kind: "capital", barPhrase: "a security deposit", propertyRule: "bank_balance" },
-  // States no figure and no currency of any kind.
-  "TH:route:thailand-privilege-visa":
-    { currency: null, period: null, kind: "none" },
-};
-
-// The truth condition behind the baht line — and the MECHANISM, not the
-// literal. The note must RETIRE ITSELF the day a baht income bar exists,
-// so the sentence cannot outlive the table it describes. This is the one predicate both
-// the note and the option-label suffix are gated on, and it takes the
-// table as a defaultable argument for exactly one reason: it has to be
-// PROVABLE. A caller can hand it a copy with one income row flipped to
-// THB and watch the answer change: the self-retire proven, not asserted.
-// Nothing here reads or writes data — it is a question about this
-// module's own hand-transcribed table, the declared debt this build
-// carries, and this predicate retires with that table on the day real
-// currency_code/bar_kind fields land on the route rows.
+//   bar_kind       "income" | "capital" | "none" — what the bar measures.
+//   currency_code  the bar's currency, or "unstated".
+//   period         "month" | "year" | "unstated"; only ever consulted for
+//                  kind "income", and "unstated" on every bar that is not
+//                  one — so there is no third value to consult.
+//   property_rule  how a capital bar may be read against a reader's
+//                  property capital: "compare" | "bank_balance" |
+//                  "total_assets", or "unstated" while no source has been
+//                  extracted for it. Only meaningful for kind "capital".
 //
-// MEASURED over ROUTE_BARS as shipped: zero rows satisfy
-// kind === "income" && currency === "THB". The three baht rows are
-// TH:route:destination-thailand-visa and
-// TH:route:non-immigrant-o-x-retirement-visa (kind "capital" — a bank
-// balance and a security deposit) and TH:route:non-immigrant-o-a-
-// retirement-visa (kind "none", a compound OR with no single comparable
-// figure). So a baht figure is compared against no route by construction,
-// income or capital, which is why the 12-of-12 failure is structural and
-// not a data gap.
-export function hasIncomeBarInCurrency(currencyCode, bars = ROUTE_BARS) {
-  return Object.values(bars).some((b) => b.kind === "income" && b.currency === currencyCode);
+// ONE MAPPING, AND IT IS NOT A JUDGEMENT ABOUT A ROUTE. "unstated"
+// becomes `null` — the value the retired table held for exactly the same
+// absence — on both currency and period, so that no comparison anywhere
+// downstream can test a reader's real currency against the literal string
+// "unstated" and convert, wall or band off it, and so that no reader
+// string can spend the word as if it were a period. Two of them would:
+// app-shared.js's marginPeriodSuffix() renders this field into prose, and
+// the line above it chooses between "Your income" and "Your capital" on
+// whether it is set at all.
+//
+// THE BROWSER HOLDS NO RULE ABOUT WHEN TO TRUST THIS FIELD, and that is
+// the point. An earlier draft of this function nulled `period` on every
+// bar that was not an income bar, because the export stated a real period
+// on bars that are not per-anything. That was a rule about the data living
+// in the reader of the data. The export now states "unstated" on every
+// non-income bar, so the field can be read straight and the absence is the
+// export's own word for it.
+//
+// FAIL-CLOSED ON AN UNKNOWN KIND, deliberately: a `bar_kind` this file
+// does not know is not quietly treated as income (which would compare a
+// reader's figure against a bar that may measure something else) — the
+// row gets no bar at all, evaluateRow() renders it as "nothing on file",
+// and assertRouteBarFields() below refuses the whole box for it.
+export const BAR_KINDS = ["income", "capital", "none"];
+
+// The values of `property_rule` this engine acts on are handled by name in
+// gate2()'s capital branch — "compare" compares, "bank_balance" and
+// "total_assets" refuse. "unstated" is not one of them and must never be
+// mapped onto one here: it is the absence of an extracted rule, and that
+// branch refuses on it.
+export function barForRow(row) {
+  if (!row || typeof row.bar_kind !== "string") return null;
+  if (!BAR_KINDS.includes(row.bar_kind)) return null;
+  return {
+    kind: row.bar_kind,
+    currency: row.currency_code === "unstated" ? null : row.currency_code,
+    period: row.period === "unstated" ? null : row.period,
+    propertyRule: row.property_rule,
+  };
 }
 
 // The slice is every ':route:'-kind row in the five read countries.
@@ -211,22 +166,24 @@ export function sliceRoutes(allRouteRows) {
   return allRouteRows.filter(isReadRoute);
 }
 
-// The table is asserted, not trusted. Every
-// route_key in ROUTE_BARS must exist in the data, and every slice row
-// must be in ROUTE_BARS. A mismatch renders the whole box in its refusal
-// state with one line, never a partial answer built on a stale key.
-export function assertRouteBarTable(allRouteRows) {
+// THE EXPORT IS ASSERTED, NOT TRUSTED — the same net the retired table's
+// own load-time assertion was, moved onto the thing that now carries the
+// facts. Then: every route_key in the table had to exist in the data and
+// every slice row had to be in the table, because a stale key meant a
+// wrong bar. Now: every row in the slice must carry a `bar_kind` this
+// engine knows and a `property_rule` field, because a row exported before
+// those fields existed would otherwise be read as a bar of no kind. A
+// mismatch renders the whole box in its refusal state with one line,
+// never a partial answer built on half an export.
+export function assertRouteBarFields(allRouteRows) {
   const slice = sliceRoutes(allRouteRows);
-  const dataKeys = new Set(slice.map((r) => r.route_key));
-  const tableKeys = Object.keys(ROUTE_BARS);
-  const missingFromData = tableKeys.filter((k) => !dataKeys.has(k));
-  const missingFromTable = [...dataKeys].filter((k) => !ROUTE_BARS[k]);
+  const missingFields = slice
+    .filter((r) => !barForRow(r) || typeof r.property_rule !== "string")
+    .map((r) => r.route_key);
   return {
-    ok: missingFromData.length === 0 && missingFromTable.length === 0,
-    tableCount: tableKeys.length,
+    ok: missingFields.length === 0,
     sliceCount: slice.length,
-    missingFromData,
-    missingFromTable,
+    missingFields,
   };
 }
 
@@ -427,13 +384,27 @@ function gate2(row, bar, input, fxRates) {
     // Capital bars compare against the reader's property-capital figure,
     // and only where the reader gave one.
     if (!input.property_capital) {
-      return { reason: "kind_mismatch", barPhrase: bar.barPhrase };
+      // No instrument phrase on this payload any more: nothing ever
+      // destructured it (measured), and the instrument now reaches copy
+      // from the row itself at the one site that renders it.
+      return { reason: "kind_mismatch" };
     }
     if (bar.propertyRule === "bank_balance") return { reason: "property_bank_balance" };
     if (bar.propertyRule === "total_assets") return { reason: "property_total_assets" };
-    // propertyRule === "compare": the one row (GT:route:investor-visa)
-    // whose own paperwork names property as a qualifying vehicle. One
-    // currency per submission: the property figure is read in
+    // THE GUARD THIS BRANCH DID NOT HAVE. The "compare" path used to be
+    // reached by FALLING THROUGH the two tests above — there was
+    // no test for "compare" itself, only a comment saying that is what
+    // was left. Latent while the hand table held one of three known
+    // values on every capital row; live the moment `property_rule` became
+    // an exported field with a fourth value ("unstated"), because a row
+    // whose rule no source has stated would have been compared anyway —
+    // handing a reader a NUMERIC verdict against a bar nobody has
+    // established their property capital may be read against. That is a
+    // wrong answer, not a blander one. Anything that is not an explicit
+    // "compare" refuses here, on the same generic capital reason.
+    if (bar.propertyRule !== "compare") return { reason: "property_rule_unstated" };
+    // "compare": the row's own paperwork names property as a qualifying
+    // vehicle. One currency per submission: the property figure is read in
     // input.currency — there is no separate property_capital.currency
     // once the second selector is gone.
     if (input.currency === bar.currency) {
@@ -473,7 +444,7 @@ function gate2(row, bar, input, fxRates) {
 // through to Gate 2 untouched; this function looks at none of its shape
 // itself.
 export function evaluateRow(row, input, fxRates) {
-  const bar = ROUTE_BARS[row.route_key];
+  const bar = barForRow(row);
   const conditional = isConditional(row);
   const result = {
     routeKey: row.route_key,
@@ -488,8 +459,9 @@ export function evaluateRow(row, input, fxRates) {
     bucket: 2,
   };
   if (!bar) {
-    // Unreachable while assertRouteBarTable() gates the whole box, kept
-    // so this function is total rather than throwing on a stale key.
+    // Unreachable while assertRouteBarFields() gates the whole box, kept
+    // so this function is total rather than throwing on a row whose
+    // export carries no bar kind this engine knows.
     result.typeState = "absent";
     result.bucket = 2;
     return result;

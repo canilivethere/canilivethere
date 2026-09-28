@@ -45,7 +45,7 @@
 //      reader is asked for anything.
 
 import { escapeHtml } from "./app-shared.js";
-import { assertRouteBarTable, convertAmount, countRoutesWithNoTypeRecord } from "./own-numbers-data.js";
+import { assertRouteBarFields, convertAmount, countRoutesWithNoTypeRecord } from "./own-numbers-data.js";
 
 // ---------------------------------------------------------------------
 // Copy table. The wording is the spec's, not this file's: none of these
@@ -117,7 +117,7 @@ const PERIOD_OPTIONS = [
 // COVERAGE_LINE below for the one fact worth carrying out of the second
 // of those).
 const OWN_CURRENCY_NOTE_BASE =
-  "Bars stated in the other currency are converted into yours at the rate on file. Your income and your property capital are read in the currency you pick here.";
+  "Bars stated in the other currency are converted into yours at the rate on file. Your income is read in the currency you pick here.";
 // Appended when the rules-layer rate this promise depends on can't be
 // trusted right now — the row absent, the pair missing, or stale
 // (js/own-numbers-data.js's convertAmount()) — at the point of selection
@@ -171,8 +171,21 @@ const INCOME_TYPE_GAP_NOTE =
 
 // Field D — property capital, optional and collapsed by default.
 const FIELD_D_CHECKBOX = "I also have capital I could put into property";
+// THE SUCCESSOR, and it needs no truth condition — which is why it
+// replaced one that had a good one. Its predecessor said a capital figure
+// changed no answer yet; a rule on every capital row made that false, its
+// own emit condition suppressed it, and this describes what the comparison
+// IS rather than what the data currently permits. It survives a route
+// gaining or losing a recorded condition, so it renders whenever the box is
+// ticked, with no suppression clause.
+//
+// No quantifier anywhere in it, deliberately: "A route can ask" is true at
+// one route or fourteen and cannot be outgrown by the data — the test the
+// string it replaces failed. The closing sentence is the one that matters
+// most now that conditions are on file for some routes and not others: a
+// route showing none would otherwise read as condition-free.
 const FIELD_D_COVERAGE =
-  "Right now this changes the answer on one route — Guatemala's investor visa, which names property as a qualifying vehicle in its own paperwork. It adds a note on two Thailand routes. Everywhere else the site hasn't recorded a property-linked path.";
+  "Your capital figure is compared against the capital figure each route this box reads states — the number, and only the number. A route can ask for that amount to be put into something it recognises rather than simply held; where that's on file, the answer beside it says so. Where nothing is on file, that's a gap, not a guarantee there's no condition.";
 // AUTHORED-CHOICE (label only): the spec specifies one numeric input plus
 // the same currency select as Field A, without naming the input.
 const FIELD_D_AMOUNT_LABEL = "How much capital?";
@@ -274,10 +287,14 @@ const ARIA_PERIOD = "Per month or per year";
  */
 export function createOwnNumbersStep({ container, store, prefill, onValidity }) {
   const allRoutes = [].concat(...[...store.visaRoutesByCountry.values()]);
-  // B10 — the lookup table is asserted, not trusted. A mismatch means the
-  // box would answer off a stale key, so it refuses to ask for the
-  // reader's income at all rather than collecting it for nothing.
-  const tableOk = assertRouteBarTable(allRoutes).ok;
+  // B10 — the export is asserted, not trusted. The lookup table this used
+  // to check is retired; the same net now checks that every row the box
+  // reads carries the bar fields the engine needs. A row that doesn't
+  // means the box would answer off half an export, so it refuses to ask
+  // for the reader's income at all rather than collecting it for nothing.
+  // The line below it is unchanged and is owed a rewording — it still
+  // says "this box's own list of routes", and there is no longer a list.
+  const tableOk = assertRouteBarFields(allRoutes).ok;
   if (!tableOk) {
     container.innerHTML = `<p class="own-route-note">${escapeHtml(TABLE_MISMATCH_LINE)}</p>`;
     if (onValidity) onValidity(false);
@@ -293,6 +310,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
   // exercise (both currencies left in CURRENCY_OPTIONS), so that's the
   // one pair checked here.
   const fxAvailable = convertAmount(store.fxRates, 1, "EUR", "USD") !== null;
+
 
   // Also computed once per render, not per keystroke: for each kind the
   // reader can pick, whether ANY route the box reads has no record of it.

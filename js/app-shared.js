@@ -983,6 +983,79 @@ const READER_BELOW_SOME_UNREAD_CLAIM =
 // same guarantee: its shipped value below is still exactly these two
 // halves concatenated, and the ledger goes BETWEEN them.
 const READER_ABOVE_BAR_CLAIM = "Above the bar this route sets.";
+
+// THE SAME STATE, READ ON A CAPITAL BAR. An income bar is met by earning
+// the figure; these capital bars are compared against a figure the reader
+// holds, and where the route asks for that amount to be put into
+// something, holding it is not meeting it. One token, two readings,
+// selected by the summary js/reader-lens.js's aboveBarKindSummary()
+// carries on `reader_bar_kind` — the mechanism READER_BELOW_VARIANTS
+// already ships. No new state, no new band, no legend row, no schema
+// change.
+//
+// Held without its full stop so the condition clause can attach as a third
+// clause of the same sentence rather than as a second sentence.
+const READER_ABOVE_BAR_CAPITAL_BASE =
+  "Above the amount this route sets — but it asks you to put that money in, not just have it";
+// WHAT THE CAPITAL HAS TO GO INTO, in English, keyed on the exported
+// `capital_instrument_condition` and never on a route key or a country.
+//
+// EVERY GLOSS IS null TODAY AND THAT IS A STATED GAP, NOT AN OVERSIGHT:
+// the keys below are the four the export carries, and no reader copy has
+// been written for them yet. A null gloss renders the claim above WITHOUT a
+// condition clause — true, and short of the whole truth — rather than
+// inventing a summary of a condition or borrowing the no-instrument
+// sentence, which would tell a reader nothing is on file when something is.
+// The moment the words exist they go here, one line each, and the clause
+// starts rendering with no other change.
+// WHICH INSTRUMENTS MEAN THE MONEY MUST BE PUT SOMEWHERE. This is the whole
+// of the keying, and it is the reason the sentence above is true where it
+// renders: a placed investment and a real-estate purchase are money put in;
+// a bank balance and a total-assets test are money HELD, and telling a
+// reader who meets one of those that the route "asks you to put that money
+// in, not just have it" would deny exactly what the route requires.
+//
+// ANY OTHER VALUE — a key this file does not know, or no instrument on file
+// at all — takes the shipped income-shaped sentence, which is true of every
+// capital comparison. Fail-safe by construction: a new instrument cannot
+// start claiming placement by arriving, it has to be added here on purpose.
+const CAPITAL_CONDITION_PLACED = ["placed_investment", "real_estate_only"];
+
+const CAPITAL_CONDITION_GLOSS = {
+  placed_investment: null,
+  real_estate_only: null,
+  bank_balance: null,
+  total_assets: null,
+};
+
+// The join, and it is a rule rather than a preference: the condition is a
+// THIRD CLAUSE of the claim's own sentence, and the ratified wording
+// "conditions this route sets in its own words" must not be used once a
+// gloss is printed — the moment the site prints its own summary, "in its
+// own words" is false. One or the other, never both.
+function readerAboveBarCapitalClaim(condition) {
+  const gloss = CAPITAL_CONDITION_GLOSS[condition];
+  return gloss
+    ? `${READER_ABOVE_BAR_CAPITAL_BASE}: ${gloss}.`
+    : READER_ABOVE_BAR_CAPITAL_BASE + ".";
+}
+
+// One predicate, three surfaces — the headline, the short form and the short
+// form with a distance in it. They carry the identical claim, so they are
+// selected by the identical test; splitting them is how a sighted reader and
+// a screen-reader reader end up being told different things.
+function isPlacementBar(barKind) {
+  return !!barKind && barKind.kind === "capital"
+    && CAPITAL_CONDITION_PLACED.includes(barKind.condition);
+}
+
+// The short twin of the same claim, and it moves WITH it rather than after
+// it: for a screen-reader reader inside a cluster knot the knot's own label
+// is the only path to the band, so leaving these two behind would ship the
+// true sentence to sighted readers and the false one to everyone else.
+const READER_ABOVE_BAR_CAPITAL_SHORT = "above the amount this route asks you to put in";
+const READER_ABOVE_BAR_CAPITAL_SHORT_WITH_MARGIN = (m) =>
+  `above the amount this route asks you to put in, by ${m}`;
 const READER_ABOVE_BAR_TAIL = " The other gates weren't read for you.";
 // And the same split for the at-the-line pair, whose shipped values are
 // likewise still exactly opener + tail. The ledger goes between them, and
@@ -1224,10 +1297,16 @@ export const STATE_HEADLINE_LOCATION_CAPPED =
 //   income   the shipped sentence, verbatim. It was always true here.
 //   capital  names the instrument where one instrument can be named
 //            ("that bar is an asset requirement"), and falls back to the
-//            kind where it cannot. The singular "that bar" is safe by
-//            construction: the barPhrase values are pairwise distinct, so
-//            two capital routes read and below necessarily carry
-//            different phrases and `phrase` arrives null.
+//            kind where it cannot. The singular "that bar" is safe because
+//            this variant renders only when EXACTLY ONE capital route was
+//            read and below. Phrases are keyed on the bar's
+//            `property_rule`, so two routes can share one — which is why
+//            js/reader-lens.js's belowBarKindSummary() counts routes and
+//            not distinct strings. Measured: only
+//            `property_rule: "compare"` reaches a band at all, so the
+//            below-capital set holds at most one route on today's data;
+//            the guard is what makes that a property of the sentence
+//            rather than a property of the data.
 //   mixed    names NEITHER instrument, deliberately. Naming one while the
 //            other bars measure something else would tell the reader
 //            which phrase belongs to which route, which a single sentence
@@ -1239,6 +1318,29 @@ export const STATE_HEADLINE_LOCATION_CAPPED =
 // "assets": the box asks for this figure as "I also have capital I could
 // put into property" / "How much capital?", so the sentence hands back
 // the word they were asked for.
+// THE CAPITAL BAR'S INSTRUMENT, IN ENGLISH. Three keys, one phrase —
+// keyed on the engine-exported `property_rule`, never on a route key, so a
+// new route with a `compare` bar gets the phrase for free and a new
+// instrument shows up as a missing key rather than borrowing another
+// instrument's word. "an asset requirement" is
+// GT:route:investor-visa's own `threshold_label` wording, transported,
+// not authored here.
+//
+// THE TWO NULLS ARE A WRITTEN DECISION, NOT A BLANK. A missing key and a
+// key that deliberately has no phrase look identical at the call site and
+// mean opposite things. These two rules refuse before any comparison is
+// built (own-numbers-data.js's gate2()), so no reader can ever be
+// read-and-below against one of them; the instrument-free sentence below —
+// true of every capital bar and of any mixture of them — is what renders,
+// and naming an instrument here would be copy for a state nothing can
+// reach. The words each route's own record uses for these two bars stay in
+// derived/visa-routes.jsonl, where they came from.
+const CAPITAL_BAR_PHRASE = {
+  compare: "an asset requirement",
+  bank_balance: null,
+  total_assets: null,
+};
+
 const READER_BELOW_VARIANTS = {
   READER_BELOW_BAR: {
     capitalWithPhrase: (phrase) =>
@@ -1317,9 +1419,19 @@ const READER_NOT_ENOUGH_CLAUSES = {
   },
   // Gate 2 condition 1: the bar measures capital, not the figure the
   // reader gave (kind_mismatch / property_bank_balance / property_total_assets).
+  // THE INSTRUMENT LIST IS GONE AND THE CLAIM WITH IT. With a comparison
+  // rule on every capital row, gate2() returns a comparable whenever the
+  // reader gave a capital figure — so the only way a capital row reaches
+  // this cause is the branch where they gave none (measured in this tree:
+  // 216 cells per capital route, `kind_mismatch`, and no other reason).
+  // "not a figure yours could be read against" then reports a dead end
+  // where there is a door: the site would read their figure, if they
+  // entered one. The replacement names the one thing the reader can act on,
+  // in the same number of clauses and fewer words, and retires the
+  // three-instrument enumeration with it.
   B: {
-    sole: "the bars here measure capital — a bank balance, a total-assets test, a deposit — not a figure yours could be read against",
-    among: "some set a capital bar — a bank balance, a total-assets test, a deposit — not one yours could be read against",
+    sole: "the bars here measure capital, and you haven't entered a capital figure",
+    among: "some set a capital bar, and you haven't entered a capital figure",
   },
   // Gate 2 condition 2: the route states no single figure at all (no_number).
   C: {
@@ -1478,9 +1590,19 @@ function readerStateClaim(state, barKind) {
   const variants = barKind && READER_BELOW_VARIANTS[state];
   if (variants && barKind.kind === "mixed") return variants.mixed;
   if (variants && barKind.kind === "capital") {
-    return barKind.phrase ? variants.capitalWithPhrase(barKind.phrase) : variants.capital;
+    // The key comes off the row (reader-lens.js's belowBarKindSummary(),
+    // under its one-route guard); the words are looked up here, where the
+    // rest of the reader's sentences live. An unknown or absent key, and a
+    // key whose phrase is deliberately null, both fall to the
+    // instrument-free sentence — which is true of every capital bar.
+    const phrase = CAPITAL_BAR_PHRASE[barKind.phraseKey];
+    return phrase ? variants.capitalWithPhrase(phrase) : variants.capital;
   }
-  if (state === "READER_ABOVE_BAR") return READER_ABOVE_BAR_CLAIM;
+  if (state === "READER_ABOVE_BAR") {
+    return isPlacementBar(barKind)
+      ? readerAboveBarCapitalClaim(barKind.condition)
+      : READER_ABOVE_BAR_CLAIM;
+  }
   if (state === "READER_BELOW_SOME_UNREAD") return READER_BELOW_SOME_UNREAD_CLAIM;
   if (state === "READER_NONE_CLEARS_SOME_UNREAD") return READER_NONE_CLEARS_SOME_UNREAD_CLAIM;
   return STATE_HEADLINE[state] || state;
@@ -1546,6 +1668,9 @@ function readerShortWithMargin(state, barKind, margin) {
     const conditions = barKind && barKind.conditional ? ", with conditions" : "";
     if (margin.direction === "exact") return `right at the line, exactly on the bar${conditions}`;
     return `right at the line, ${shortMarginText(margin)} ${margin.direction === "over" ? "over" : "under"}${conditions}`;
+  }
+  if (state === "READER_ABOVE_BAR" && isPlacementBar(barKind)) {
+    return READER_ABOVE_BAR_CAPITAL_SHORT_WITH_MARGIN(shortMarginText(margin));
   }
   const kindVariants = barKind && READER_BELOW_SHORT_WITH_MARGIN[state];
   if (kindVariants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
@@ -1613,6 +1738,9 @@ export function readerStateShort(state, barKind, margin) {
   // nothing here does.
   if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
     return READER_WRONG_TYPE_ACCEPTING_UNREAD_SHORT;
+  }
+  if (state === "READER_ABOVE_BAR" && isPlacementBar(barKind)) {
+    return READER_ABOVE_BAR_CAPITAL_SHORT;
   }
   const variants = barKind && READER_BELOW_SHORT_VARIANTS[state];
   if (variants && (barKind.kind === "capital" || barKind.kind === "mixed")) {

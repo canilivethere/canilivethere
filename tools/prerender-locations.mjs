@@ -473,9 +473,24 @@ const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "red
 // chapter run. Content untouched — position only.
 const INTRO_SECTION = "overview";
 
+// Hand-kept-in-sync copy of js/app-shared.js's roundDisplayValue() — same
+// duplication class as formatValue()/sectionForFact() below. Display-only
+// rounding so a town's elevation doesn't render to the centimetre
+// ("1530.17 metres"); the stored row keeps its full figure. Scoped to an
+// exact `metres` unit with a magnitude guard, because nearly every other
+// bare-decimal row on file needs its decimals. Change one copy, change
+// both. Full reasoning: the comment on the app-shared.js original.
+function roundDisplayValue(raw, unit) {
+  const u = String(unit == null ? "" : unit).trim().toLowerCase();
+  if (u !== "metres" && u !== "meters") return raw;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
+  return String(Math.round(n));
+}
+
 function formatValue(fact) {
   if (fact.value_raw === "[GAP]") return "Not yet researched";
-  const raw = String(fact.value_raw);
+  const raw = roundDisplayValue(String(fact.value_raw), fact.unit);
   if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) return `${raw} ${fact.unit}`;
   return raw;
 }

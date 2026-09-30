@@ -2291,6 +2291,36 @@ export function formatNumbersInText(text) {
   return text.replace(/\d{5,}/g, (run) => Number(run).toLocaleString("en-US"));
 }
 
+// Display precision, ordered by Cap 2026-09-30 after a human read of the
+// rendered Antigua page: the elevation row read "1530.17 metres". The
+// source (SEGEPLAN, quoting DGN 1981) really does say 1,530.17, and the
+// vault keeps that figure — but centimetre precision on a town's
+// elevation reads as false precision to a person. This rounds the
+// DISPLAY only; no row, no derived file, no stored value is touched.
+//
+// Deliberately narrow rather than a general numeric-rounding policy:
+// of the 64 bare-decimal value_raw rows on file, every one except this
+// elevation needs its decimals (index scores, homicide rates per
+// 100,000, percentages, prices), so a blanket rule would corrupt 63 real
+// numbers to fix one. Scoped to an exact `metres` unit, with a magnitude
+// guard so a genuinely small metres value (a 0.4m sea-level rise) can
+// never round to zero. Today that is exactly one row.
+//
+// No general display-precision convention exists yet; one has been
+// requested. If it lands, this function is the thing it replaces.
+//
+// DUPLICATION CLASS: tools/prerender-locations.mjs keeps its own copy of
+// this (same hand-kept-in-sync class as its formatValue/sectionForFact).
+// Change one, change both, or the static page and the hydrated page
+// disagree.
+export function roundDisplayValue(raw, unit) {
+  const u = String(unit == null ? "" : unit).trim().toLowerCase();
+  if (u !== "metres" && u !== "meters") return raw;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
+  return String(Math.round(n));
+}
+
 // Some
 // fact rows on file (pet-import especially) are one dense run-on
 // `value_raw` paragraph bundling several distinct clauses — real content,
@@ -2496,7 +2526,7 @@ export function glossaryWrap(text, store) {
 // if a new call site is ever added without the badge.
 export function formatValue(fact, { suppressGapText = false } = {}) {
   if (fact.value_raw === "[GAP]") return suppressGapText ? "—" : "Not yet researched";
-  const raw = formatNumbersInText(String(fact.value_raw));
+  const raw = formatNumbersInText(roundDisplayValue(String(fact.value_raw), fact.unit));
   // Only append the unit if value_raw doesn't already carry it as text —
   // some facts' own value_raw already spells out its unit inline (e.g.
   // "50km coast / 100km border", "49% of building"), and appending the

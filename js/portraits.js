@@ -13,18 +13,29 @@
 // buildPortrait().
 
 export const PORTRAITS = {
+  // TWO DEVIATIONS FROM VERBATIM TRANSPORT, both authorised, both in
+  // GT-antigua's portrait. The upstream copy still carries the old
+  // wording and is tracked for reconciliation:
+  //  1. "meters" -> "metres". British spelling is the project standard
+  //     for reader copy, and the fact row directly below this prose on
+  //     the same screen reads "metres".
+  //  2. The clause ", forty-five minutes from the capital's airport and
+  //     its best hospitals" is struck. The page's own travel-time row
+  //     reads 45-75 minutes; the prose took the optimistic end of its
+  //     own band. Struck, not replaced: this seat authors zero facts,
+  //     so the row carries the figure and the prose says nothing about
+  //     it. Nothing else in the sentence changed.
   "GT-antigua": {
     portrait:
       "Antigua was Guatemala's capital until an earthquake ended that " +
       "arrangement in 1773, and the city never entirely got over the " +
       "demotion: cobblestone streets, a UNESCO-protected colonial core, and " +
       "three volcanoes standing watch over every rooftop view. Sitting at " +
-      "1,530 meters keeps the air spring-like all year — no real winter, no " +
+      "1,530 metres keeps the air spring-like all year — no real winter, no " +
       "real summer, just the same mild register morning after morning. It's " +
       "also Guatemala's best-established foreign-resident town by a wide " +
       "margin, with Spanish schools doubling as social clubs and a genuinely " +
-      "thriving coworking scene, forty-five minutes from the capital's " +
-      "airport and its best hospitals. Call it the country's easy mode: a " +
+      "thriving coworking scene. Call it the country's easy mode: a " +
       "well-worn corridor rather than a frontier, which is exactly the " +
       "tradeoff worth weighing in the chapters below.",
     hook: "Guatemala's easiest on-ramp — a colonial city three volcanoes still watch over.",

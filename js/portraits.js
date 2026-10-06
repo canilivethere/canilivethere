@@ -20,11 +20,11 @@ export const PORTRAITS = {
   //     for reader copy, and the fact row directly below this prose on
   //     the same screen reads "metres".
   //  2. The clause ", forty-five minutes from the capital's airport and
-  //     its best hospitals" is struck. The page's own travel-time row
-  //     reads 45-75 minutes; the prose took the optimistic end of its
-  //     own band. Struck, not replaced: this seat authors zero facts,
-  //     so the row carries the figure and the prose says nothing about
-  //     it. Nothing else in the sentence changed.
+  //     its best hospitals" is struck, not replaced: the page's own
+  //     travel-time row carries the figure and the prose states none.
+  //     This seat authors zero facts. Nothing else in the sentence
+  //     changed. This comment points at the row rather than naming a
+  //     figure of its own, which had gone stale against it.
   "GT-antigua": {
     portrait:
       "Antigua was Guatemala's capital until an earthquake ended that " +
@@ -39,7 +39,6 @@ export const PORTRAITS = {
       "well-worn corridor rather than a frontier, which is exactly the " +
       "tradeoff worth weighing in the chapters below.",
     hook: "Guatemala's easiest on-ramp — a colonial city three volcanoes still watch over.",
-    number: "Elevation 1,530m — the reason it never really has a summer or a winter.",
   },
   "AR-buenosaires": {
     portrait:
@@ -140,3 +139,180 @@ export const CHAPTER_INTROS = {
     "The hard truths, stated plainly — real risks, sitting right next to " +
     "everything that's actually going well.",
 };
+
+// ---------------------------------------------------------------------
+// Reader sentences — one layer up from a fact row: a paragraph that
+// performs a comparison the rows can only supply the parts of. Thirteen
+// Red-flags rows in export order, three of them the same measurement at
+// three geographic scopes and none of the three adjacent, are right and
+// still leave the comparison undone; nothing on the page was doing it.
+// These paragraphs do it.
+//
+// Specified by the reader-sentence placement spec, AS AMENDED BY CAP
+// 2026-10-04, whose amendment moved fixture 1 out of the portrait plate
+// and fixture 5 to the foot of its chapter, verbatim: "fixture 1 goes at
+// the head of Overview, not the portrait block, so the top of the page
+// stays as it is today ... Fixture 5 goes at the bottom of Overview, as
+// on Chania. Fixtures 3 and 4 stay at the head of Red flags. Chapters
+// stay closed; that is accepted."
+//
+// Transport only — zero facts authored, zero words reworded, same rule
+// as the portrait strings above. Each string is the marked-shippable
+// blockquoted lines of its fixture block in the reviewed source copy
+// deck, joined with one space; the deck's internal annotation lines
+// (which rows a figure came from, and which of the proposed clauses had
+// no row behind them and so went unwritten) are internal and do not
+// cross. Nothing of them is here. The strings were extracted and written
+// by script rather than retyped, and their measured lengths are the
+// transport's own check: fixture 3 = 353, fixture 4 = 349, fixture 5 =
+// 710. A shipped string of a different length is a failed transport.
+// FIXTURE 1 IS 159, NOT THE 200 IT ARRIVED AS: the elevation shows once
+// in the opened Overview and the fact row is where it shows, so this
+// fixture's closing sentence "It sits at 1,530 metres above sea level."
+// is struck. That is a ruled change to
+// the string, not a failed transport — the only kind of length change
+// this check is not meant to catch, which is why it is named here.
+//
+// Characters a "tidying" edit would silently change, named so that it
+// cannot: EM DASH U+2014 (fixtures 1, 3 and 4), EN DASH U+2013 (fixture
+// 3's "16–18 km" — a different character from the em dash and from a
+// hyphen), the accents in Volcán, Diálogos and Sacatepéquez, and the
+// British forms metres / paediatrics / orthopaedics, which are
+// deliberate. Escaping happens at render, never here.
+//
+// SHAPE, and the one place it departs from the spec as written. The spec
+// specified an above-the-fold `lead` slot plus per-chapter ORDERED
+// ARRAYS rendered at the HEAD of their chapter. Cap's amendment needs
+// Overview to carry a sentence at its head AND one at its foot, which a
+// single array per chapter cannot express, and it leaves `lead` with no
+// referent at all. So: `lead` is gone rather than left behind as a dead
+// key, and `chapters[key]` is an object of POSITION slots — `head`
+// (above the chapter's fact rows) and `foot` (below them, closing the
+// chapter) — each holding an ordered array whose order is render order.
+// Nothing else of the specified shape moves: same file, same export
+// style, same claim-free topic-noun labels, same hard placeholder rule.
+// The spec's one-item cap was `lead`'s alone and `lead` is gone; it is
+// NOT reimposed on the position arrays, because the spec's own Red-flags
+// fill puts two sentences at one position.
+//
+// `topic` is OPTIONAL. Where present it is a topic noun phrase, three
+// words or fewer, with no claim and no question in it: the
+// perspective-disclosure law treats a control's promise as a claim, so a
+// question-shaped label would promise an answer the paragraph may only
+// partly give. "Healthcare" is load-bearing rather than decorative —
+// Overview is a catch-all chapter that also holds pet import, climate,
+// population and travel time, so an unlabelled healthcare paragraph
+// there would misrepresent what the chapter is.
+//
+// Fixture 1 carries NO topic, and that is a deliberate restraint rather
+// than an omission: it had none in the spec (it was the bare `lead`), it
+// is the Overview chapter's own subject rather than one scoped reading
+// inside it, and authoring a fourth reader-facing label is the design
+// spec's call and not this build's.
+//
+// v7 §2.3's hard placeholder rule, inherited in force: a location with
+// no entry renders NOTHING here. No stub, no "[pending]", no empty
+// block. And a position slot may only be filled where that chapter has
+// at least one fact row at that location — a reader sentence rendered
+// above the honest "Not yet researched" line would be a
+// self-contradiction shipped to a reader.
+// tools/prerender-locations.mjs asserts that at build time and fails
+// loudly; js/location.js cannot render the pair by construction, since
+// its empty-chapter branch returns before any reader sentence is
+// appended.
+//
+// NO LENS BRANCHING IN THE DATA, EVER. These values are static per
+// location. A lens-conditional reader sentence would make
+// READER_SENTENCE_SCOPE_LINE below false, so this is a constraint on the
+// surface rather than a note about it.
+// ---------------------------------------------------------------------
+export const READER_SENTENCE_POSITIONS = ["head", "foot"];
+
+export const READER_SENTENCES = {
+  "GT-antigua": {
+    chapters: {
+      overview: {
+        head: [
+          {
+            text:
+              "Antigua is a town of 62,839 people, on the national "
+              + "statistics institute's projection for 2026. The last time "
+              + "anyone counted — the 2018 census — it was 46,054.",
+          },
+        ],
+        foot: [
+          {
+            topic: "Healthcare",
+            text:
+              "Across the department of Sacatepéquez, 83% of people had no "
+              + "health insurance in 2023, on the national statistics office's "
+              + "figures. Antigua's public hospital, Hospital Nacional Pedro "
+              + "de Bethancourt, is free, and its stated scope is broad: "
+              + "general medicine, surgery, obstetrics, paediatrics, trauma "
+              + "and orthopaedics, emergency, intensive care and diagnostics. "
+              + "Reviews of it are mixed, with real complaints about "
+              + "overcrowding and waiting times. Newborn intensive care opened "
+              + "there on 28 March 2025. It gave its first chemotherapy on 7 "
+              + "January 2026, and as of 29 September 2026 the oncology unit "
+              + "was still incomplete. The capital, with its major hospitals "
+              + "and the international airport, is 72 minutes away by road.",
+          },
+        ],
+      },
+      redflags: {
+        head: [
+          {
+            topic: "Volcán de Fuego",
+            text:
+              "Volcán de Fuego is 16–18 km from town, and from town it is a "
+              + "view — one of three volcanoes visible from the street. The "
+              + "2018 deaths were on Fuego's south and south-east flank, below "
+              + "about 2,500 m: the Las Lajas drainage, San Miguel Los Lotes "
+              + "and El Rodeo, in Escuintla. Do not rent or buy there. Antigua "
+              + "sits on the far side, shielded by Volcán de Agua.",
+          },
+          {
+            topic: "Homicide rate",
+            text:
+              "In the twelve months to March 2026, Antigua Guatemala "
+              + "municipality recorded 11.1 killings per 100,000 people. "
+              + "Guatemala as a whole recorded 16.2. The surrounding "
+              + "department of Sacatepéquez recorded 9.1 — so the town sits "
+              + "below the national rate and above its own department's. All "
+              + "three figures are from the same report, by the Diálogos "
+              + "observatory.",
+          },
+        ],
+      },
+    },
+  },
+};
+
+// Perspective disclosure (the law of 2026-07-17, which makes the no-lens
+// state itself a perspective that has to say so). All four strings above
+// are general-lens, and the page's own existing disclosure already covers
+// them: renderPerspectiveBlock() runs directly under the <h1>, above
+// every placement here, and in the no-lens state it reads "Shown as-is —
+// the general figures, nobody's situation in particular." A second
+// general-lens confession above the content is the thing v8 Part 10
+// Ruling 3 rules out — "no surface leads with a process confession when
+// it has real content to lead with" — so none is added.
+//
+// What this line is for is the LENS-SELECTED state, where the line under
+// the h1 instead reads "Shown for Waldo …" or "Shown for you …", and a
+// reader who has just been told the page is in their lens could
+// reasonably take a prose paragraph as part of it. It is not. So the
+// scope rides the data at the data's own position, which is v8 Part 10's
+// own reconciliation of this tension. Near-verbatim reuse of an
+// already-live, already-gated string — js/cost-comparison.js's
+// COPY_C1_LENS — rather than new authorship.
+//
+// It is a claim, and it is true by construction: READER_SENTENCES has no
+// lens branch. It goes false the instant anyone gives a reader sentence
+// one.
+//
+// The prerendered twin never renders it — a static page has no lens by
+// definition, and its topbar corner already says so.
+export const READER_SENTENCE_SCOPE_LINE =
+  "General figures — the same for every reader; no persona, passport, "
+  + "or saved profile changes them.";

@@ -474,15 +474,21 @@ const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "red
 const INTRO_SECTION = "overview";
 
 // Hand-kept-in-sync copy of js/app-shared.js's roundDisplayValue() — same
-// duplication class as formatValue()/sectionForFact() below. Display-only
-// rounding so a town's elevation doesn't render to the centimetre
-// ("1530.17 metres"); the stored row keeps its full figure. Scoped to an
-// exact `metres` unit with a magnitude guard, because nearly every other
-// bare-decimal row on file needs its decimals. Change one copy, change
-// both. Full reasoning: the comment on the app-shared.js original.
+// duplication class as formatValue()/sectionForFact() below. The ruled
+// display-precision convention: physical
+// measurements (heights, distances, areas) round to whole numbers, half up;
+// rates, index scores, prices and percentages keep their decimals; the exact
+// figure stays in the store and the source. Classified on the FIRST WORD of
+// `unit`, exact match against metres and meters, m, km, km², hectares, with the
+// magnitude guard kept so a small physical value cannot display as nothing.
+// °C keeps its decimals. The rule in full and the reasoning: the comment on
+// the app-shared.js original.
+// Change one copy, change both.
+const PHYSICAL_DISPLAY_UNITS = new Set(["metres", "meters", "m", "km", "km²", "hectares"]);
+
 function roundDisplayValue(raw, unit) {
-  const u = String(unit == null ? "" : unit).trim().toLowerCase();
-  if (u !== "metres" && u !== "meters") return raw;
+  const head = String(unit == null ? "" : unit).trim().toLowerCase().split(/\s+/)[0];
+  if (!PHYSICAL_DISPLAY_UNITS.has(head)) return raw;
   const n = Number(raw);
   if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
   return String(Math.round(n));
@@ -498,7 +504,14 @@ function formatValue(fact) {
 // Portrait copy — imported from the same module the live JS build uses,
 // so the static fallback and the JS-hydrated page never disagree (one
 // source, not two authored copies of the same string).
-const { PORTRAITS, CHAPTER_INTROS } = await import("../js/portraits.js");
+const {
+  PORTRAITS, CHAPTER_INTROS, READER_SENTENCES, READER_SENTENCE_POSITIONS,
+} = await import("../js/portraits.js");
+// READER_SENTENCE_SCOPE_LINE is deliberately NOT imported. It is the
+// lens-selected scope disclosure, and a static page has no lens by
+// definition — its topbar corner already says "Who's asking: nobody
+// yet". Importing it here would be the first step toward rendering a
+// claim this page cannot make.
 // ONE STRING ON ALL 38, NOT TWO. The footer's list of what the
 // interactive version adds named "your own figures read against this
 // place" on all 38 pages; the box reads five countries, which is 12 of
@@ -531,6 +544,83 @@ function interactiveExtras() {
   return FOOTER_EXTRAS;
 }
 
+// ---------------------------------------------------------------------
+// Reader sentences — the static twin of js/location.js's
+// readerSentencesHtml(). Same hand-kept-in-sync class as
+// formatValue()/sectionForFact()/roundDisplayValue() in this file: change
+// one, change both, or the prerendered page and the hydrated page say
+// different things about the same place. The shape, the amendment that
+// produced it and the no-CSS consequence are documented once, in
+// js/portraits.js's own header.
+//
+// ONE DELIBERATE DIVERGENCE, and it is not a sync failure: this twin
+// never renders the lens-selected scope line, because this page has no
+// lens. Everything else — the two positions, the order inside each, the
+// optional topic label and its `fact-label` class — is identical.
+// ---------------------------------------------------------------------
+function readerSentencesHtml(locationId, key, position) {
+  if (!locationId || !READER_SENTENCE_POSITIONS.includes(position)) return "";
+  const entry = READER_SENTENCES[locationId];
+  const slots = entry && entry.chapters ? entry.chapters[key] : null;
+  const list = slots ? slots[position] : null;
+  if (!Array.isArray(list) || !list.length) return "";
+  let html = `<div class="reader-sentences reader-sentences-${position}">`;
+  for (const item of list) {
+    if (item.topic) {
+      html += `<p class="reader-sentence-topic fact-label">${escapeHtml(item.topic)}</p>`;
+    }
+    html += `<p class="reader-sentence">${escapeHtml(item.text)}</p>`;
+  }
+  return html + `</div>`;
+}
+
+function readerSentencesAt(locationId, key) {
+  const entry = READER_SENTENCES[locationId];
+  const slots = entry && entry.chapters ? entry.chapters[key] : null;
+  if (!slots) return 0;
+  return READER_SENTENCE_POSITIONS
+    .reduce((n, pos) => n + (Array.isArray(slots[pos]) ? slots[pos].length : 0), 0);
+}
+
+// Build-time assertion, the spec's §2.1: "fail the build loudly" rather
+// than render a surface that contradicts itself. Structural only — it
+// checks that every key in READER_SENTENCES names something that exists
+// and that every entry carries real text. It CANNOT check the
+// facts-exist condition, because whether a chapter renders any rows
+// depends on a per-country filter applied inside the loop below; that
+// half is asserted at its own render point, in chapterHtml().
+function assertReaderSentences(locationIds) {
+  for (const [locationId, entry] of Object.entries(READER_SENTENCES)) {
+    if (!locationIds.has(locationId)) {
+      throw new Error(`READER_SENTENCES: unknown location_id "${locationId}"`);
+    }
+    const chapters = (entry && entry.chapters) || {};
+    for (const [key, slots] of Object.entries(chapters)) {
+      if (!SECTION_ORDER.includes(key)) {
+        throw new Error(`READER_SENTENCES[${locationId}]: unknown chapter "${key}"`);
+      }
+      for (const [pos, list] of Object.entries(slots || {})) {
+        if (!READER_SENTENCE_POSITIONS.includes(pos)) {
+          throw new Error(`READER_SENTENCES[${locationId}].${key}: unknown position "${pos}" (expected ${READER_SENTENCE_POSITIONS.join(" or ")})`);
+        }
+        if (!Array.isArray(list) || !list.length) {
+          throw new Error(`READER_SENTENCES[${locationId}].${key}.${pos}: empty slot — omit the key instead`);
+        }
+        for (const item of list) {
+          if (!item || typeof item.text !== "string" || !item.text.trim()) {
+            throw new Error(`READER_SENTENCES[${locationId}].${key}.${pos}: entry with no text`);
+          }
+          if (item.topic !== undefined && (typeof item.topic !== "string" || !item.topic.trim())) {
+            throw new Error(`READER_SENTENCES[${locationId}].${key}.${pos}: topic present but empty`);
+          }
+        }
+      }
+    }
+  }
+}
+
+assertReaderSentences(new Set(locations.map((l) => l.location_id)));
+
 const outDir = join(ROOT, "l");
 mkdirSync(outDir, { recursive: true });
 
@@ -552,7 +642,7 @@ for (const loc of locations) {
 
   const portrait = PORTRAITS[loc.location_id];
   const portraitHtml = portrait
-    ? `<div class="portrait-block"><p>${escapeHtml(portrait.portrait)}</p><p class="portrait-teaser">${escapeHtml(portrait.hook)} — ${escapeHtml(portrait.number)}</p></div>`
+    ? `<div class="portrait-block"><p>${escapeHtml(portrait.portrait)}</p><p class="portrait-teaser">${escapeHtml(portrait.hook)}${portrait.number ? ` — ${escapeHtml(portrait.number)}` : ""}</p></div>`
     : "";
 
   // The "Recent change events" block used to be assembled here and emitted
@@ -590,6 +680,14 @@ for (const loc of locations) {
     // here on purpose.
     const cls = "chapter" + (key === "redflags" ? " chapter-redflags" : "");
     if (!list.length) {
+      // The spec's own §2.1 other half, asserted at the only point the
+      // filtered row count is known: a reader sentence directly above
+      // the honest "Not yet researched" line is a self-contradiction
+      // shipped to a reader, so this fails the build rather than
+      // rendering both.
+      if (readerSentencesAt(loc.location_id, key)) {
+        throw new Error(`READER_SENTENCES[${loc.location_id}].${key}: reader sentences on a chapter that renders no fact rows`);
+      }
       // A chapter with no facts but real extra content is not a gap, and
       // must not claim to be one.
       const body = extra || `<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
@@ -601,7 +699,16 @@ for (const loc of locations) {
         <div class="fact-value">${escapeHtml(formatValue(f))}</div>
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`).join("");
-    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}${extra}</details>`;
+    // Head sits above the rows, below the chapter-intro line; foot sits
+    // last in the chapter, closing it. `extra` keeps its existing
+    // position between them — this file has always emitted it after the
+    // rows where js/location.js emits it before them, a pre-existing
+    // divergence this change neither creates nor repairs. For the two
+    // Antigua chapters filled today `extra` is empty, so both pages
+    // emit the same thing.
+    const head = readerSentencesHtml(loc.location_id, key, "head");
+    const foot = readerSentencesHtml(loc.location_id, key, "foot");
+    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${head}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}${extra}${foot}</details>`;
   };
 
   const introChapterHtml = chapterHtml(INTRO_SECTION);

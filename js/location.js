@@ -16,7 +16,10 @@ import {
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
   sentenceCaseRuleParagraph, locationGateProvenanceHtml,
 } from "./app-shared.js";
-import { PORTRAITS, CHAPTER_INTROS } from "./portraits.js";
+import {
+  PORTRAITS, CHAPTER_INTROS,
+  READER_SENTENCES, READER_SENTENCE_SCOPE_LINE, READER_SENTENCE_POSITIONS,
+} from "./portraits.js";
 import { siteUrl } from "./site-root.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
@@ -121,7 +124,7 @@ async function main() {
   root.appendChild(buildVerdictBlock(store, loc, country, persona));
   root.appendChild(buildSectionNav());
   root.appendChild(buildPortrait(loc));
-  root.appendChild(buildSection(INTRO_SECTION, bySection.get(INTRO_SECTION) || [], ""));
+  root.appendChild(buildSection(INTRO_SECTION, bySection.get(INTRO_SECTION) || [], "", loc.location_id));
 
   // Part 25.6: the passport lens re-renders the ENTRY LAYER only, inside
   // this one section — nothing else on the page changes under it (25.9's
@@ -139,7 +142,7 @@ async function main() {
     const extraHtml = sectionKey === "visa"
       ? buildPassportStripHtml(store, nationality, nationalityRow, country) + buildVisaRoutesHtml(store, country, nationalityRow)
       : "";
-    root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || [], extraHtml));
+    root.appendChild(buildSection(sectionKey, bySection.get(sectionKey) || [], extraHtml, loc.location_id));
   }
 
   root.appendChild(buildScoreBar(store, loc, persona));
@@ -624,7 +627,7 @@ function buildPortrait(loc) {
   div.className = "portrait-block";
   div.innerHTML = `
     <p>${escapeHtml(data.portrait)}</p>
-    <p class="portrait-teaser">${escapeHtml(data.hook)} — ${escapeHtml(data.number)}</p>
+    <p class="portrait-teaser">${escapeHtml(data.hook)}${data.number ? ` — ${escapeHtml(data.number)}` : ""}</p>
   `;
   return div;
 }
@@ -1188,6 +1191,73 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
   `;
 }
 
+// ---------------------------------------------------------------------
+// Reader sentences inside a chapter. Specified by the reader-sentence
+// placement spec, its §2.3 and §5, as amended by Cap 2026-10-04 — the
+// amendment's own words and the head/foot shape it forces are documented
+// once, in js/portraits.js's own header, and not restated here.
+//
+// Two positions per chapter: `head` renders between the chapter-intro
+// line and the chapter's own extra content (so the visa chapter's
+// passport strip and route cards stay BELOW any reader sentence —
+// orientation that arrives after the thing it orients is not
+// orientation), and `foot` renders last inside the chapter, below the
+// fact rows, closing it. The foot position is Cap's, on the Chania
+// precedent: that page's Overview chapter already closes on a
+// healthcare row whose content is a referral drive to a bigger city.
+//
+// SEMANTICS: <p class="reader-sentence-topic">, never a heading element.
+// Inside a <details> the <summary> is the heading, and the rows below
+// use <div class="fact-label"> for exactly this labelling role; an <h4>
+// here would inject phantom levels into the document outline for a
+// screen-reader user. The topic carries `fact-label` as a second class
+// because the spec names that rule's own font-weight: 600 as the
+// treatment to reuse rather than a label treatment to invent (its §2.4).
+//
+// NO CSS SHIPS WITH THIS CHANGE, by instruction. `.reader-sentences`,
+// `.reader-sentence` and `.reader-sentence-scope` are therefore
+// undefined in css/style.css and carry no rule: these paragraphs render
+// at the chapter's inherited body type with the stylesheet's default
+// paragraph margins and no measure constraint — the same unconstrained
+// measure the already-live `.chapter-intro` line above them runs at,
+// which matters more here only because these paragraphs are longer (710
+// characters against an intro line's ~140). The class names ship as the
+// hooks the spec's §2.4 rules attach to if and when those are ruled in.
+//
+// The scope line renders ONCE PER CHAPTER, and in lens-selected states
+// only. getActivePersona() returns null in the explicit-general state,
+// which is a general view and correctly gets no line; it returns a
+// persona id or READER_ID otherwise.
+//
+// ONCE PER CHAPTER REPLACES ONCE PER BLOCK.
+// The head/foot split made the old rule render the line twice in
+// Antigua's Overview under a lens, eighteen rows apart, and the wording
+// here argued that was the acceptable cost of the split. It is not:
+// `withScope` is false for the foot block whenever the head block
+// already rendered one, so the chapter carries exactly one line, at the
+// first block that appears in it. A chapter with only a foot block still
+// gets its line, because nothing suppressed it there.
+// ---------------------------------------------------------------------
+function readerSentencesHtml(locationId, key, position, withScope = true) {
+  if (!locationId || !READER_SENTENCE_POSITIONS.includes(position)) return "";
+  const entry = READER_SENTENCES[locationId];
+  const slots = entry && entry.chapters ? entry.chapters[key] : null;
+  const list = slots ? slots[position] : null;
+  // Hard placeholder rule (v7 §2.3): no entry renders nothing at all.
+  if (!Array.isArray(list) || !list.length) return "";
+  let html = `<div class="reader-sentences reader-sentences-${position}">`;
+  for (const item of list) {
+    if (item.topic) {
+      html += `<p class="reader-sentence-topic fact-label">${escapeHtml(item.topic)}</p>`;
+    }
+    html += `<p class="reader-sentence">${escapeHtml(item.text)}</p>`;
+  }
+  if (withScope && getActivePersona()) {
+    html += `<p class="reader-sentence-scope">${escapeHtml(READER_SENTENCE_SCOPE_LINE)}</p>`;
+  }
+  return html + `</div>`;
+}
+
 // v7 §2.4: each fact section is now a <details class="chapter">, closed
 // by default, every location, no exceptions — including Overview, which
 // gets no silent default-open exemption (the verdict block + portrait
@@ -1195,7 +1265,7 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
 // line (js/portraits.js's CHAPTER_INTROS, verbatim source copy) sits
 // right under the summary where one exists (5 of 6 sections this pilot;
 // Overview has none drafted, renders without one).
-function buildSection(key, facts, extraHtml = "") {
+function buildSection(key, facts, extraHtml = "", locationId = null) {
   const details = document.createElement("details");
   details.id = `sec-${key}`;
   // Red Flags keeps its stronger heading treatment even while collapsed
@@ -1207,6 +1277,15 @@ function buildSection(key, facts, extraHtml = "") {
     ? `<p class="chapter-intro">${escapeHtml(CHAPTER_INTROS[key])}</p>`
     : "";
 
+  // DELIBERATE DEPARTURE from the spec's §2.3, which said to insert the
+  // reader-sentence block in BOTH places introHtml is used. Its own §2.1
+  // forbids a reader sentence and the "Not yet researched" line
+  // co-rendering — that pair is a self-contradiction shipped to a reader
+  // — and §2.1 is the rule, so this branch renders no reader sentence at
+  // all. A location/chapter whose slots are filled but whose facts are
+  // empty is a DATA error, not a render case: the prerender build asserts
+  // it and fails loudly, and this branch makes the pair unreachable here
+  // by construction.
   if (!facts.length && !extraHtml) {
     details.innerHTML = `<summary>${title}</summary>${introHtml}<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
     return details;
@@ -1233,7 +1312,8 @@ function buildSection(key, facts, extraHtml = "") {
     }
   }
 
-  let bodyHtml = introHtml + extraHtml;
+  const readerHeadHtml = readerSentencesHtml(locationId, key, "head");
+  let bodyHtml = introHtml + readerHeadHtml + extraHtml;
   if (routeGroups.size) {
     bodyHtml += `<div class="fact-list">`;
     for (const [, byRole] of routeGroups) {
@@ -1283,6 +1363,11 @@ function buildSection(key, facts, extraHtml = "") {
   // nothing (empty string) until a real prohibited-enforced fact exists
   // in this section's facts.
   bodyHtml += buildIllegalRoutesHtml(facts);
+
+  // Last inside the chapter, below the fact rows: Cap's foot position. The
+  // scope line rides the head block when there is one, so the foot asks for
+  // it only when the head rendered nothing at all.
+  bodyHtml += readerSentencesHtml(locationId, key, "foot", !readerHeadHtml);
 
   details.innerHTML = `<summary>${title}</summary>${bodyHtml}`;
   return details;

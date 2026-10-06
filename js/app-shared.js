@@ -2291,31 +2291,39 @@ export function formatNumbersInText(text) {
   return text.replace(/\d{5,}/g, (run) => Number(run).toLocaleString("en-US"));
 }
 
-// Display precision, ordered by Cap 2026-09-30 after a human read of the
-// rendered Antigua page: the elevation row read "1530.17 metres". The
-// source (SEGEPLAN, quoting DGN 1981) really does say 1,530.17, and the
-// vault keeps that figure — but centimetre precision on a town's
-// elevation reads as false precision to a person. This rounds the
-// DISPLAY only; no row, no derived file, no stored value is touched.
+// Display precision, the ruled convention: display rounds physical
+// measurements (heights, distances, areas) to whole numbers. Rates, index
+// scores, prices and percentages keep their decimals. The exact figure
+// stays in the store and the source.
 //
-// Deliberately narrow rather than a general numeric-rounding policy:
-// of the 64 bare-decimal value_raw rows on file, every one except this
-// elevation needs its decimals (index scores, homicide rates per
-// 100,000, percentages, prices), so a blanket rule would corrupt 63 real
-// numbers to fix one. Scoped to an exact `metres` unit, with a magnitude
-// guard so a genuinely small metres value (a 0.4m sea-level rise) can
-// never round to zero. Today that is exactly one row.
+// THE CLASSIFIER: the FIRST WORD of `unit`, exact match against
+// metres and meters, m, km, km², hectares. First word, because `unit` is free
+// text and
+// carries parentheticals — "km (~45 min drive)", "hectares (without meeting
+// specific conditions)". Exact, because a substring test on "m" would catch
+// $/m², mm/year, μg/m³ and m³/person/year, which are prices and rates and
+// keep their decimals. °C keeps its decimals as well: a temperature is not
+// a height, a distance or an area.
 //
-// No general display-precision convention exists yet; one has been
-// requested. If it lands, this function is the thing it replaces.
+// Rounding is ordinary, half up (Math.round). THE MAGNITUDE GUARD STAYS, so
+// a small physical value — a 0.4 m sea-level rise — cannot display as
+// nothing. DISPLAY ONLY: no row, no derived file, no
+// stored value is touched, and a `value_raw` that is not a single number —
+// a range, an approximation, an open band, free text — passes through
+// untouched.
+//
+// SUPERSEDES the metres-only scope this function shipped with, and the
+// no-general-rounding-rule clause it rested on.
 //
 // DUPLICATION CLASS: tools/prerender-locations.mjs keeps its own copy of
 // this (same hand-kept-in-sync class as its formatValue/sectionForFact).
 // Change one, change both, or the static page and the hydrated page
 // disagree.
+const PHYSICAL_DISPLAY_UNITS = new Set(["metres", "meters", "m", "km", "km²", "hectares"]);
+
 export function roundDisplayValue(raw, unit) {
-  const u = String(unit == null ? "" : unit).trim().toLowerCase();
-  if (u !== "metres" && u !== "meters") return raw;
+  const head = String(unit == null ? "" : unit).trim().toLowerCase().split(/\s+/)[0];
+  if (!PHYSICAL_DISPLAY_UNITS.has(head)) return raw;
   const n = Number(raw);
   if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
   return String(Math.round(n));

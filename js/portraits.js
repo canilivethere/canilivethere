@@ -164,7 +164,7 @@ export const CHAPTER_INTROS = {
 // no row behind them and so went unwritten) are internal and do not
 // cross. Nothing of them is here. The strings were extracted and written
 // by script rather than retyped, and their measured lengths are the
-// transport's own check: fixture 3 = 353, fixture 4 = 349, fixture 5 =
+// transport's own check: fixture 3 = 427, fixture 4 = 349, fixture 5 =
 // 710. A shipped string of a different length is a failed transport.
 // FIXTURE 1 IS 159, NOT THE 200 IT ARRIVED AS: the elevation shows once
 // in the opened Overview and the fact row is where it shows, so this
@@ -172,6 +172,13 @@ export const CHAPTER_INTROS = {
 // is struck. That is a ruled change to
 // the string, not a failed transport — the only kind of length change
 // this check is not meant to catch, which is why it is named here.
+// FIXTURE 3 IS 427, NOT THE 353 IT ARRIVED AS: Cap ruled the Fuego
+// clause's qualifier in on 2026-10-06 (17:31 +00), so "Do not rent or
+// buy there." now reads "...unless you are really into living in the
+// impact zone of an active volcano." That is a ruled change to the
+// string, not a failed transport — the same exemption as fixture 1's,
+// named here for the same reason. Fixtures 1, 4 and 5 were re-measured
+// on that date and match the figures above unchanged.
 //
 // Characters a "tidying" edit would silently change, named so that it
 // cannot: EM DASH U+2014 (fixtures 1, 3 and 4), EN DASH U+2013 (fixture
@@ -268,8 +275,10 @@ export const READER_SENTENCES = {
               + "view — one of three volcanoes visible from the street. The "
               + "2018 deaths were on Fuego's south and south-east flank, below "
               + "about 2,500 m: the Las Lajas drainage, San Miguel Los Lotes "
-              + "and El Rodeo, in Escuintla. Do not rent or buy there. Antigua "
-              + "sits on the far side, shielded by Volcán de Agua.",
+              + "and El Rodeo, in Escuintla. Do not rent or buy there unless "
+              + "you are really into living in the impact zone of an active "
+              + "volcano. Antigua sits on the far side, shielded by Volcán de "
+              + "Agua.",
           },
           {
             topic: "Homicide rate",

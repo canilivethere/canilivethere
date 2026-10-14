@@ -8,9 +8,16 @@
 //   ending its own way. A reader's passport, priorities and numbers are
 //   one job, and the door asked them as three, joined by "or".
 //
-//   NOW: one entry card, "Be you", opening one three-step process —
-//   numbers, then priorities, then passport, in that order because income
-//   and preferences are what move the answer most. Every step is
+//   AND AS OF 2026-10-12: the middle step is GONE. Cap's ruling, his
+//   typed words — "remove preferences cleanly now, they come back later
+//   when built properly" — retires the priorities questionnaire AND the
+//   stored weight vector it wrote. "Later when built properly" has no
+//   date, no owner and no dormant code path waiting for it in this file:
+//   there is no hidden branch, no orphaned key and no count that still
+//   expects a third screen.
+//
+//   NOW: one entry card, "Be you", opening one two-step process —
+//   numbers, then passport. Every step is
 //   skippable and nothing is mandatory. One submit, "See the world",
 //   which closes the box in place and re-renders the map underneath from
 //   what the reader gave. No second page, no result screen, no dead end.
@@ -32,19 +39,16 @@
 
 import {
   VALID_PERSONAS, personaDescriptorSentence, withPersona, escapeHtml, isActivationKey,
-  hasCustomProfile, loadCustomProfile, saveCustomProfile,
   loadNationality, saveNationality, loadSavedPerspective, saveSavedPerspective,
   setExplicitGeneral, clearExplicitGeneral,
   hasAnySavedReaderState, wireForgetControl,
   isDoorAnswered, markDoorAnswered, loadOwnNumbers,
-  saveOwnNumbersForVisit, saveOwnNumbers,
-  readerKeepsOnDevice, keepReaderAnswersOnDevice, stopKeepingReaderAnswers,
-  isReaderStorageAvailable, CUSTOM_TILE_ICON, REOPEN_FLAG,
+  saveOwnNumbersForVisit, saveOwnNumbers, readerKeepsOnDevice,
+  keepBlockHtml, wireKeepBlock,
+  CUSTOM_TILE_ICON, REOPEN_FLAG,
 } from "./app-shared.js";
-import { loadStore, defaultWeightForCriterion } from "./data.js";
-import {
-  createOwnNumbersStep, SAVE_LABEL, SAVE_NOTE, SAVE_UNAVAILABLE_LINE,
-} from "./own-numbers.js";
+import { loadStore } from "./data.js";
+import { createOwnNumbersStep } from "./own-numbers.js";
 // The engine half's own convertAmount(), not a second hand-typed rate —
 // see waldoReferenceBandNote() below.
 import { convertAmount } from "./own-numbers-data.js";
@@ -64,11 +68,14 @@ const DOOR_BRAND_LINE = "CanILiveThere";
 // record — they read the same to everyone" and then offered the reader
 // three things joined by "or". It was built on a false premise: a visa
 // rule does not read the same to everyone — a passport is exactly what
-// makes it read differently. The replacement states the offer and the reward, names the
-// three things as one process rather than three choices, and says up
+// makes it read differently. The replacement states the offer and the reward, names what
+// it asks for as one process rather than a set of choices, and says up
 // front that every part of it is optional.
+// FOUR WORDS OUT with the middle step ("what matters to you and"), and
+// nothing else touched: the line's ruled structure — offer, reward,
+// everything optional — is intact, and so is the premise above.
 const WELCOME_LINE =
-  "Want to see the world as it looks for you? Tell the site what you live on, what matters to you and what passport you hold — as much or as little as you like — and the map opens for you.";
+  "Want to see the world as it looks for you? Tell the site what you live on and what passport you hold — as much or as little as you like — and the map opens for you.";
 const ESCAPE_HATCH_LABEL = "See the facts as they are.";
 
 // The one entry card. "Be you" is one half of a two-part choice — be
@@ -76,23 +83,33 @@ const ESCAPE_HATCH_LABEL = "See the facts as they are.";
 // persona row below is the other half, which is why neither needs to
 // explain the other.
 const ENTRY_CARD_LABEL = "Be you";
+// A two-item list takes "and", not a comma: "What you live on, your
+// passport" reads as a list with a word missing. "every step optional"
+// STAYS — it is true of two steps as of three, and "both steps" would be
+// a second edit buying nothing.
 const ENTRY_CARD_SUBLINE =
-  "What you live on, what matters to you, your passport — one quick process, every step optional. Nothing you enter leaves this browser.";
+  "What you live on and your passport — one quick process, every step optional. Nothing you enter leaves this browser.";
 
 // Unchanged: it already reads as the alternative.
 const PERSONA_ROW_HEADING = "Or compare against eight worked examples — fictional people, real rules.";
 
-// The three step headings. The position is carried
-// inline in the heading, never as a separate progress element.
+// The two step headings. The position is carried
+// inline in the heading, never as a separate progress element. A count in
+// a heading that disagrees with the flow is the plainest form of the
+// "a control's promise counts as a claim" defect, so these move in the
+// same commit as the step.
 const STEP_HEADINGS = [
-  "Your numbers — 1 of 3",
-  "Your priorities — 2 of 3",
-  "Your passport — 3 of 3",
+  "Your numbers — 1 of 2",
+  "Your passport — 2 of 2",
 ];
 
 // The step controls, at equal reading weight. "Skip
 // this" is never disabled: a step the reader skips commits nothing for
 // that dimension, and the site uses the general figures for it.
+// ONE DEFINITION OF "WHICH STEP IS THE LAST ONE", because three literal
+// 3s in three functions is how a step count goes stale in one place and
+// not the others — which is precisely the defect the heading count was.
+const LAST_STEP = STEP_HEADINGS.length;
 const NEXT_LABEL = "Next";
 const SKIP_LABEL = "Skip this";
 const SUBMIT_LABEL = "See the world";
@@ -136,36 +153,21 @@ const SWITCH_LABEL = "Switch or start over";
 const RESUME_KICKER_LABEL = "Welcome back.";
 const RESUME_CONTINUE_LABEL = "Continue where you left off";
 
-// The keep-switch's own home. AUTHORED PLACEMENT, flagged: the spec has
-// the durable save as a switch the reader turns on "after you've seen the
-// map" and does not say where it lives. It lives
-// here, on the door's main screen, beside the resume band — which is the
-// one surface a reader reaches AFTER the map, through the corner control,
-// and the surface that already carries the other control over their saved
-// state. It renders only while there is something to keep: figures
-// carried for this visit that the device is not already holding.
-// REWORDED — "Your figures" was false in both
-// states the same way: the switch governs every key in READER_ANSWER_KEYS
-// (own_numbers, nationality, custom_profile, saved_perspective), so a reader
-// who handed over a passport was told, in the loudest line of the block,
-// that this is about money. The file's own comment at keepSwitchHtml() has
-// said so since the switch's scope changed.
-const KEEP_HEADING = "Your answers are here for this visit.";
-// The switch's SECOND state, needed once un-ticking un-saves. That fix
-// makes un-ticking un-save, so the switch has to stay on screen once it is
-// ticked; the heading above it then goes on saying "for this visit" about
-// figures the device is holding, which is the same false-by-one-state
-// shape F2 itself was. No instruction in the heading: SAVE_NOTE already
-// says what the switch does.
+// THE KEEP SWITCH NOW RENDERS IN TWO PLACES, so its five strings and its
+// builder MOVED OUT of this file and into js/app-shared.js — the module
+// both surfaces already import. The rule is FORGET_LABEL's own, directly
+// above: the same string living at two sites moves together, or the site
+// ships two names for one control. The door's own copy of the block
+// stays, deliberately — a reader inside the box should not have to leave
+// it to keep what they just typed — and the SECOND home, on the map, is
+// what finally makes step 1's promise true ("a switch you turn on
+// yourself, after you've seen the map").
 //
-// AND THE HORIZON CLAUSE LIVES HERE, NOT ON THE RESUME BAND:
-// "until you clear them" belongs in exactly one of the two places that
-// could carry it, and this is the one that renders wherever there are
-// figures in play — keepSwitchHtml() is emitted on the no-band branch too,
-// so the clause is never orphaned by the band's absence. It points at two
-// controls the reader can see from this same block: un-ticking the switch,
-// and the forget button beneath it.
-const KEEP_HEADING_KEPT = "Your answers are kept on this device until you clear them.";
+// The two headings that used to be defined here are KEEP_HEADING and
+// KEEP_HEADING_KEPT in app-shared.js, verbatim, with their arguments
+// intact: the first is false in neither state because it names "answers"
+// rather than figures, and the second exists because un-ticking un-saves,
+// so the control has to stay on screen once ticked.
 
 function portraitSrc(id) {
   return `assets/portraits/${id}.png`;
@@ -185,11 +187,19 @@ function shouldShowDoor() {
 }
 
 // §8AA.1/25.4: the compound phrase the resume band names in two places.
-// Every saved dimension named at once — a reader who saved a passport AND
-// built priorities sees both named, not just one. Now also names figures,
-// because under one process figures are a dimension of the same answer
-// and a band that silently omitted them would under-describe what the
-// reader has on this device.
+// Every saved dimension named at once — a reader who saved a passport and
+// picked a worked example sees both named, not just one. Also names
+// figures, because under one process figures are a dimension of the same
+// answer and a band that silently omitted them would under-describe what
+// the reader has on this device.
+//
+// THE `priorities` LENS KIND IS GONE, with the step and the stored vector:
+// this function is what stopped reporting it, and it is what makes the
+// empty own-lens state in js/reader-lens.js reachable rather than
+// hypothetical — the descriptor stops naming a priorities lens while
+// `saved_perspective: "custom"` goes on resolving the reader into their
+// own lens. Those two facts sit in different files and only meet on
+// screen; H8 over there is the guard.
 function savedPerspectiveDescriptor() {
   const savedPersp = loadSavedPerspective();
   const nationality = loadNationality();
@@ -200,8 +210,6 @@ function savedPerspectiveDescriptor() {
   if (savedPersp && savedPersp.kind === "persona" && VALID_PERSONAS.includes(savedPersp.persona_id)) {
     lensKind = "persona";
     personaName = personaDisplayName(savedPersp.persona_id);
-  } else if (hasCustomProfile()) {
-    lensKind = "priorities";
   }
 
   if (!lensKind && !nationalityName) return null;
@@ -240,15 +248,15 @@ function resumeStateParts(descriptor) {
   if (lensKind === "persona" && nationalityName) {
     return { fragment: `${personaName}'s example and ${art} ${nationalityName} passport`, verb: "are" };
   }
-  if (lensKind === "priorities" && nationalityName) {
-    return { fragment: `Your own priorities and ${art} ${nationalityName} passport`, verb: "are" };
-  }
   if (lensKind === "persona") {
     return { fragment: `${personaName}'s example`, verb: "is" };
   }
-  if (lensKind === "priorities") {
-    return { fragment: "Your own priorities", verb: "are" };
-  }
+  // The two `priorities` branches are DELETED — "Your own priorities and a
+  // <Country> passport are here for this visit" and its solo twin. They
+  // were a REPORT of what the device was holding rather than a promise, so
+  // they were right to survive the step on their own; they do not survive
+  // the stored vector going with it. The passport-only branch below
+  // already serves what is left.
   if (nationalityName) {
     return { fragment: `${art === "an" ? "An" : "A"} ${nationalityName} passport`, verb: "is" };
   }
@@ -263,7 +271,7 @@ function resumeStateParts(descriptor) {
 // dimension lives in sessionStorage and goes when the visit does.
 //
 // NO NEW BRANCH IN resumeStateParts(). The horizon clause moved to the keep
-// switch's own heading (see KEEP_HEADING_KEPT above), which withdrew the
+// switch's own heading (KEEP_HEADING_KEPT, now in app-shared.js), which withdrew the
 // `is`->`it` / `are`->`them` pronoun the first draft of this sentence needed.
 // All that changes here is which of two literal tails the existing template
 // takes. buildResumeAriaFragment() below uses the fragment alone and is
@@ -288,19 +296,41 @@ function markSeenLegacyKeyRemoved() {
 
 // THE STAND-IN BAND ON WALDO'S TILE.
 //
-// WHAT IT IS AND IS NOT. This is NOT Waldo's figure and it must never be
-// read as one: the persona record holds $2,500/month, every pin and
-// verdict on Waldo's map is computed from that, and it is unchanged by
-// this line. The record moving to a euro figure is a confirmed follow-on
-// and not this crossing, so the band lives on the tile and NOT in the
-// store — which is precisely why the copy below says "for scale" and
-// names what it measures instead of asserting anything about him.
+// WHAT IT IS. It IS Waldo's figure now. The persona record holds the euro
+// band itself — €3,850/month gross — and the dollar figure his map is
+// computed from is DERIVED from it, at one named rate (EUR->USD, as_of
+// 2026-10-12, the same fx_rates row this site already reads), rather than
+// recorded separately.
 //
-// WHOSE NUMBER IT IS. €3,850 a month, gross, is the EU27 professionals
-// band, Eurostat, 2022. It is on the tile as the nearest MEASURED
-// stand-in, which is the whole label: nobody measures remote workers.
-// The figure and its scope were sourced by a researcher; nothing here
-// looked one up.
+// THE SEQUENCING NOTE THAT STOOD HERE IS CLOSED, AND THE CLOSURE IS THE
+// POINT: it warned that the published export predated the record's move
+// and so still computed Waldo at the earlier dollar figure, with the
+// exporters "the step after this one". They have run. The export in this
+// tree was generated after the move (verdicts.jsonl generated_at
+// 2026-10-13T16:12:32Z) and derived/profiles.jsonl ships Waldo at
+// income_monthly_usd 4301 — so tile and export now read the same record
+// and no reader sees two figures. The old note's closing principle
+// outlives the window it described and is kept: nothing here compensates
+// for an export by hand, because a tile that quietly disagreed with the
+// record to match a stale export would be the harder defect to find.
+//
+// SUPERSEDED, KEPT SO THE CHANGE IS LEGIBLE: this comment used to say the
+// record held $2,500/month, that the band on this tile was NOT Waldo's
+// figure "and must never be read as one", and that the record moving to a
+// euro figure was "a confirmed follow-on and not this crossing". The
+// follow-on IS this crossing — the record moved first and this tile was
+// left behind, which made its two framing clauses false rather than
+// merely dated: "for scale" existed only because the band was somebody
+// else's number, and the closer said his map was "still read from his
+// recorded figure above, not from this band" when the band is what it is
+// read from. Both are gone from the copy below, replaced wholesale.
+//
+// WHOSE NUMBER IT IS — UNCHANGED, AND IT HAD TO BE. €3,850 a month, gross,
+// is the EU27 professionals band, Eurostat, 2022. It is on the tile as the
+// nearest MEASURED stand-in, which is still the whole label: nobody
+// measures remote workers, so his figure is a measurement of that band and
+// never of a person. The figure and its scope were sourced by a
+// researcher; nothing here looked one up.
 //
 // THE DOLLARS ARE DERIVED, NOT RECORDED — the euro figure is the record.
 // The conversion is stated to the dollar because it is arithmetic on one
@@ -318,13 +348,14 @@ function markSeenLegacyKeyRemoved() {
 // the rate on file can't be trusted (row absent, pair missing, or stale)
 // rather than asserting a dollar figure it can't back.
 function waldoReferenceBandNote(fxRates) {
-  const lead = "For scale, the nearest measured stand-in — nobody measures remote workers: "
-    + "€3,850 a month gross, the EU27 professionals band (Eurostat, 2022). ";
+  const lead = "Waldo's figure is €3,850 a month, gross — before tax. "
+    + "Nobody measures remote workers, so the site uses the nearest measured stand-in: "
+    + "the EU27 professionals band (Eurostat, 2022). ";
   const converted = convertAmount(fxRates, 3850, "EUR", "USD");
   const derived = converted
     ? `About $${Math.round(converted.amount).toLocaleString("en-US")} a month, derived at the rate on file. `
     : "The site has no exchange rate on file it can convert this at today. ";
-  return lead + derived + "Waldo's own map is still read from his recorded figure above, not from this band.";
+  return lead + derived + "It is a measurement of that band, not of a person.";
 }
 function personaReferenceBand(id, fxRates) {
   return id === "waldo" ? waldoReferenceBandNote(fxRates) : null;
@@ -355,57 +386,17 @@ async function tilesHtml() {
   }).join("");
 }
 
-function questionRowHtml(q, prefillAnswers) {
-  const prefilled = prefillAnswers ? prefillAnswers[q.criterion_id] : null;
-  const choices = TIER_CHOICES.map(
-    (c) => `
-      <label class="priority-choice">
-        <input type="radio" name="q-${q.criterion_id}" value="${c.value}"${String(c.value) === String(prefilled) ? " checked" : ""}>
-        <span>${escapeHtml(c.label)}</span>
-      </label>`
-  ).join("");
-  return `
-    <fieldset class="door-question" data-criterion="${q.criterion_id}">
-      <legend>${escapeHtml(q.question)}</legend>
-      <div class="priority-choices">${choices}</div>
-    </fieldset>
-  `;
-}
-
-// v11 21.5 — the seven forced-choice questions, restricted to the High/
-// Medium-High weight-class criteria. Unchanged.
-const CUSTOM_QUESTIONS = [
-  { criterion_id: "community-social-fabric", question: "How much does being part of a real community — neighbors who know you, a social life that comes easily — matter to you?" },
-  { criterion_id: "nature-water-adjacency", question: "How much do mountains, water, or green space right outside your door matter to you?" },
-  { criterion_id: "income-viability", question: "How much does being able to actually earn a living there matter to you?" },
-  { criterion_id: "routine-sustainability-pace-of-life", question: "How much does it matter to you that daily life there just works — simple errands, reliable services, a routine that doesn't fall apart with the seasons?" },
-  { criterion_id: "cost-of-living-affordability", question: "How much does your money going further — rent, groceries, the ordinary bills — matter to you?" },
-  { criterion_id: "visa-legal-pathway-ease", question: "How much does simple paperwork — a visa that's easy to get and easy to keep, whether for a season or for good — matter to you?" },
-  { criterion_id: "room-for-others-group-viability", question: "How much does having room for friends or family to join you later matter to you?" },
-];
-const TIER_CHOICES = [
-  { value: 3, label: "A lot" },
-  { value: 2, label: "Some" },
-  { value: 1, label: "Not much" },
-  { value: 0, label: "Not at all" },
-];
-
-// The priorities INTRO SCREEN is retired as a screen: a
-// screen between the reader and the questions is a step inside a step.
-// Its content does not vanish — the scope line and the honesty line are
-// the step's own lead paragraphs, verbatim, and the "what it does" line's
-// no-hard-filter clause is the one thing a reader must know before
-// answering, so it leads.
-const PRIORITIES_SCOPE =
-  "Seven quick questions — community, nature, making a living, pace, cost, visas, and room for company — and the same facts every visitor sees get weighed by what matters to you, not by which of the eight examples you most resemble. One limit, worth knowing up front: this tips scales, it doesn't hide places. You can't tell it “never show me X” — only “this matters more, that matters less.” Every place stays on the map.";
-const PRIORITIES_HONESTY =
-  "Seven answers make a quick sketch of what you care about, not a full profile. Read the result as a rough first fit, not a verdict.";
-const PRIORITIES_BOUNDARY =
-  "It builds a Fit index, not a visa verdict; no eligibility check runs off these answers.";
-// RETIRED with the intro screen: "A fuller version is coming — one where
-// you set every priority yourself, not just these seven." It is a forward
-// promise about a capability the site does not have, and the promise-
-// surface rule forbids one. Nothing replaces it.
+// THE RETIRED STEP'S WHOLE INTERIOR STOOD HERE: questionRowHtml(), the
+// seven forced-choice questions (CUSTOM_QUESTIONS), the four tier choices
+// (TIER_CHOICES) and the step's three lead paragraphs (PRIORITIES_SCOPE,
+// PRIORITIES_HONESTY, PRIORITIES_BOUNDARY).
+//
+// RETIRED, NOT REWORDED, and no part of it moves to another screen:
+// there is no ruling for a priorities surface anywhere else on this site,
+// and inventing one would be a new mechanism inside a removal. The words
+// are not kept here as a commented-out block either — they are in the
+// file's history and in the copy spec this build worked from, which is
+// where a retired string belongs.
 
 /**
  * Summon (and own) the door.
@@ -421,21 +412,28 @@ export function initPerspectiveDoor({ onCommit } = {}) {
 
   const params = new URLSearchParams(location.search);
   // The corner control's one-shot flag, in the exact
-  // shape of the shipped ?edit-priorities=1 — read once, stripped from the
-  // URL, never stored, carrying no reader data of any kind.
+  // shape the retired ?edit-priorities=1 flag had — read once, stripped
+  // from the URL, never stored, carrying no reader data of any kind.
   const reopenRequested = params.get(REOPEN_FLAG) === "1";
-  // The legacy flag still works: it used to be set by "Edit your answers"
-  // in the profile bar, which is gone, but a bookmarked or in-flight URL
-  // should still land somewhere sensible. It now opens step 2 of the one
-  // process rather than a standalone questionnaire.
-  const editRequested = params.get("edit-priorities") === "1";
+  // THE ?edit-priorities=1 ENTRY IS GONE, with the step it opened. It was
+  // already a legacy flag — set by an "Edit your answers" control that
+  // retired before it did — and it is not re-pointed at the main screen,
+  // because a flag that silently means something else is a worse artefact
+  // than one that means nothing.
+  //
+  // READER-VISIBLE CONSEQUENCE, FLAGGED WITH NO COPY PROPOSED: a
+  // bookmarked ?edit-priorities=1 link now lands on the box's main
+  // screen, with the unknown parameter left in the address bar until the
+  // reader's first internal click (every internal link is rebuilt by
+  // withPersona(), which carries only the persona). No explanatory
+  // sentence is added: a stripped URL flag is not a reader surface, and
+  // apologising for a link the reader does not remember using is noise.
 
-  if (reopenRequested || editRequested) {
-    // Strip the one-shot flags so a later reload doesn't reopen unasked.
+  if (reopenRequested) {
+    // Strip the one-shot flag so a later reload doesn't reopen unasked.
     try {
       const url = new URL(location.href);
       url.searchParams.delete(REOPEN_FLAG);
-      url.searchParams.delete("edit-priorities");
       history.replaceState(null, "", url.pathname + url.search + url.hash);
     } catch (e) {}
   }
@@ -449,7 +447,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   // the reader skipped leaves its slot null and commits nothing, which is
   // what makes "the site uses the general figures for it" literally true
   // rather than a claim about an empty write.
-  let flow = { numbers: null, answers: null, nationality: null };
+  let flow = { numbers: null, nationality: null };
 
   function fog() {
     if (mapRoot) mapRoot.classList.add("map-fogged");
@@ -511,16 +509,6 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       }
       committed = true;
     }
-    if (flow.answers) {
-      // A subset commits. The all-seven-required gate is retired: a
-      // reader who answers three questions has told the site three true
-      // things, and refusing to store them because there are four more is
-      // the site holding its own form hostage. The untouched criteria
-      // take their own site-wide default weight, never zero and never an
-      // absent key.
-      saveCustomProfile(flow.answers.weights, flow.answers.answers);
-      committed = true;
-    }
     if (flow.nationality) {
       saveNationality(flow.nationality);
       committed = true;
@@ -529,7 +517,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       saveSavedPerspective("custom", null);
       clearExplicitGeneral();
     }
-    flow = { numbers: null, answers: null, nationality: null };
+    flow = { numbers: null, nationality: null };
     return committed;
   }
 
@@ -554,8 +542,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   function leaveWithoutLens() {
     const committed = commitFlow();
     const priorSaved = loadSavedPerspective();
-    const hadLensToSetAside = !committed && (hasCustomProfile()
-      || loadOwnNumbers()
+    const hadLensToSetAside = !committed && (loadOwnNumbers()
       || (priorSaved && priorSaved.kind === "persona" && VALID_PERSONAS.includes(priorSaved.persona_id)));
     markDoorAnswered();
     if (hadLensToSetAside) {
@@ -584,7 +571,10 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     // figures visit-only?", which a successful save makes false — so
     // there was no untick to wire and a stranger's income went durable
     // one-way. (That predicate is gone; see app-shared.js's note.)
-    const keepBlock = loadOwnNumbers() ? keepSwitchHtml() : "";
+    // The render condition — only while there is something to keep — moved
+    // inside keepBlockHtml(), so the door and the map cannot disagree
+    // about when a switch that keeps nothing is a dead control.
+    const keepBlock = keepSwitchHtml();
     const forgetBtn = hasAnySavedReaderState()
       ? `<button type="button" class="door-link-btn" id="door-forget-resume">${escapeHtml(FORGET_LABEL)}</button>`
       : "";
@@ -704,54 +694,20 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   // The durable-save switch. Off by default, always — the reader has to
   // reach for it, which is the strongest form the site's zero-backend
   // posture can take on the one field it would most like to keep.
-  function keepSwitchHtml() {
-    const available = isReaderStorageAvailable();
-    // The tick mark IS the state of the device, read fresh on every
-    // render — not a local flag the handler sets. A checkbox whose
-    // checked-ness is a guess about what is stored is the same class of
-    // lie as a switch with no un-save behind it.
-    // THE SWITCH NOW GOVERNS EVERY ANSWER THE BOX TOOK, not the figures
-    // alone — see the write-rule block in app-shared.js. The tick mark is
-    // still the state of the device read fresh, never a local flag.
-    const kept = readerKeepsOnDevice();
-    return `
-      <div class="own-save" id="door-keep-block">
-        <p class="door-resume-line">${escapeHtml(kept ? KEEP_HEADING_KEPT : KEEP_HEADING)}</p>
-        <label class="priority-choice own-choice">
-          <input type="checkbox" id="door-keep-toggle"${kept ? " checked" : ""}${available ? "" : " disabled"}>
-          <span>${escapeHtml(SAVE_LABEL)}</span>
-        </label>
-        <p class="own-field-note">${escapeHtml(SAVE_NOTE)}</p>
-        ${available ? "" : `<p class="own-field-note">${escapeHtml(SAVE_UNAVAILABLE_LINE)}</p>`}
-      </div>`;
-  }
-
-  function wireKeepSwitch() {
-    const toggle = panel.querySelector("#door-keep-toggle");
-    if (!toggle) return;
-    toggle.addEventListener("change", () => {
-      if (!toggle.checked) {
-        // Every durable copy goes — figures, passport, priorities and the
-        // door's own memory of the choice. The visit copies stay, because
-        // the reader unticked "keep this", not "forget this": the map
-        // they are looking at does not change, and next visit there is
-        // nothing left to resume from.
-        stopKeepingReaderAnswers();
-        renderMainScreen();
-        return;
-      }
-      const ok = keepReaderAnswersOnDevice();
-      if (!ok) {
-        toggle.checked = false;
-        toggle.disabled = true;
-        return;
-      }
-      renderMainScreen();
-    });
-  }
+  //
+  // BUILT AND WIRED FROM app-shared.js NOW, because the same control also
+  // renders on the map (see renderSlotInto() in js/reader-lens.js). The
+  // door's instance keeps its own element ids, so the panel can hold both
+  // the block and the forget button without either reaching the other's
+  // nodes. NO HEADING HERE, deliberately: inside the box the block sits
+  // under "Welcome back." in a panel that is entirely about the reader's
+  // own state.
+  const DOOR_KEEP_ID = "door-keep";
+  const keepSwitchHtml = () => keepBlockHtml({ id: DOOR_KEEP_ID });
+  const wireKeepSwitch = () => wireKeepBlock(panel, DOOR_KEEP_ID, renderMainScreen);
 
   // ------------------------------------------------------------------
-  // The three steps
+  // The two steps
   // ------------------------------------------------------------------
   //
   // Each is a full-panel re-render behind the shared .door-back control —
@@ -761,7 +717,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   // button that looks like an apology is not an offer.
 
   function stepControlsHtml(step, primaryDisabled) {
-    const isLast = step === 3;
+    const isLast = step === LAST_STEP;
     return `
       <div class="door-step-controls">
         <button type="button" class="door-escape door-step-primary" id="door-step-next"${primaryDisabled ? " disabled" : ""}>${escapeHtml(isLast ? SUBMIT_LABEL : NEXT_LABEL)}</button>
@@ -776,7 +732,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
       <div class="door-step-body" id="door-step-body">${innerHtml}</div>
       ${stepControlsHtml(step, primaryDisabled)}
     `;
-    // .door-back on step 1 returns to the main screen; on 2 and 3 to the
+    // .door-back on step 1 returns to the main screen; on step 2 to the
     // previous step, with its answers intact.
     panel.querySelector("#door-back").addEventListener("click", () => {
       if (step === 1) renderMainScreen();
@@ -788,7 +744,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     const next = panel.querySelector("#door-step-next");
     const skip = panel.querySelector("#door-step-skip");
     const advance = () => {
-      if (step === 3) seeTheWorld();
+      if (step === LAST_STEP) seeTheWorld();
       else renderStep(step + 1);
     };
     next.addEventListener("click", () => {
@@ -806,17 +762,15 @@ export function initPerspectiveDoor({ onCommit } = {}) {
 
   function clearStep(step) {
     if (step === 1) flow.numbers = null;
-    if (step === 2) flow.answers = null;
-    if (step === 3) flow.nationality = null;
+    if (step === 2) flow.nationality = null;
   }
 
   function renderStep(step) {
     if (step === 1) return renderNumbersStep();
-    if (step === 2) return renderPrioritiesStep();
     return renderPassportStep();
   }
 
-  // ---- step 1 of 3: the numbers ----
+  // ---- step 1 of 2: the numbers ----
   async function renderNumbersStep() {
     const store = await loadStore();
     renderStepShell(1, "", true);
@@ -838,65 +792,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     panel.focus();
   }
 
-  // ---- step 2 of 3: the priorities ----
-  async function renderPrioritiesStep() {
-    // The store is awaited BEFORE the step renders, not inside its
-    // commit: a commit that has to wait for a fetch is a commit that can
-    // lose a race with the reader tapping "Next" — the weights would be
-    // null at flow exit and the whole step would vanish silently. Every
-    // step in this process resolves what it needs up front, and the
-    // promise is already in flight from page load, so this is normally
-    // already-resolved rather than a real wait.
-    const store = await loadStore();
-    const existing = loadCustomProfile();
-    const prefillAnswers = (flow.answers && flow.answers.answers)
-      || (existing ? existing.answers : null);
-    renderStepShell(2, `
-      <div class="own-numbers-box">
-        <p class="door-passport-scope">${escapeHtml(PRIORITIES_SCOPE)}</p>
-        <p class="own-field-note">${escapeHtml(PRIORITIES_BOUNDARY)}</p>
-        <p class="own-field-note">${escapeHtml(PRIORITIES_HONESTY)}</p>
-        <div class="door-questions">
-          ${CUSTOM_QUESTIONS.map((q) => questionRowHtml(q, prefillAnswers)).join("")}
-        </div>
-      </div>
-    `, true);
-
-    const next = panel.querySelector("#door-step-next");
-    const answeredAny = () =>
-      CUSTOM_QUESTIONS.some((q) => panel.querySelector(`input[name="q-${q.criterion_id}"]:checked`));
-    const sync = () => { next.disabled = !answeredAny(); };
-    panel.querySelectorAll('input[type="radio"]').forEach((input) => {
-      input.addEventListener("change", sync);
-    });
-    sync();
-
-    wireStepControls(2, {
-      commit: () => {
-        if (!answeredAny()) { flow.answers = null; return; }
-        const answers = {};
-        for (const q of CUSTOM_QUESTIONS) {
-          const checked = panel.querySelector(`input[name="q-${q.criterion_id}"]:checked`);
-          if (checked) answers[q.criterion_id] = checked.value;
-        }
-        // 8P.1: all 13 criterion_ids present, always — the untouched ones
-        // take this criterion's own site-wide weight, never 0 and never an
-        // absent key. A reader who answered three of seven gets three
-        // real weights and ten site defaults, which is a truthful record
-        // of what they said; a vector with ten zeroes in it would not be.
-        const weights = {};
-        for (const crit of store.criteria) {
-          weights[crit.criterion_id] = Object.prototype.hasOwnProperty.call(answers, crit.criterion_id)
-            ? Number(answers[crit.criterion_id])
-            : defaultWeightForCriterion(crit);
-        }
-        flow.answers = { answers, weights };
-      },
-    });
-    panel.focus();
-  }
-
-  // ---- step 3 of 3: the passport ----
+  // ---- step 2 of 2: the passport ----
   async function renderPassportStep() {
     const store = await loadStore();
     const tierCodes = new Set(store.nationalityCodes);
@@ -911,7 +807,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     // touch the reader's own saved value either.
     const existingOffered = Boolean(existing) && tierCodes.has(existing.code);
 
-    renderStepShell(3, `
+    renderStepShell(2, `
       <div class="door-passport-box">
         <p class="door-passport-scope">${escapeHtml(PASSPORT_BOX_SCOPE)}</p>
         <label for="door-nationality-select">Your nationality</label>
@@ -933,7 +829,7 @@ export function initPerspectiveDoor({ onCommit } = {}) {
     select.addEventListener("change", sync);
     sync();
 
-    wireStepControls(3, {
+    wireStepControls(2, {
       // §8Z item 5 / §8AA.5: personal fields never serialize into URLs.
       // Nothing here touches URLSearchParams or location.search with this
       // value; the reader's own storage is the only carrier.
@@ -945,15 +841,13 @@ export function initPerspectiveDoor({ onCommit } = {}) {
   // ------------------------------------------------------------------
   // Open
   // ------------------------------------------------------------------
-  function open(screen) {
+  function open() {
     ensureOverlay();
     fog();
-    if (screen === "priorities") renderStep(2);
-    else renderMainScreen();
+    renderMainScreen();
   }
 
   if (reopenRequested) open();
-  else if (editRequested) open("priorities");
   else if (shouldShowDoor()) open();
 
   return { open };

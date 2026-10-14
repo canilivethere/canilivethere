@@ -7,9 +7,9 @@ import {
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, WEIGHT_CLASS_LABEL,
   verdictBand, BAND_ORDER, BAND_LABEL, stateHeadline,
   READER_DEPENDENCY_PENDING_LABEL, verdictConfidenceBadge,
-  CUSTOM_ESTIMATE_SUFFIX, glossaryWrap,
+  glossaryWrap,
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
-  READER_ID, hasReaderWeights, loadViewIndex, saveViewIndex, personaPossessiveLabel,
+  READER_ID, loadViewIndex, saveViewIndex, personaPossessiveLabel,
   READER_BASIS_DECLARED_LINE,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
@@ -206,9 +206,19 @@ function updatePurposeExplainer(store) {
   // (21.7's own scope boundary — a flat table, same shape as no persona)
   // — its own clause names that directly rather than reusing the
   // eight-persona wording, which would wrongly imply a "groups below" a
-  // custom-weighted view never has.
+  // reader's own view never has.
+  //
+  // A SIXTH PRIORITIES SITE, FOUND BY SWEEP AND NOT IN THE COPY SPEC'S
+  // INVENTORY, so it is flagged here and listed back rather than quietly
+  // reworded. Its trailing clause — "this sort only reweights the same
+  // facts by what you told us matters" — is gated on `persona ===
+  // "custom"` and NOT on a stored profile, so it is reachable and it went
+  // FALSE the moment nothing reweights anything. The repair is the
+  // narrowest one available: a deletion of the clause that is no longer
+  // true, with the sentence's own job (what this sort does NOT check)
+  // untouched and no word added. The shipped "either" is kept as shipped.
   const doesntClause = persona === "custom"
-    ? "it doesn't check your own visa, budget, or eligibility either — this sort only reweights the same facts by what you told us matters"
+    ? "it doesn't check your own visa, budget, or eligibility either"
     : persona
     ? "it doesn't decide the groups below — that's a separate, persona-specific read, unaffected by this sort"
     : "it doesn't check your own visa, budget, or eligibility — pick a persona above for that";
@@ -345,10 +355,15 @@ function personaCoverageLine(store, persona, rows) {
 // reader scrolling to "Not checked yet" and finding sixteen countries in
 // it needs to know that is coverage, not judgement.
 function readerContextLine(store, rows) {
-  const weighted = hasReaderWeights();
-  const rankingClause = weighted
-    ? `Ranked by your own priorities — the same facts, weighted the way you told us matters (${CUSTOM_ESTIMATE_SUFFIX}).`
-    : "Ranked by the general Fit index — you haven't told the site what matters most to you, so nothing here is reweighted.";
+  // ONE CLAUSE, NOT TWO. The weighted arm — "Ranked by your own
+  // priorities — the same facts, weighted the way you told us matters" —
+  // was gated on the reader's own stored weight vector and is deleted
+  // with it. The general arm was already written beside it and is the
+  // only reading now. LISTED, NOT REWORDED: its "you haven't told the
+  // site what matters most to you" is still literally true of every
+  // reader, and the sentence is owed a re-read now that there is no
+  // surface on which they could tell it.
+  const rankingClause = "Ranked by the general Fit index — you haven't told the site what matters most to you, so nothing here is reweighted.";
   if (!hasReaderVerdicts(store)) {
     return rankingClause;
   }
@@ -377,7 +392,7 @@ function readerContextLine(store, rows) {
   // analogue is that a row is never sunk below where its fit put it is
   // still open, and a flat fit-ranked alternative is specified and
   // waiting if it is wanted.
-  const readerFitPhrase = weighted ? "weighted by your priorities" : "the general figures";
+  const readerFitPhrase = "the general figures";
   return `${rankingClause} Your own read is shown per row where this box has read the country — ${joinList(readCountryNames(store))} — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries this box hasn't read against your figures and the ones where the record doesn't reach an answer; neither is a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
 }
 
@@ -416,7 +431,10 @@ function buildRows(store, persona) {
         // out, never given a score it hasn't earned.
         const idx = store.personaIndex(READER_ID, loc.location_id);
         fitValue = idx ? idx.value : null;
-        personaAdjusted = hasReaderWeights();
+        // Never persona-adjusted now: the reader's Fit value is the general
+        // index, which is what personaIndex() returns for them, and every
+        // surface that labels it says "general figures" in its own words.
+        personaAdjusted = false;
         engineVerdict = resolveVerdict(store, READER_ID, loc);
       } else if (persona) {
         const perLoc = store.fixturesByPersona.get(persona)?.get(loc.location_id);
@@ -496,6 +514,32 @@ function render(store, persona) {
       : persona
       ? personaCoverageLine(store, persona, rows)
       : "Unpersonalized general ranking — the same 13-criterion weighted index shown on the map.") + visitContextLine;
+
+  // (e) THE VERDICT COLUMN'S HEADER IS LENS-KEYED, set here because this
+  // is where the sibling disclosure line is already set and `persona` is
+  // already in scope. The shipped static header read "Persona verdict" in
+  // every lens — telling a reader in their OWN lens that the column holds
+  // a persona's read, which is the defect (e) exists to close.
+  //
+  // Two of the three cases are an EXISTING helper:
+  // personaPossessiveLabel() already returns "your own" / "Wenda's" / "",
+  // so only the no-lens case needed a string, and "general figures" is
+  // this site's own shipped phrase for that state. A bare "Verdict" was
+  // the cheaper option and is rejected: it is true in all three lenses
+  // and discloses none of them, and the perspective-disclosure law makes
+  // the disclosure the point.
+  //
+  // The static markup in lists.html carries the no-lens string, so a
+  // no-JS reader and a reader whose lens is not resolvable both meet
+  // "Verdict — general figures" and never "Persona verdict".
+  const verdictHeaderEl = document.getElementById("verdict-col-header");
+  if (verdictHeaderEl) {
+    verdictHeaderEl.textContent = persona === READER_ID
+      ? "Your own verdict"
+      : persona
+        ? `${personaPossessiveLabel(persona)} verdict`
+        : "Verdict — general figures";
+  }
 
   const tbody = document.getElementById("rank-tbody");
   tbody.innerHTML = "";
@@ -739,17 +783,14 @@ function renderRow(store, row, persona, tbody, { suppressVerdict = false } = {})
   const fallbackTag = row.personaAdjusted === false && !STATE.purposeCriterion
     ? ` <span class="scope-tag" title="General figure — ${escapeHtml(personaPossessiveLabel(persona))} own re-score hasn't reached here yet.">(general)</span>`
     : "";
-  // 21.6 item 2: the disclosure suffix rides wherever the custom-weighted
-  // number itself renders — here, not on the purpose-criterion view (that
-  // column shows one raw, unweighted score, unrelated to the reader's own
-  // weight vector).
-  // The suffix names the reader's own priorities, so it renders only where
-  // priorities exist. A reader who gave figures and no priorities sees the
-  // general index under their own lens, and a "(from your priorities)" tag
-  // beside it would be a false sentence about a number they never shaped.
-  const customTag = persona === READER_ID && hasReaderWeights() && !STATE.purposeCriterion
-    ? ` <span class="scope-tag">(${CUSTOM_ESTIMATE_SUFFIX})</span>`
-    : "";
+  // THE "(from your priorities)" TAG IS DELETED. It rode wherever a
+  // custom-weighted number rendered, gated on the reader's own stored
+  // weight vector — so with the vector retired it is unreachable rather
+  // than false, and no number under the reader's lens is weighted by
+  // anything of theirs any more. Nothing takes its place: the column's
+  // own caption and the context line above the table both already say the
+  // ranking is the general Fit index.
+  const customTag = "";
   // While a purpose view is active, the column shows that criterion's own
   // score directly — the whole point of §3 is answering "just the visa
   // question" (etc.) without opening the breakdown row to find the number.

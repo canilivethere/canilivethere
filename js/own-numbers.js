@@ -116,8 +116,14 @@ const PERIOD_OPTIONS = [
 // and the old "the site doesn't convert" OTHER line — see
 // COVERAGE_LINE below for the one fact worth carrying out of the second
 // of those).
+// "THE OTHER" -> "ANOTHER", one word, and it is a correction rather than
+// a polish: "the other currency" means the other of the two the reader
+// can pick, USD or EUR. A THB bar is in NEITHER, and is converted. With
+// the baht sentence deleted below, this note is the box's whole account
+// of conversion, and as written it did not cover the very read (b) exists
+// to stop denying.
 const OWN_CURRENCY_NOTE_BASE =
-  "Bars stated in the other currency are converted into yours at the rate on file. Your income is read in the currency you pick here.";
+  "Bars stated in another currency are converted into yours at the rate on file. Your income is read in the currency you pick here.";
 // Appended when the rules-layer rate this promise depends on can't be
 // trusted right now — the row absent, the pair missing, or stale
 // (js/own-numbers-data.js's convertAmount()) — at the point of selection
@@ -125,7 +131,7 @@ const OWN_CURRENCY_NOTE_BASE =
 // retired baht note was written to answer, carried forward to the one
 // cause that can still happen).
 const OWN_CURRENCY_NOTE_FX_DOWN =
-  "Today the site has no exchange rate on file it can convert with, so routes whose bars are stated in the other currency won't be read against your figure. It won't guess a rate.";
+  "Today the site has no exchange rate on file it can convert with, so routes whose bars are stated in another currency won't be read against your figure. It won't guess a rate.";
 
 // Field C — where the income comes from. The display names are the
 // spec's; the stored token underneath is the corpus vocabulary's own
@@ -194,13 +200,26 @@ const FIELD_D_AMOUNT_LABEL = "How much capital?";
 const FIELD_D_INCOMPLETE_NOTE =
   "You've ticked the capital box but not put an amount in it — enter one, or untick the box.";
 
-// Second sentence added by the conversion crossing: the one
-// surviving fact from the retired CURRENCY_OTHER_NOTE (the baht-bars-are-
-// bank-balances-only note), carried here now that no reader can select
-// baht to be told it there.
+// THE THIRD SENTENCE IS DELETED, and it was false in BOTH halves rather
+// than only in the clause Cap named. His words: "we compare. Drop the
+// sentence in step 1 that says the box won't compare Thai bank balances;
+// show the rate as my fx ruling says."
+//
+// Measured from derived/visa-routes.jsonl:
+// TH:route:destination-thailand-visa and
+// TH:route:non-immigrant-o-x-retirement-visa both carry
+// currency_code "THB" with property_rule "compare" — so bars are NOT all
+// "stated in dollars or euros", and both ARE compared. The DTV's 500,000
+// THB converts and produces a real reader figure.
+//
+// A sentence with no true half is a deletion, not a rewrite, and NOTHING
+// replaces it here: the conversion promise is already made at the point
+// of selection by OWN_CURRENCY_NOTE_BASE above, and the rate itself is
+// disclosed at the verdict, by the rate line in js/app-shared.js. The
+// retired sentence's job is not quietly re-assigned to a new sentence in
+// this box.
 const COVERAGE_LINE =
-  "This box reads Thailand, Guatemala, Portugal, Spain and Crete. Everywhere else, it says so instead of guessing. "
-  + "Bars are stated in dollars or euros; a few Thai routes set a bank-balance figure in baht, which the box notes and doesn't compare.";
+  "This box reads Thailand, Guatemala, Portugal, Spain and Crete. Everywhere else, it says so instead of guessing.";
 
 // The "not now, and why" limits — the ones that are not rendered at a
 // point of selection, in the spec's own order.
@@ -220,27 +239,20 @@ const LIMITS_LINES = [
   "Staying long enough to use one of these routes usually makes you tax-resident, and these five countries treat that very differently. This box doesn't read any of that.",
 ];
 
-// The save control's own words, exported because the control itself now
-// lives on the door's main screen — after the reader has seen the map,
-// which is what the privacy paragraph above promises them. One string,
-// one claim, wherever it renders.
-export const SAVE_LABEL = "Keep this on my device";
-// REWORDED. The shipped note named ONE
-// of the four things the switch now governs — ticking it writes the
-// passport, the priorities and the door's memory of the chosen lens as well
-// as the figures. This is the consent text for the switch and the defect
-// being closed was a scope claim, so the scope is named item by item: the
-// four keys in READER_ANSWER_KEYS, in the order the reader answered them,
-// with the lens last because it is the site's memory of a choice rather than
-// something typed. The off-state's lifetime is stated plainly rather than
-// left as an absence. The closing sentence is unchanged and still true in
-// both states — no write path in this box reaches the network.
-export const SAVE_NOTE =
-  "Off by default. Turn it on and this browser keeps your answers \u2014 your figures, your priorities, your passport, the lens you picked \u2014 so they're here next time. Leave it off and they go when this visit ends. Nothing is sent anywhere either way.";
-// AUTHORED-CHOICE (unchanged from v1): B9 asks for one plain line saying
-// why, without giving the line.
-export const SAVE_UNAVAILABLE_LINE =
-  "This browser isn't letting the site store anything, so there's nothing to keep. Everything above still works either way.";
+// SAVE_LABEL, SAVE_NOTE and SAVE_UNAVAILABLE_LINE MOVED to
+// js/app-shared.js, verbatim, with one deletion inside SAVE_NOTE: the
+// four words "your priorities, " came out of its enumeration with the
+// step that wrote them, so the consent text names exactly the three keys
+// READER_ANSWER_KEYS now holds. The move is because the switch they
+// belong to renders in two places now — the door's main screen and the
+// map — and this file is only loaded by the door.
+//
+// WHY THE DELETION RATHER THAN A REPHRASING, kept here because this
+// string's own history is the argument: it was rewritten BECAUSE it
+// under-claimed its scope (it named the figures and governed four keys),
+// and that was blocked at review. Under-claiming what is being written to a
+// stranger's device is the worse error. Naming a key the switch no longer
+// governs is the other direction of the same defect.
 
 // B10 — the whole-box refusal state. AUTHORED-CHOICE (unchanged from v1):
 // the spec asks for "one line" and does not write it.

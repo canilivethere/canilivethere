@@ -36,8 +36,9 @@
 // stays index.html-only, reached through the door.
 
 import {
-  loadOwnNumbers, loadNationality, hasCustomProfile,
-  applyStoredCustomWeights, isExplicitGeneral, hasReaderInput,
+  loadOwnNumbers, loadNationality,
+  keepBlockHtml, wireKeepBlock, KEEP_BLOCK_HEADING,
+  isExplicitGeneral, hasReaderInput,
   personaDescriptorSentence, personaDisplayLabel, escapeHtml,
   DISCLAIMER_DETAILS_HTML, READER_ID,
 } from "./app-shared.js";
@@ -62,7 +63,12 @@ import {
 // bands). Named here as constants so a typo is a reference error rather
 // than a silently unrendered state.
 const S_ABOVE = "READER_ABOVE_BAR";
-const S_AT_LINE = "READER_AT_LINE";
+// S_AT_LINE is RETIRED (Cap, 2026-10-07: "clearing the bar is clearing").
+// Nothing composes it, nothing bands it and nothing has a sentence for it
+// any more — see app-shared.js's own retirement block for the four
+// strings. The population split by direction: at-or-above the bar is
+// S_ABOVE / S_ABOVE_CONDITIONAL carrying a closeness note, below the bar
+// is S_BELOW carrying its shortfall.
 const S_ABOVE_CONDITIONAL = "READER_ABOVE_CONDITIONAL";
 const S_BELOW = "READER_BELOW_BAR";
 const S_WRONG_TYPE = "READER_WRONG_TYPE";
@@ -85,7 +91,6 @@ const S_FX_UNAVAILABLE = "UNCERTAIN_FX_UNAVAILABLE";
 
 const STATE_BAND = {
   [S_ABOVE]: "clean",
-  [S_AT_LINE]: "uncertain_or_conditional",
   [S_ABOVE_CONDITIONAL]: "uncertain_or_conditional",
   [S_BELOW]: "hard_fail",
   [S_WRONG_TYPE]: "hard_fail",
@@ -221,23 +226,22 @@ const BAND_RANK = { clean: 0, uncertain_or_conditional: 1, hard_fail: 2, data_ga
 // Transport, not interpretation: every branch below reads a field the shipped
 // evaluateRow() already set, and sets no number of its own.
 export function readerStateForRow(result) {
-  if (result.amountBand === "above") {
+  // TWO BAND VALUES, ONE STATE PAIR. "above" and "above_near" both clear
+  // the bar, so both take the same token and the same band — the
+  // near-line reading is a note on a yes, not a third verdict. Which of
+  // the two the row carried is read later, off `result.amountBand`, by
+  // aboveBarKindSummary(); it does not reach the state vocabulary at all,
+  // which is what keeps the legend, the bands and the short forms from
+  // gaining a row apiece for one qualifier.
+  //
+  // The CONDITIONAL branch is unchanged and now serves both: Thailand's
+  // three LTR reduced-bar routes (USD 40,000/year, whose `unit` carries
+  // CONDITIONAL) keep their condition whether they clear by a lot or only
+  // just — which is the case the retired at-the-line state could not
+  // express without a token of its own.
+  if (result.amountBand === "above" || result.amountBand === "above_near") {
     return result.conditional ? S_ABOVE_CONDITIONAL : S_ABOVE;
   }
-  // AT THE LINE ON A CONDITIONAL BAR. This branch reads no
-  // `result.conditional` and must not start: there is no
-  // READER_AT_LINE_CONDITIONAL token, and inventing one would add a state,
-  // a band entry, a legend row and a short form to a crossing that is
-  // about a figure. Returning S_ABOVE_CONDITIONAL instead would be worse
-  // than the defect — it says "above the bar" about a row that is not.
-  //
-  // So the condition is carried the way every other per-state detail on
-  // this row is carried, through atLineConversionSummary() below onto
-  // `reader_bar_kind`, and app-shared.js's readerAtLineHeadline() swaps
-  // the OPENER. Same token, same band, same legend row; only the text
-  // varies. Reachable on three real rows: Thailand's three LTR
-  // reduced-bar routes (USD 40,000/year), whose `unit` carries CONDITIONAL.
-  if (result.amountBand === "at") return S_AT_LINE;
   if (result.amountBand === "below") return S_BELOW;
   // Added by the conversion crossing: a currency mismatch that COULD have been converted
   // but wasn't — the row absent, the pair missing, or the rate stale — is
@@ -372,20 +376,38 @@ export function belowBarKindSummary(entries) {
 //
 // READ OFF THE DECIDING ENTRY, not off the set: the sentence says "this
 // route" and the margin beside it names that same route, so the two must be
-// the same row. Returns null on an income bar — the shipped sentence then
-// renders through the same no-summary path it always did — and null when no
-// route is above at all.
+// the same row. Returns null where there is nothing to vary — the shipped
+// sentence then renders through the same no-summary path it always did.
 //
 // `condition` is the deciding row's own `capital_instrument_condition`,
 // carried as the exported key and never as words; app-shared.js turns it
 // into English where the rest of the reader's sentences live.
-export function aboveBarKindSummary(entries, deciding) {
-  const above = entries.filter((e) => e.state === S_ABOVE);
+//
+// IT NOW CARRIES A SECOND FACT, `nearLine`, and it is the same mechanism
+// doing the same job: the band's third value ("above_near") says the
+// reader cleared from inside the near-line band, and app-shared.js's
+// closeness note and its ", only just" short twin are selected by it.
+// It rides HERE rather than becoming a state because clearing is
+// clearing — a qualifier on a yes must not be able to colour a pin, band
+// a Lists row or earn a legend line of its own.
+//
+// `state` is which above-family token the country composed to, passed in
+// rather than assumed, because READER_ABOVE_CONDITIONAL's rows need the
+// closeness exactly as READER_ABOVE_BAR's do and they carry a different
+// token. Defaulted to S_ABOVE so an existing two-argument caller is
+// unchanged.
+export function aboveBarKindSummary(entries, deciding, state = S_ABOVE) {
+  const above = entries.filter((e) => e.state === state);
   if (!above.length) return null;
-  const chosen = deciding && deciding.state === S_ABOVE ? deciding : above[0];
+  const chosen = deciding && deciding.state === state ? deciding : above[0];
   const bar = barForRow(chosen.row);
-  if (!bar || bar.kind !== "capital") return null;
-  return { kind: "capital", condition: chosen.row.capital_instrument_condition || null };
+  const capital = !!(bar && bar.kind === "capital");
+  const nearLine = chosen.result.amountBand === "above_near";
+  if (!capital && !nearLine) return null;
+  return {
+    ...(capital ? { kind: "capital", condition: chosen.row.capital_instrument_condition || null } : {}),
+    ...(nearLine ? { nearLine: true } : {}),
+  };
 }
 
 // WHETHER A ROUTE THE SITE COULD NOT READ ACTUALLY TAKES THE READER'S
@@ -426,47 +448,14 @@ export function wrongTypeUnreadSummary(entries) {
   return acceptingUnread ? { acceptingUnread: true } : null;
 }
 
-// Added by the conversion crossing. WHETHER THE "AT THE LINE"
-// READING WAS A CONVERTED COMPARISON — the one fact
-// app-shared.js's READER_AT_LINE variant sentence needs, found the same
-// way belowBarKindSummary() above finds its own fact: summarised over
-// exactly the routes the sentence is about. Returns null (the plain,
-// unchanged sentence renders) unless at least one at-the-line route's
-// deciding comparison was actually converted.
-// WIDENED BY THE MARGIN WORK, in two ways, both of them consequences
-// of the sentence now NAMING a route:
-//
-//   1. It reports `conditional` as well as `converted` — see
-//      readerStateForRow()'s own note for why the condition rides here
-//      rather than becoming a state.
-//   2. Both facts are read off the DECIDING entry where there is one,
-//      instead of off "any at-the-line route". That distinction did not
-//      exist while the sentence named no route; now that it says "this
-//      route's bar was converted" beside a named bar, an any-route reading
-//      would attach one route's property to another route's name.
-//      `deciding` is decidingEntry()'s answer — the one selector, passed
-//      in rather than recomputed, so there is no second call and no second
-//      rule.
-//
-// Falls back to the any-route reading when no deciding entry is given, so
-// the function stays total for a caller that holds only entries.
-export function atLineConversionSummary(entries, deciding) {
-  const atLine = entries.filter((e) => e.state === S_AT_LINE);
-  if (!atLine.length) return null;
-  const read = (e) => ({
-    converted: !!(e.result.gate2 && e.result.gate2.comparable && e.result.gate2.comparable.converted),
-    conditional: !!e.result.conditional,
-  });
-  const summary = deciding && deciding.state === S_AT_LINE
-    ? read(deciding)
-    : {
-      converted: atLine.some((e) => read(e).converted),
-      conditional: atLine.some((e) => read(e).conditional),
-    };
-  // Null where there is nothing to vary, so the plain shipped sentence
-  // renders through the same no-summary path it always did.
-  return (summary.converted || summary.conditional) ? summary : null;
-}
+// atLineConversionSummary() RETIRES WITH ITS STATE. It answered two
+// questions for the at-the-line sentence — was the deciding comparison
+// converted, and did the deciding bar attach conditions — and both
+// questions now have homes that are not a summary: the condition reaches
+// readerStateForRow()'s own CONDITIONAL branch, and the conversion
+// reaches the reader as the RATE ITSELF, named in app-shared.js's rate
+// line rather than gestured at by a sentence about why the answer "can't
+// be tighter".
 
 // Added by the conversion crossing. WHICH GATE(S) actually
 // stopped a READER_NOT_ENOUGH country — the fact app-shared.js's composed
@@ -603,7 +592,6 @@ function noMarginFallbackEntry(entries, countryState) {
 const MARGIN_CANDIDATE_STATE = {
   [S_ABOVE]: S_ABOVE,
   [S_ABOVE_CONDITIONAL]: S_ABOVE_CONDITIONAL,
-  [S_AT_LINE]: S_AT_LINE,
   [S_BELOW]: S_BELOW,
   [S_BELOW_SOME_UNREAD]: S_BELOW,
   [S_NONE_CLEARS]: S_BELOW,
@@ -666,7 +654,16 @@ function composeReaderMargin(chosen, input, fxRates) {
   const bar = barForRow(chosen.row);
   const converted = !!chosen.result.gate2.comparable.converted;
 
-  // Fixed key order, kept so a diff of two rows lines up.
+  // Fixed key order, kept so a diff of two rows lines up. The five rate
+  // keys are appended at the end rather than interleaved, for the same
+  // reason: an existing diff of two rows still lines up down to the key
+  // the margin shipped with.
+  //
+  // THE RATE IS CARRIED BECAUSE THE READER IS TOLD IT. Cap's fx ruling
+  // has two halves and only the first was ever built: the table on file
+  // is consulted, and "the hover says which rate was used" was not. The
+  // three values existed one layer down, on gate2.comparable, and this
+  // function DISCARDED them — so the disclosure had nothing to render.
   const margin = {
     status: "ok",
     route_key: chosen.row.route_key,
@@ -678,6 +675,11 @@ function composeReaderMargin(chosen, input, fxRates) {
     currency: input.currency,
     period: bar.period,
     converted,
+    rate: null,
+    rate_currency: null,
+    rate_as_of: null,
+    rate_source: null,
+    rate_stale_after_days: null,
   };
 
   const rawReader = bar.kind === "capital"
@@ -687,6 +689,41 @@ function composeReaderMargin(chosen, input, fxRates) {
   let rawBar = chosen.row.value_num_low;
   if (input.currency !== bar.currency) {
     const back = convertAmount(fxRates, chosen.row.value_num_low, bar.currency, input.currency);
+    if (back) {
+      // ONE RATE, AND IT IS THE ONE THIS CONVERSION ACTUALLY CONSULTED.
+      // convertAmount() reports the single NON-BASE table entry it used
+      // (`named = fromEntry.isBase ? toEntry : fromEntry`) — so for a THB
+      // bar read into USD it is the THB entry, and for a USD bar read
+      // into EUR it is the EUR one.
+      //
+      // THE CODE IS DERIVED HERE, by that same rule, and the reason is
+      // scope rather than taste: convertAmount() returns the rate but not
+      // which currency the entry belongs to, and its file is out of this
+      // box beyond the band split. Of the two currencies in a conversion,
+      // the one named is the one that is not the table's base — which for
+      // THIS call (from the bar's currency into the reader's) is the bar's
+      // currency unless the bar is already in the base.
+      //
+      // THE TWO-RATE CASE IS REAL AND IS NOT FAKED. A EUR reader against
+      // a THB bar consumes two non-base entries, and convertAmount()
+      // still reports one: the bar's. So this line names the bar's rate
+      // and says nothing about the reader's leg. The two-rate wording is
+      // written (spec §F2) and is OWED, with the engine carry it needs;
+      // nothing here invents a second rate to fill it, and
+      // convertAmount()'s own comment — which wrongly claims both
+      // currencies are never non-USD — is left exactly as it stands
+      // rather than replaced with a claim this build has not tested.
+      margin.rate = back.rate;
+      margin.rate_currency = bar.currency === (fxRates && fxRates.base) ? input.currency : bar.currency;
+      margin.rate_as_of = back.asOf;
+      margin.rate_source = back.source;
+      // The window the age is stated inside, interpolated from the row and
+      // never written into the sentence — the same value-copy rule
+      // BAND = 0.10 carries in js/own-numbers-data.js.
+      margin.rate_stale_after_days = fxRates && Number.isFinite(fxRates.stale_after_days)
+        ? fxRates.stale_after_days
+        : null;
+    }
     if (!back) {
       // The second refusal: a band exists and the amount cannot be
       // expressed in the reader's currency. Every figure null — never a
@@ -787,28 +824,30 @@ export function buildReaderVerdictRows(store, input) {
     // consumes it in that case today; this makes it impossible for
     // anything to start.
     //
-    // Widened by the conversion crossing: two more states now
-    // carry a summary on this same field, same mechanism, same rule —
-    // READER_AT_LINE (whether the deciding comparison was converted) and
-    // READER_NOT_ENOUGH (which of the three causes are actually present,
-    // composed per country since S_NOT_ENOUGH only ever names a country
-    // where EVERY route landed it).
+    // Widened by the conversion crossing: READER_NOT_ENOUGH carries a
+    // summary on this same field, same mechanism, same rule — which of
+    // the three causes are actually present, composed per country since
+    // S_NOT_ENOUGH only ever names a country where EVERY route landed it.
     //
-    // Widened again by the margin crossing: the at-the-line summary is now
-    // read off the DECIDING entry, because the sentence beside it names
-    // that route. One decidingEntry() call, its answer passed to both
-    // consumers — never two calls that could disagree.
+    // Widened again by the margin crossing: a summary that describes the
+    // route the SENTENCE NAMES is read off the DECIDING entry. One
+    // decidingEntry() call, its answer passed to both consumers — never
+    // two calls that could disagree.
+    //
+    // NARROWED by the band split: the at-the-line summary is gone with
+    // its state, and the above-family summary now serves BOTH above
+    // tokens, because the closeness note belongs to a conditional clear
+    // exactly as much as to a plain one.
     const deciding = decidingEntry(entries, overallState);
     const readerBarKind = (overallState === S_BELOW || overallState === S_BELOW_SOME_UNREAD)
       ? belowBarKindSummary(entries)
-      // Widened again by the capital comparison: READER_ABOVE_BAR
+      // Widened again by the capital comparison: the above family
       // carries a summary on this same field, same mechanism, same rule —
       // { kind: "capital", condition } where the deciding bar measures
-      // capital, null where it measures income.
-      : overallState === S_ABOVE
-        ? aboveBarKindSummary(entries, deciding)
-      : overallState === S_AT_LINE
-        ? atLineConversionSummary(entries, deciding)
+      // capital, { nearLine: true } where the reader cleared from inside
+      // the band, both where both, null where neither.
+      : (overallState === S_ABOVE || overallState === S_ABOVE_CONDITIONAL)
+        ? aboveBarKindSummary(entries, deciding, overallState)
         : overallState === S_NOT_ENOUGH
           ? notEnoughCauseSummary(entries)
           // Widened again by the wrong-type split: a fourth shape on the
@@ -847,8 +886,9 @@ export function buildReaderVerdictRows(store, input) {
       // Read by stateHeadline()/readerStateShort() to pick which text an
       // existing token renders. Despite the name, carries three different
       // shapes now, one per state that needs one: { kind, phraseKey } for
-      // S_BELOW/S_BELOW_SOME_UNREAD, { converted } for S_AT_LINE,
-      // { hasA, hasB, hasC } for S_NOT_ENOUGH, { acceptingUnread } for
+      // S_BELOW/S_BELOW_SOME_UNREAD, { kind?, condition?, nearLine? } for
+      // S_ABOVE/S_ABOVE_CONDITIONAL, { hasA, hasB, hasC } for
+      // S_NOT_ENOUGH, { acceptingUnread } for
       // S_WRONG_TYPE_SOME_UNREAD. Null on every row whose state carries
       // no summary — most of them, by construction. FOUR shapes behind
       // one name is now the honest count and the name has drifted off
@@ -904,9 +944,10 @@ export function buildReaderVerdictRows(store, input) {
 // Layer the reader onto an already-built store: the weights exactly as
 // today, plus the verdict rows. ONE call, in every page's main(), right
 // after loadStore() resolves — the same position and the same category as
-// applyStoredCustomWeights(), which it now wraps.
+// applyStoredCustomWeights(), which it used to wrap — that function is
+// retired with the stored weight vector, so this one no longer layers
+// anything onto the store before building the verdict rows.
 export function applyReaderLens(store) {
-  applyStoredCustomWeights(store);
   // THE STALE-ROWS DEFECT, AND THE FIX. This function has three paths
   // that set no rows — no figures, a visit, an unsound route table — and
   // not one of them used to clear what a previous call had already put in
@@ -951,8 +992,8 @@ export function hasReaderVerdicts(store) {
 // THE RULE: overlay — fit fill on all 38, eligibility as a mark on the
 // pin. This is the whole of it, in code:
 //
-//   QUALITY   — the fit index, reweighted by the reader's own priorities
-//               where they gave any, general where they did not. It is
+//   QUALITY   — the fit index, on the general figures for every reader
+//               now that the stored weight vector is retired. It is
 //               the FILL, on all 38 locations, always, and entering
 //               numbers changes not one of them.
 //   ELIGIBILITY — the reader's own read, carried as a MARK beside the
@@ -1099,15 +1140,22 @@ export function joinList(parts) {
 const LINE_A = "Shown as-is — the general figures, nobody's situation in particular.";
 const LINE_A_META = "Tell the site about you from the corner, any time.";
 const LINE_B = "Shown as-is — your own answers are set aside for now, not deleted.";
+// H5: the `priorities` key is DELETED, not emptied. joinList() reads one
+// item as itself and two as "A and B", so with the key gone the line reads
+// "Shown for you — read from your numbers and your passport." or either
+// one alone. Both grammatical; no separator is left dangling. The
+// zero-item reading is H8's, in perspectiveLineParts() below.
 const READER_DIMENSION_LABELS = {
   numbers: "your numbers",
-  priorities: "your priorities",
   passport: "your passport",
 };
 const LINE_E_META =
   "You said a visit, so your numbers aren't read against residence routes — entry rules for a visit come from your passport.";
-const LINE_F_META_PRIORITIES =
-  "The pins and the ranking are reweighted by your priorities; nothing here is a visa or money verdict.";
+// LINE_F_META_PRIORITIES is RETIRED — "The pins and the ranking are
+// reweighted by your priorities; nothing here is a visa or money
+// verdict." Nothing reweights them any more, so the ternary it stood in
+// collapses to the passport line below, which is already written and
+// already true of the one population that reaches it.
 const LINE_F_META_PASSPORT =
   "Only the entry rules change with your passport; the pins and the ranking are the general figures.";
 
@@ -1115,7 +1163,6 @@ function readerDimensions() {
   const numbers = loadOwnNumbers();
   const dims = [];
   if (numbers) dims.push("numbers");
-  if (hasCustomProfile()) dims.push("priorities");
   if (loadNationality()) dims.push("passport");
   return { dims, numbers };
 }
@@ -1140,6 +1187,32 @@ export function perspectiveLineParts(store, persona) {
   // D / E / F — the reader's own lens.
   if (persona === READER_ID) {
     const { dims, numbers } = readerDimensions();
+    // H8 — THE EMPTY OWN-LENS, NEWLY REACHABLE, AND THE SENTENCE IT
+    // BREAKS. REPRODUCED ON THE LIVE SITE BEFORE IT WAS GUARDED, not
+    // argued from the code: skip step 1, answer one priority question,
+    // skip step 3, and the box commits `custom_profile` plus
+    // `saved_perspective {kind:"custom"}` with no own_numbers and no
+    // nationality — because commitFlow() wrote the saved perspective
+    // whenever ANYTHING committed, priorities alone included. That reader
+    // returns, their retired profile is deleted on sight (H9), `dims` is
+    // [], joinList([]) returns "", and this line renders
+    // "Shown for you — read from ." — a sentence ending in a bare full
+    // stop, on the surface whose whole job is saying whose view this is.
+    //
+    // THE FIX NEEDS NO NEW WORDS, and that is the point: a "custom" lens
+    // with nothing behind it is not the reader's own view, so the render
+    // falls through to the two shipped no-lens strings at the foot of this
+    // function. NOT to LINE_B ("your own answers are set aside for now,
+    // not deleted"), which is for a reader who HAS answers and chose to
+    // look plainly — this reader has none, and the thing they gave is
+    // gone rather than set aside, so both of LINE_B's clauses would be
+    // false.
+    //
+    // THE GUARD, NOT A STORAGE WRITE: clearing the answerless lens on
+    // page load would also reach this state, and it would make a write to
+    // a stranger's device part of rendering a sentence. This way is also
+    // true of any future empty-lens state.
+    if (!dims.length) return { text: LINE_A, meta: LINE_A_META };
     const named = joinList(dims.map((d) => READER_DIMENSION_LABELS[d]));
     const text = `Shown for you — read from ${named}.`;
     if (numbers && numbers.duration_band === "visit") {
@@ -1159,9 +1232,13 @@ export function perspectiveLineParts(store, persona) {
       // replacement was specified for exactly this change; landing it
       // authors nothing. If the scope call is wrong, it is one edit to
       // revert and the old sentence is directly above in the history.
-      const fitClause = hasCustomProfile()
-        ? "the Fit index weighted by your priorities"
-        : "the general Fit index";
+      // H7: the ternary collapsed to its general arm. The weighted arm
+      // ("the Fit index weighted by your priorities") was gated on a
+      // stored profile, which no reader can have — a dead arm beside a
+      // reader-facing sentence naming stored priorities is the exact
+      // thing H5 and H6 exist to remove. The general arm was already
+      // written, so no words are new.
+      const fitClause = "the general Fit index";
       return {
         text,
         // TWO CORRECTIONS, and the first is the bigger one. "THE residence
@@ -1181,10 +1258,9 @@ export function perspectiveLineParts(store, persona) {
         meta: `Your numbers are read against residence routes in ${joinList(names)} — income bars and capital bars, where a route states one this site can compare; elsewhere they aren't read yet, and each page says so. Pin colors and the ranking are ${fitClause}, everywhere.`,
       };
     }
-    return {
-      text,
-      meta: hasCustomProfile() ? LINE_F_META_PRIORITIES : LINE_F_META_PASSPORT,
-    };
+    // The only population left here is a reader who gave a passport and no
+    // figures: the no-numbers branch, with the priorities branch retired.
+    return { text, meta: LINE_F_META_PASSPORT };
   }
 
   // B — explicitly general, with answers set aside. Distinguished from A
@@ -1207,8 +1283,50 @@ export function perspectiveLineHtml(store, persona) {
   `;
 }
 
+// ---------------------------------------------------------------------
+// (g) THE SAVE SWITCH'S NEW HOME, AND WHY IT IS THIS ONE.
+//
+// Directly beneath the perspective line, inside #persona-slot, before the
+// disclaimer fold. Argued rather than asserted:
+//
+//  1. This is the one block on the page that already answers "whose view
+//     is this, and what is the site holding for me" — which is the
+//     question the switch acts on. The reader's eye is already trained
+//     here: the perspective line took the retired profile bar's exact
+//     slot, by design.
+//  2. This slot renders on index.html, lists.html AND every location
+//     page, so the switch becomes reachable from wherever a stranger
+//     actually typed their income — the same argument that moved "Forget
+//     my answers" into the footer. No new mechanism.
+//  3. On index.html the slot sits above #map-root, so the reader meets it
+//     on the way back from "See the world" — which is exactly what step
+//     1's privacy paragraph promises them ("a switch you turn on
+//     yourself, after you've seen the map").
+//
+// NOT IN THE FOOTER, where its destructive twin lives: the ask was "more
+// visible", and the footer is the least-read band on the page. NOT
+// floating or sticky: nothing on this map is positioned over the plate,
+// by rule.
+//
+// It carries the one new string in (g) as a heading, because here the
+// block arrives with no context — in the door it sits inside a panel that
+// is entirely about the reader's own state and needs none.
+const SLOT_KEEP_ID = "slot-keep";
+
 function slotInnerHtml(store, persona) {
-  return `${perspectiveLineHtml(store, persona)}${DISCLAIMER_DETAILS_HTML}`;
+  return `${perspectiveLineHtml(store, persona)}`
+    + `${keepBlockHtml({ id: SLOT_KEEP_ID, heading: KEEP_BLOCK_HEADING })}`
+    + `${DISCLAIMER_DETAILS_HTML}`;
+}
+
+// The switch's state line and its tick mark are both read off the device
+// at render time, so flipping it re-renders the block it lives in rather
+// than patching two nodes by hand. Re-rendering the whole slot also
+// re-reads the perspective line, which is correct: un-ticking changes
+// what the browser is holding, and this block is where the site says so.
+function renderSlotInto(el, store, persona) {
+  el.innerHTML = slotInnerHtml(store, persona);
+  wireKeepBlock(el, SLOT_KEEP_ID, () => renderSlotInto(el, store, persona));
 }
 
 // index.html / lists.html: the static <div id="persona-slot"></div> the
@@ -1217,7 +1335,7 @@ function slotInnerHtml(store, persona) {
 // the "whose view is this" answer in the place it already looks.
 export function renderPerspectiveSlot(el, store, persona) {
   if (!el) return;
-  el.innerHTML = slotInnerHtml(store, persona);
+  renderSlotInto(el, store, persona);
 }
 
 // l/*.html: no static placeholder exists at parse time (the H1 is built
@@ -1229,6 +1347,6 @@ export function renderPerspectiveBlock(store, persona, anchorEl) {
   if (existing) existing.remove();
   const wrap = document.createElement("div");
   wrap.id = "persona-slot";
-  wrap.innerHTML = slotInnerHtml(store, persona);
   anchorEl.insertAdjacentElement("afterend", wrap);
+  renderSlotInto(wrap, store, persona);
 }

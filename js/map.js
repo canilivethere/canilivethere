@@ -5,8 +5,8 @@ import {
   renderFooter, getActivePersona, withPersona, escapeHtml,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, buildFitHeadline, isActivationKey,
   formatNumbersInText, splitFactSentences, stateHeadline, STATE_HEADLINE_BAND,
-  CONF_LABEL, CUSTOM_ESTIMATE_SUFFIX, initLocationSearch,
-  READER_ID, personaDisplayLabel, hasReaderWeights,
+  CONF_LABEL, initLocationSearch,
+  READER_ID, personaDisplayLabel,
   loadViewIndex, saveViewIndex, wireCornerLensInPlace,
   READER_BASIS_DECLARED_LINE,
   READER_STATE_SHORT, readerStateShort, READER_LABEL_UNREAD, READER_LABEL_UNREAD_MEMBER,
@@ -628,7 +628,7 @@ async function main() {
   const store = await loadStore();
   // The reader's weights AND the reader's verdict rows, layered
   // onto the built store before anything renders. One call, one position —
-  // the same position applyStoredCustomWeights() held, which it now wraps.
+  // the same position applyStoredCustomWeights() held before it retired.
   applyReaderLens(store);
   renderFooter(store);
   document.getElementById("fit-def-caption").textContent = FIT_INDEX_DEFINITION;
@@ -748,15 +748,12 @@ function renderPurposeSelector(store, lenses) {
       // differently. AUTHORED-CHOICE — the spec covers the LENS explainer
       // and leaves the blended one, so this is composed from the shipped
       // persona and custom lines, which is why they read alike.
+      // ONE VARIANT, NOT TWO: the weighted reading retired with the
+      // reader's own weight vector, so the FILL this first clause
+      // describes is the general Fit index for every reader. The
+      // general sentence was already written beside the weighted one.
       if (hasReaderVerdicts(store)) {
-        // Two variants on hasReaderWeights(), because under
-        // the overlay the FILL is the thing the first clause describes and
-        // the fill is weighted or general depending on this exact test.
-        explainerEl.textContent = hasReaderWeights()
-          ? READER_EXPLAINER_VERDICTS_WEIGHTED
-          : READER_EXPLAINER_VERDICTS_GENERAL;
-      } else if (hasReaderWeights()) {
-        explainerEl.textContent = `Pins colored by your own weighted Fit index (${CUSTOM_ESTIMATE_SUFFIX}).`;
+        explainerEl.textContent = READER_EXPLAINER_VERDICTS_GENERAL;
       } else {
         explainerEl.textContent = READER_EXPLAINER_PASSPORT_ONLY;
       }
@@ -806,11 +803,11 @@ function renderPurposeSelector(store, lenses) {
 // The overlay is what ships; both sentences are now true of what renders, which is why the placeholder they replace is
 // gone rather than reworded.
 //
-// The variants split on hasReaderWeights() because the FILL is the thing
-// the first clause names, and the fill is the reader's weighted index or
-// the general one on exactly that test.
-const READER_EXPLAINER_VERDICTS_WEIGHTED =
-  "Every pin is colored by the Fit index, weighted by your priorities — how well the place fits what you said matters. The mark on a pin is your own read, and only the countries this box has read carry one; hover a pin and it says which.";
+// ONE VARIANT NOW. The weighted twin — "Every pin is colored by the Fit
+// index, weighted by your priorities — how well the place fits what you
+// said matters…" — is DELETED with the vector that made it true. It was
+// gated on hasReaderWeights(), so it became unreachable rather than
+// false, and the general sentence below was already written beside it.
 const READER_EXPLAINER_VERDICTS_GENERAL =
   "Every pin is colored by the general Fit index — place quality, not eligibility. The mark on a pin is your own read, and only the countries this box has read carry one; hover a pin and it says which.";
 const READER_EXPLAINER_PASSPORT_ONLY =
@@ -1221,14 +1218,14 @@ function renderMap(store, lenses) {
     } else if (persona === READER_ID) {
       // Door v2. THE RULE, superseding the grey this branch once shipped
       // for the 26: the reader's map keeps the quality layer for all 38
-      // (fit index from their priorities) and overlays eligibility only
+      // (the general fit index) and overlays eligibility only
       // where the box read the route. Entering numbers never subtracts a
       // pin. Resolved as an overlay — fit fill on all 38, eligibility as
       // a mark on the pin.
       //
       // TWO LAYERS, and they no longer contend for one channel.
-      //   QUALITY — the fit index, reweighted by the reader's own
-      //   priorities where they gave any, general where they did not. It
+      //   QUALITY — the fit index, on the general figures for every
+      //   reader now that the reader's own weight vector is retired. It
       //   is the FILL, on every one of the 38 locations, every time, and
       //   nothing overlays it. (Measured: all 38 carry at
       //   least one score in derived/scores.jsonl, zero unscored — the
@@ -1249,17 +1246,17 @@ function renderMap(store, lenses) {
       // The no-verdict-for-unread-countries rule is scoped and survives
       // — it governs the ELIGIBILITY layer (no verdict for the countries
       // the box hasn't read, and there is none below), not the
-      // priorities-based quality index.
+      // quality index.
       // The paint decision itself is readerPinPaint() in
       // js/reader-lens.js — one call, no branch of its own here, because
       // the ruling has to be runnable and not merely readable. What stays
       // here is the tooltip, which is this file's job.
       const paint = readerPinPaint(store, loc);
       const readerVerdict = paint.verdict;
-      const weighted = hasReaderWeights();
       const value = paint.value;
-      const indexSuffix = weighted ? CUSTOM_ESTIMATE_SUFFIX : "general figures";
-      const qualityLine = `Fit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${indexSuffix})`;
+      // "(general figures)" unconditionally: the weighted alternative was
+      // gated on the reader's own stored weight vector, which is retired.
+      const qualityLine = `Fit index: ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (general figures)`;
       fill = paint.fill;
       gap = paint.gap;
       eliminated = paint.eliminated;
@@ -1311,7 +1308,7 @@ function renderMap(store, lenses) {
           ? `\n${READER_BASIS_DECLARED_LINE}`
           : "";
         // The first tooltip, landed from the spec: "The pin's color is
-        // the Fit index, {value}/5 ({indexSuffix}) — place quality, a
+        // the Fit index, {value}/5 (general figures) — place quality, a
         // different question from eligibility." The only thing
         // substituted into it is the value expression, which has to carry
         // a null ("not yet scored") the specified literal has no form for
@@ -1319,7 +1316,7 @@ function renderMap(store, lenses) {
         // now names the colour as the FILL, which is the whole difference
         // the overlay makes here: under fill-replacement this line was
         // describing a colour the reader was not looking at.
-        const qualitySentence = `The pin's color is the Fit index, ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (${indexSuffix}) — place quality, a different question from eligibility.`;
+        const qualitySentence = `The pin's color is the Fit index, ${value != null ? value.toFixed(1) + "/5" : "not yet scored"} (general figures) — place quality, a different question from eligibility.`;
         tooltip = `${loc.display_name}, ${country.name} — your own read: ${stateText}${confSuffix}${basisLine}\n${qualitySentence}${insteadLine}`;
       } else {
         // The box did NOT read this country. One state only now — the
@@ -1329,7 +1326,7 @@ function renderMap(store, lenses) {
         const headline = buildFitHeadline(store, null, loc, country, value);
         // The SECOND tooltip, landed verbatim from its second sentence
         // onward. Its specified first line reads "{place}, {country} — Fit
-        // index {value}/5 ({indexSuffix})"; the two lines already above
+        // index {value}/5 (general figures)"; the two lines already above
         // this one say exactly that and say it null-safely, so they stay
         // and the sentence lands as the line it was written to be. It also
         // closes an older defect by construction: the sentence it replaces
@@ -2082,7 +2079,11 @@ function renderMap(store, lenses) {
   }
 
   renderLegend(document.getElementById("map-legend"), persona, activeLens, store, { states: paintedStates, kinds: paintedKinds, ringDrawn });
-  renderJudgmentNote(document.getElementById("map-judgment-note"));
+  // The active lens reaches the note, so the persona-only limit renders
+  // only where it describes something on screen. `persona` is this
+  // render's own resolved lens — the same value the legend above reads, so
+  // the two cannot disagree about whose map this is.
+  renderJudgmentNote(document.getElementById("map-judgment-note"), persona);
 }
 
 // =====================================================================
@@ -2145,7 +2146,15 @@ const READER_MARK_ROWS = [
   // "on income" deleted — matches the same deletion on the sentence this
   // row compresses. A clean band can be earned against a capital bar.
   { band: "clean", label: "Above the bar" },
-  { band: "uncertain_or_conditional", label: "Not settled — right at the line, above with conditions, or a no on only the routes the site could read" },
+  // "right at the line" DELETED — a deletion, because that case has LEFT
+  // this band. The row's own rule is that its label must be true of every
+  // state in its band, and after the band split the at-the-line reading is
+  // true of none of them: at-or-above the bar bands clean, below it bands
+  // hard_fail. The other three rows are unchanged and were checked rather
+  // than assumed — "Above the bar" is already true of both populations the
+  // clean band now holds, which is the strongest evidence that the
+  // no-new-token wiring is the right shape.
+  { band: "uncertain_or_conditional", label: "Not settled — above with conditions, or a no on only the routes the site could read" },
   // Lead deleted, trailing clause KEPT: "or not this kind of income" is
   // READER_WRONG_TYPE, which genuinely is about income type. Only the
   // lead claimed the whole band was an income reading.
@@ -2636,8 +2645,8 @@ const STATE_CHIP_LABEL = {
 // mark" -> "the mark at a pin's top-right", once, in the first clause,
 // because the mark is no longer a stroke ON the pin and a sentence that
 // says otherwise sends the eye to the wrong pixels. ONE constant, ONE
-// remaining substitution: "fits your priorities" / "fits, on the general
-// figures".
+// remaining substitution, now a single value: "fits, on the general
+// figures" (its weighted twin retired with the stored weight vector).
 // THE MIDDLE CLAUSE CARRIED BOTH DEFECTS AT ONCE and the third sentence
 // is transported verbatim.
 //   "whether ITS residence routes take your income" was the same
@@ -2660,7 +2669,9 @@ const STATE_CHIP_LABEL = {
 // one paragraph from where it had just been repaired.
 const READER_LEGEND_NOTE_TEMPLATE =
   "The color is how well the place {fitClause}; the mark at a pin's top-right is how your figures read against residence routes in that country — income bars and capital bars, where a route states one this site can compare. Pins with no mark are in countries this box hasn't read against your figures — their color is still the place's Fit index, and none of it is a verdict.";
-const READER_LEGEND_FIT_CLAUSE_WEIGHTED = "fits your priorities";
+// READER_LEGEND_FIT_CLAUSE_WEIGHTED ("fits your priorities") is DELETED
+// with the weight vector it described. One substitution remains, and it
+// is no longer a substitution: the general clause is the only reading.
 const READER_LEGEND_FIT_CLAUSE_GENERAL = "fits, on the general figures";
 // The two recede summaries. UI copy about the site's own display, not a
 // claim about any place. Each names what is behind it, so the summary is a
@@ -2675,19 +2686,15 @@ const WALDO_RECEDE_SUMMARY = "What this color compares, and where his visa read 
 const READER_LEGEND_RECEDE_SUMMARY =
   "The colour is not a verdict — what it compares, and what a mark adds";
 
-function renderReaderVerdictKey(scaleHtml, weighted) {
+function renderReaderVerdictKey(scaleHtml) {
   // The ramp's own title is the SHIPPED one this same reader sees in the
   // no-verdicts state two branches below — reused rather than rewritten,
   // so entering numbers does not change what the fill legend calls
   // itself, which is the legend-side reading of "entering numbers never
-  // subtracts a pin".
-  const rampTitle = weighted
-    ? `Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)})`
-    : "Pin color — general Fit index";
-  const note = READER_LEGEND_NOTE_TEMPLATE.replace(
-    "{fitClause}",
-    weighted ? READER_LEGEND_FIT_CLAUSE_WEIGHTED : READER_LEGEND_FIT_CLAUSE_GENERAL
-  );
+  // subtracts a pin". The weighted title retired with the vector; one
+  // title, both states.
+  const rampTitle = "Pin color — general Fit index";
+  const note = READER_LEGEND_NOTE_TEMPLATE.replace("{fitClause}", READER_LEGEND_FIT_CLAUSE_GENERAL);
   // THE PHONE BAR. At 390 this legend measured 464.2px against a map card
   // of 300.5 — the map was not the tallest thing on its own page, it was
   // explanation wrapped around a map. The fix moves NO WORDS: at <=700px
@@ -2939,14 +2946,11 @@ function renderLegend(el, persona, activeLens, store, painted) {
     // a legend that describes colours the pins are not painting is the
     // defect Part 15.5 was written to fix, and the reader identity can
     // now paint two completely different channels.
-    const weighted = hasReaderWeights();
     if (hasReaderVerdicts(store)) {
-      el.innerHTML = renderReaderVerdictKey(scaleHtml, weighted);
+      el.innerHTML = renderReaderVerdictKey(scaleHtml);
       return;
     }
-    const title = weighted
-      ? `Pin color — your own weighted Fit index (${escapeHtml(CUSTOM_ESTIMATE_SUFFIX)})`
-      : "Pin color — general Fit index";
+    const title = "Pin color — general Fit index";
     el.innerHTML = `
       <div class="legend-scale">${title}: ${scaleHtml}</div>
       <span>${escapeHtml(SCALE_ANCHOR_STRING)}</span>
@@ -3037,22 +3041,54 @@ function bandDisclosureHtml() {
   return line ? `<span>${escapeHtml(line)}</span>` : "";
 }
 
-function renderJudgmentNote(el) {
+// (e) A READER IN THEIR OWN LENS IS NEVER TOLD IT IS A PERSONA.
+//
+// Item (2) is a claim about THREE PERSONAS' MAPS — Wenda's and Carmen's
+// fixtures, Waldo's missing eliminated state. In the reader's own lens it
+// describes nothing on screen, and the word "persona" in a note under a
+// reader's own map tells them their view is someone else's. So the item
+// is GATED ON THE LENS and not reworded by a byte: where it is true it
+// renders verbatim, and where it describes nothing it does not render.
+//
+// THIS IS NOT DISCLOSURE DESIGNED OUT OF VIEW. The limit that DOES apply
+// to the reader's own map is already stated twice within a screen of this
+// note — READER_MARK_KEY_TRAILING ("No mark: this box hasn't read that
+// country against your figures.") and the perspective line. Nothing about
+// the reader's own read recedes by one pixel.
+//
+// THE NO-LENS ROW IS AN EXTENSION BEYOND (e)'s LETTER, marked as such:
+// with no lens active those three fixtures colour nothing either, so the
+// item describes nothing on that screen too. Drop this row and keep the
+// reader row if the gate wants the minimum change — it is the condition
+// below, not a second branch.
+//
+// Item (1) is true in every lens and renders unconditionally. "Full
+// detail in the build notes" is left exactly as it stands: I could not
+// resolve it to any reader-reachable page, and it is routed as a question
+// rather than changed inside a copy repair.
+function renderJudgmentNote(el, persona) {
+  const personaLimitApplies = Boolean(persona) && persona !== READER_ID;
+  const lead = personaLimitApplies
+    ? "Two more honest limits of this first map build:"
+    : "One more honest limit of this first map build:";
+  const personaItem = personaLimitApplies
+    ? `
+    (2) Only Wenda's and Carmen's verdict fixtures give a real
+    clears/misses read; Waldo's map has no "eliminated" state to show yet,
+    because no hard-constraint pass/fail has been computed for him — only
+    his four re-scored criteria, which still blend into the same 1–5 ramp,
+    not a gone/not-gone one. Full detail in the build notes.`
+    : "";
   el.innerHTML = `
     Good enough to place a dot on the map, not for door-to-door
     navigation. Every location gets the same treatment; more precision
     may come later.
     <br><br>
-    <strong>Two more honest limits of this first map build:</strong>
+    <strong>${escapeHtml(lead)}</strong>
     (1) Countries are all drawn the same — the pins carry the data. A
     country's outline never asserts a value, so no shading means nothing
     either way. Crete (CanILiveThere's "CR") is deliberately unmapped as a
     country outline — its two researched locations are on the island, not
-    the Greek mainland — see pins, not the Greece polygon.
-    (2) Only Wenda's and Carmen's verdict fixtures give a real
-    clears/misses read; Waldo's map has no "eliminated" state to show yet,
-    because no hard-constraint pass/fail has been computed for him — only
-    his four re-scored criteria, which still blend into the same 1–5 ramp,
-    not a gone/not-gone one. Full detail in the build notes.
+    the Greek mainland — see pins, not the Greece polygon.${personaItem}
   `;
 }

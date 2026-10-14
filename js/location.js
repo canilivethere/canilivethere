@@ -8,11 +8,11 @@ import {
   renderFooter, getActivePersona, withPersona, escapeHtml,
   formatValue, confidenceBadge, sourceLine, sourceDetailHtml, divergenceBadge,
   FIT_INDEX_DEFINITION, SCALE_ANCHOR_STRING, FIT_INDEX_DEFAULT_WEIGHTING_LINE,
-  FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED, buildFitHeadline, loadFxRates,
+  buildFitHeadline, loadFxRates,
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
-  personaDisplayLabel, CUSTOM_ESTIMATE_SUFFIX, glossaryWrap, verdictProvenanceBadge,
-  READER_ID, hasReaderWeights, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
+  personaDisplayLabel, glossaryWrap, verdictProvenanceBadge,
+  READER_ID, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
   sentenceCaseRuleParagraph, locationGateProvenanceHtml,
 } from "./app-shared.js";
@@ -355,8 +355,11 @@ function buildVerdictBlock(store, loc, country, persona) {
       //
       // What survives untouched is the sentence's job: name the cause,
       // never imply a judgement about the place.
-      const readSuffix = hasReaderWeights() ? CUSTOM_ESTIMATE_SUFFIX : "general figures";
-      const readSuffixPhrase = hasReaderWeights() ? "weighted by your priorities" : "the general figures";
+      // Both resolve unconditionally now: the weighted readings were gated
+      // on the reader's own stored weight vector, which is retired, and
+      // the general phrasings were already written beside them.
+      const readSuffix = "general figures";
+      const readSuffixPhrase = "the general figures";
       div.innerHTML = `
         <p class="verdict-headline">${escapeHtml(buildFitHeadline(store, null, loc, country, value))} (${escapeHtml(readSuffix)})</p>
         <p class="verdict-prose">Not checked yet for you at this location — this box hasn't read this country's residence routes against your figures, so nothing here is a read or a verdict. The Fit index above is ${escapeHtml(readSuffixPhrase)} and stands on its own.</p>
@@ -364,12 +367,13 @@ function buildVerdictBlock(store, loc, country, persona) {
         ${breakdownLinkGeneral}
       `;
     } else {
-      // The reader gave no figures (priorities and/or a passport only, or
-      // said "a visit"): no eligibility read exists for them anywhere, so
-      // the honest-gap voice the site already ships, fed the value that
-      // actually ranked this place. The suffix names the reader's own
-      // priorities and renders only where priorities exist.
-      const suffix = hasReaderWeights() ? ` (${CUSTOM_ESTIMATE_SUFFIX})` : " (general figures)";
+      // The reader gave no figures (a passport only, or said "a visit"):
+      // no eligibility read exists for them anywhere, so the honest-gap
+      // voice the site already ships, fed the value that actually ranked
+      // this place. The suffix is the general one in every case — the
+      // alternative named the reader's own priorities and retired with
+      // them.
+      const suffix = " (general figures)";
       div.innerHTML = `
         <p class="verdict-headline">${escapeHtml(buildFitHeadline(store, null, loc, country, value))}${suffix}</p>
         ${redFlagBadge}
@@ -599,9 +603,10 @@ function buildVerdictBlock(store, loc, country, persona) {
     // so the prerendered no-JS twin can carry the identical sentence.
     const general = store.generalIndex(loc.location_id);
     const headline = buildFitHeadline(store, null, loc, country, general ? general.value : null);
-    const weightingLine = hasReaderWeights()
-      ? FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED
-      : FIT_INDEX_DEFAULT_WEIGHTING_LINE;
+    // One line, not two: the saved-priorities variant retired with the
+    // population that could reach it. This is now the same sentence the
+    // prerendered no-JS twin emits, in every state.
+    const weightingLine = FIT_INDEX_DEFAULT_WEIGHTING_LINE;
     div.innerHTML = `
       <p class="verdict-headline">${escapeHtml(headline)}</p>
       <p class="verdict-prose">${escapeHtml(weightingLine)}</p>
@@ -1186,7 +1191,7 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
   }).join("");
   return `
     <h3>Visa routes at a glance</h3>
-    <p class="fact-notes">Every documented route into ${escapeHtml(country.name)}, compared side by side — general figures, not checked against any one persona (see the verdict above for a persona-specific read where one exists). The full write-up for each, with sourced notes, is right below.</p>
+    <p class="fact-notes">Every documented route into ${escapeHtml(country.name)}, compared side by side — the general figures, not read against anyone in particular. Only the verdict above is read for whoever this page is shown for, where there is one. The full write-up for each, with sourced notes, is right below.</p>
     <div class="fact-list">${cards}</div>
   `;
 }
@@ -1575,12 +1580,14 @@ function buildNextBest(store, loc, persona) {
     .filter((c) => c.val >= 0)
     .sort((a, b) => b.val - a.val)
     .slice(0, 5);
-  // The reader's own next-best list is ranked by whatever actually ranked
-  // it: their weights where they gave priorities, the general figures
-  // where they did not. Claiming "matching your own priorities" over a
-  // general ranking would be a false label on a real list.
+  // The reader's own next-best list is ranked by the general figures, so
+  // it carries NO label at all — which is what the retired branch already
+  // did for every reader without stored priorities. " matching your own
+  // priorities" is deleted: it was a label on a ranking nothing of theirs
+  // shaped, and claiming it over a general ranking would be a false label
+  // on a real list.
   const personaLabel = persona === READER_ID
-    ? (hasReaderWeights() ? ` matching your own priorities` : "")
+    ? ""
     : persona ? ` for ${personaDisplayLabel(persona)}` : "";
   div.innerHTML = `<h2>Where now?</h2><p>Ranked next-best alternatives${personaLabel}:</p>
     <ul>${candidates.map((c) => `<li><a href="${withPersona(siteUrl(`l/${c.l.location_id}.html`))}">

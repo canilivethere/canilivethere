@@ -82,8 +82,8 @@ const LEAVES_CLOSING =
 // droppable.
 const STAYS_PARAS = [
   "Two different things happen to what this site learns about you, and the difference is the whole of this section: most of it is gone when you close the tab, and a little of it waits for you.",
-  "Gone when you close the tab: everything you tell the welcome box \u2014 your figures, your priorities, your passport, the lens you picked \u2014 along with which ranking you last chose, whether you asked to look without a lens at all, whether you've already answered the welcome box this visit, and today's exchange rates, kept so the site doesn't go asking for them twice. That is the default. You don't have to do anything to get it.",
-  "Waiting for you next time: whether you asked for dark mode. And \u2014 only if you tick \u201cKeep this on my device\u201d on the welcome box \u2014 a copy of those same four answers, so they're there when you come back. That switch is off until you turn it on, and un-ticking it removes the copy.",
+  "Gone when you close the tab: everything you tell the welcome box \u2014 your figures, your passport, the lens you picked \u2014 along with which ranking you last chose, whether you asked to look without a lens at all, whether you've already answered the welcome box this visit, and today's exchange rates, kept so the site doesn't go asking for them twice. That is the default. You don't have to do anything to get it.",
+  "Waiting for you next time: whether you asked for dark mode. And \u2014 only if you tick \u201cKeep this on my device\u201d on the welcome box \u2014 a copy of those same answers, so they're there when you come back. That switch is off until you turn it on, and un-ticking it removes the copy.",
   "The same box has a button that clears every answer you gave it, the visit copy and the kept copy both. Clearing your browser data does the same job from the other end. Your dark-mode setting is left alone either way \u2014 it's the one thing here that says nothing about you. And none of it was ever sent to us: it is written by the page you are reading, in your browser, on a site with nothing at the other end to receive it.",
 ];
 
@@ -102,9 +102,8 @@ const LIGHT_PARAS = [
   "Turn off JavaScript entirely and a location page still renders — " +
   "every fact, every source link — because the page itself was built " +
   "once ahead of time, not assembled in your browser after the fact. " +
-  "JavaScript adds the live map, the currency conversion, the ability " +
-  "to reweight things to your own priorities. It was never required " +
-  "just to read what we know.",
+  "JavaScript adds the live map and the currency conversion. It was " +
+  "never required just to read what we know.",
 ];
 
 const CHECKABLE_PARAS = [

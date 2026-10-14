@@ -97,32 +97,19 @@ function readReaderPreferences() {
   }
 }
 
-// The custom_profile sub-object ({ weights, answers, created_at,
-// updated_at }), or null if none is stored / the stored value doesn't
-// parse / the version doesn't match.
-// VISIT COPY FIRST, THEN THE DURABLE ONE — the same precedence
-// loadOwnNumbers() already uses, for the same reason: a reader who
-// answered the box this visit must be answered with what they just said,
-// not with something a previous visit left on the device.
-export function loadCustomProfile() {
-  const session = readSessionPreferences();
-  const prefs = (session && session.custom_profile) ? session : readReaderPreferences();
-  return prefs && prefs.custom_profile ? prefs.custom_profile : null;
-}
-
-// Presence of a valid custom_profile object in the envelope IS the
-// completion marker 21.8 item 2 asks for — no separate flag (the ruled
-// reconciliation between the two spec authorities this build reads
-// from). Used by the door's trigger-condition third clause (21.9) and by
-// the switcher's own "Your priorities" entry-detection, both below.
-export function hasCustomProfile() {
-  const profile = loadCustomProfile();
-  return !!(profile && profile.weights);
-}
-
+// loadCustomProfile(), hasCustomProfile() and saveCustomProfile() ARE
+// RETIRED, with the whole stored priority-weight path, on Cap's ruling of
+// 2026-10-12 12:39 +00: "remove preferences cleanly now, they come back
+// later when built properly." Nothing is left half-removed in
+// anticipation of that return — no reader of the key, no writer of it, and
+// no dormant branch waiting for it. The key itself is deleted from any
+// device still holding one; see removeRetiredPriorityProfile() below, and
+// its comment for why orphaning it would have kept four retired surfaces
+// alive.
+//
 // Merge-write discipline (§8AA.1, mandatory, found live before it ever
 // shipped): the envelope now holds more than one
-// sub-object (custom_profile, nationality, saved_perspective — see the
+// sub-object (own_numbers, nationality, saved_perspective — see the
 // door/passport-lens build), so a writer that rebuilds the whole payload
 // from scratch erases every sibling key it doesn't know about. This is the
 // one write path every sub-object writer in this file goes through from
@@ -142,31 +129,11 @@ function writeReaderPreferenceKey(key, value) {
   }
 }
 
-// weights: the 13-key criterion_id -> 0-3 vector (8P.1). answers: the raw
-// per-question answer trail (8P.3's own forward-compatibility field, for a
-// future "revisit your answers" affordance) — stored alongside the
-// computed vector, not instead of it, since the vector is a deterministic
-// function of the answers and storing both costs a few dozen bytes.
-// created_at is preserved across an edit (only set fresh the first time);
-// updated_at always reflects this write. Returns true/false rather than
-// throwing, matching this module's fail-open discipline throughout.
-// THE DEFAULT IS THIS VISIT. See the block comment on
-// writeReaderAnswer() below: what the reader tells the box is written to
-// sessionStorage, and reaches localStorage only where they have turned
-// the keep switch on. Priorities used to be written durably on submit,
-// with no opt-in anywhere in the process.
-export function saveCustomProfile(weights, answers) {
-  const now = new Date().toISOString();
-  const existing = readSessionPreferences() || readReaderPreferences();
-  const createdAt = existing?.custom_profile?.created_at || now;
-  return writeReaderAnswer("custom_profile", { weights, answers, created_at: createdAt, updated_at: now });
-}
-
 // ---------------------------------------------------------------------
 // The passport lens (nationality) and the door's own memory
 // (saved_perspective) — §8AA.1's two new envelope siblings, both real
 // as of the door rework. Same fail-open,
-// merge-write discipline as custom_profile above.
+// merge-write discipline every sub-object writer in this file uses.
 // ---------------------------------------------------------------------
 
 // { code, created_at, updated_at } | null. `code` is one uppercase ISO
@@ -302,8 +269,8 @@ export function loadOwnNumbers() {
 
 // fields: { amount, currency, period, income_type, duration_band,
 // property_capital? }. created_at is preserved across an edit; updated_at
-// always reflects this write — the same shape custom_profile and
-// nationality already implement. Returns true/false rather than throwing.
+// always reflects this write — the same shape nationality already
+// implements. Returns true/false rather than throwing.
 //
 // Door v2: this is now the DURABLE write only — the one
 // the reader turns on for themselves after they have seen the map. The
@@ -327,10 +294,10 @@ export function saveOwnNumbers(fields) {
 // page across.
 //
 // SCOPED DELIBERATELY TO own_numbers, and this is a real, named
-// asymmetry: custom_profile, nationality and saved_perspective keep their
+// asymmetry: nationality and saved_perspective keep their
 // existing durable-on-save behaviour, because each already ships a gated
 // reader sentence that says "saved on this device" and moving them to a
-// visit store would make three shipped sentences false. The envelope now
+// visit store would make those sentences false. The envelope now
 // lives in two stores for exactly one key, which is a two-vocabulary risk
 // of the class the box's own build notes flag; the read path below is the
 // one place that resolves it, so there is one merge rule, not one per
@@ -390,7 +357,7 @@ function writeSessionPreferenceKey(key, value) {
 export function readerKeepsOnDevice() {
   const prefs = readReaderPreferences();
   if (!prefs) return false;
-  return !!(prefs.own_numbers || prefs.nationality || prefs.custom_profile || prefs.saved_perspective);
+  return !!(prefs.own_numbers || prefs.nationality || prefs.saved_perspective);
 }
 
 function writeReaderAnswer(key, value) {
@@ -406,7 +373,11 @@ function writeReaderAnswer(key, value) {
 // un-ticking undoes "keep this for next time", it does not wipe the map
 // the reader is currently looking at. Erasing everything is a different
 // control with a different label (forgetReaderPreferences, below).
-const READER_ANSWER_KEYS = ["own_numbers", "nationality", "custom_profile", "saved_perspective"];
+// THREE KEYS, NOT FOUR: `custom_profile` left this list with the step
+// that wrote it (Cap, 2026-10-12 12:39 +00). SAVE_NOTE's own enumeration
+// moved with it, in the same commit, or the consent text would name a
+// key the switch no longer governs.
+const READER_ANSWER_KEYS = ["own_numbers", "nationality", "saved_perspective"];
 
 export function keepReaderAnswersOnDevice() {
   const session = readSessionPreferences();
@@ -431,6 +402,97 @@ export function saveOwnNumbersForVisit(fields) {
   const createdAt = existing?.own_numbers?.created_at || now;
   return writeSessionPreferenceKey("own_numbers", { ...fields, created_at: createdAt, updated_at: now });
 }
+
+// ---------------------------------------------------------------------
+// H9 — THE RETIRED PRIORITY PROFILE IS DELETED ON SIGHT, NOT ORPHANED,
+// and this is the clause that makes Cap's word "cleanly" true rather
+// than decorative.
+//
+// WHY A DELETE AND NOT AN IGNORE. A `custom_profile` written before this
+// build sits in a returning reader's envelope with no surface left that
+// can edit, replace or explain it — and four shipped predicates used to
+// read it before anything else: hasCustomProfile(), and through it
+// hasAnySavedReaderState() (which renders "Forget my answers"),
+// hasReaderInput() (which renders "your own answers are set aside for
+// now, not deleted") and hasReaderWeights() (which gated five Fit clauses
+// this build deletes ON THE GROUNDS THAT THEY BECOME UNREACHABLE). Leave
+// the key and that grounds is false: the site would go on telling a
+// stranger their priorities are set aside, and go on weighting a Fit
+// index by a vector nothing can show them.
+//
+// THE PRECEDENT IS IN THE TREE AND IS EXACTLY THIS SHAPE —
+// markSeenLegacyKeyRemoved() in js/perspective-door.js, whose own comment
+// is the rule: "delete on sight, not 'ignore forever'".
+//
+// NO READER-FACING COPY ANNOUNCES IT, and none should: a site saying "we
+// have deleted something you forgot you gave us" tells a reader about a
+// key, not about themselves.
+//
+// IT NEVER WRITES TO A DEVICE THAT HOLDS NOTHING. The presence test is
+// first, so a fresh visitor's browser is not handed an envelope by a
+// cleanup for a key they never had. A profile stored under an older
+// schema_version is already unreachable by every reader of this file
+// (readReaderPreferences() fails the whole envelope closed on a version
+// mismatch), so it needs no second branch here.
+//
+// What can be left behind is an envelope holding nothing but its own
+// schema_version — the same residue stopKeepingReaderAnswers() has always
+// left, and it names no reader and no answer.
+export function removeRetiredPriorityProfile() {
+  const session = readSessionPreferences();
+  if (session && session.custom_profile !== undefined) {
+    writeSessionPreferenceKey("custom_profile", undefined);
+  }
+  const durable = readReaderPreferences();
+  if (durable && durable.custom_profile !== undefined) {
+    writeReaderPreferenceKey("custom_profile", undefined);
+  }
+  // AND THE LENS MARKER THAT NOW POINTS AT NOTHING, which was REPRODUCED
+  // IN A BROWSER rather than reasoned about: a reader whose only
+  // committed answer was priorities carries `saved_perspective
+  // {kind:"custom"}` as well as the profile, because the box wrote the
+  // marker whenever ANYTHING committed. Delete the profile alone and that
+  // marker keeps hasAnySavedReaderState() true, which keeps the footer's
+  // "Forget my answers" button rendering — the exact dead affordance that
+  // function's own comment says it exists to prevent, and one of the four
+  // surfaces H9 is here to close.
+  //
+  // THE CONDITION IS NARROW AND IT IS THE WHOLE POINT: kind "custom" with
+  // no figures and no passport in EITHER envelope is precisely the orphan.
+  // After this build the only committable answers are those two, so a
+  // "custom" marker with neither behind it cannot arise any other way. If
+  // a third committable answer is ever added, this condition is the line
+  // that has to learn about it.
+  //
+  // IT IS MY EXTENSION BEYOND THE SPEC'S RECOMMENDED MECHANISM, flagged
+  // rather than folded in: the design spec offered two ways to close the empty
+  // own-lens — guard the render, or clear the answerless lens — and
+  // recommended the guard, "because it is also true of any future
+  // empty-lens state and does not make a storage write part of a page
+  // load". THE GUARD IS BUILT AND IS WHAT FIXES THE SENTENCE
+  // (js/reader-lens.js's H8 branch). This clears the marker as well,
+  // because the guard fixes the screen and leaves the storage disagreeing
+  // with it — and that objection, the page-load write, is already spent by
+  // the delete directly above.
+  if (!loadOwnNumbers() && !loadNationality()) {
+    const persp = loadSavedPerspective();
+    if (persp && persp.kind === "custom") {
+      if (session && session.saved_perspective !== undefined) {
+        writeSessionPreferenceKey("saved_perspective", undefined);
+      }
+      if (durable && durable.saved_perspective !== undefined) {
+        writeReaderPreferenceKey("saved_perspective", undefined);
+      }
+    }
+  }
+}
+
+// Once per page load, at import time: this module is imported by every
+// page's entry module, and the delete has to land before any predicate
+// above reads the envelope. Both halves already fail closed inside their
+// own try/catch, so a browser refusing storage — or a Node tool importing
+// this file — is a no-op rather than a throw.
+removeRetiredPriorityProfile();
 
 // ownNumbersAreVisitOnly(), hasDurableOwnNumbers() and clearOwnNumbers()
 // are all REMOVED, and the reason is one rule replacing three.
@@ -490,7 +552,7 @@ export function clearExplicitGeneral() {
 // always-meet-the-door rework
 // (§8AA.2/25.2) dropped the old door-seen permanent gate but never
 // replaced it with any visit-scoped "already answered" concept — every
-// completion path (persona pick, passport save, priorities save,
+// completion path (persona pick, passport save,
 // explicit-general/Escape) ended in a plain reload that met
 // shouldShowDoor()'s bare "no ?persona= present" check and re-summoned
 // the door over whatever had just been correctly set. sessionStorage
@@ -534,7 +596,7 @@ export function markDoorAnswered() {
 // forgetReaderPreferences() below needs no change: it removes the whole
 // envelope key, so own_numbers is covered by construction.
 export function hasAnySavedReaderState() {
-  return !!(hasCustomProfile() || loadNationality() || loadSavedPerspective() || loadOwnNumbers());
+  return !!(loadNationality() || loadSavedPerspective() || loadOwnNumbers());
 }
 
 // §8AA.3: forget = remove the envelope key, whole — never field surgery.
@@ -585,17 +647,109 @@ export function wireForgetControl(btn, { onDone } = {}) {
   });
 }
 
-// Attaches store.customWeights (or null) onto an already-built store —
-// runtime-layered, same category as fixturesByPersona/verdictsByPersona,
-// never a derived/ fetch (data.js's own header comment names this
-// exception). Must run after loadStore() resolves and before any call to
-// store.personaIndex("custom", ...) — call once per page, right after
-// awaiting loadStore().
-export function applyStoredCustomWeights(store) {
-  const profile = loadCustomProfile();
-  store.customWeights = profile ? profile.weights : null;
+// ---------------------------------------------------------------------
+// (g) THE SAVE SWITCH, ONE DEFINITION, TWO HOMES.
+//
+// Cap: "surface the save switch on the map, more visible." The switch
+// existed only inside a reopened box behind an unadvertised corner link,
+// while step 1's own privacy paragraph promised it "after you've seen the
+// map" — so localStorage stayed empty for a reader who did exactly what
+// the box told them to do.
+//
+// THE WORDS DO NOT MOVE: all five strings below are the shipped ones,
+// verbatim, two of them lifted out of js/perspective-door.js and three
+// out of js/own-numbers.js so that BOTH render sites read one definition.
+// That is the rule FORGET_LABEL's own comment states for exactly this
+// situation — "THE SAME STRING LIVES AT THREE SITES and they move
+// together or the site ships two names for one control" — and it is why
+// they live here, in the module every page already imports, rather than
+// in either of the two files that renders them.
+//
+// SAVE_NOTE LOST FOUR WORDS AND NOTHING ELSE: "your priorities, " came
+// out of its enumeration with the step that wrote them. It is consent
+// text for writing a stranger's income to their device, and its own
+// history is that it was rewritten BECAUSE it under-claimed its scope —
+// so the edit is a deletion of a thing no longer stored, never a
+// rephrasing. It names every key READER_ANSWER_KEYS now holds.
+export const KEEP_HEADING = "Your answers are here for this visit.";
+export const KEEP_HEADING_KEPT = "Your answers are kept on this device until you clear them.";
+export const SAVE_LABEL = "Keep this on my device";
+export const SAVE_NOTE =
+  "Off by default. Turn it on and this browser keeps your answers \u2014 your figures, your passport, the lens you picked \u2014 so they're here next time. Leave it off and they go when this visit ends. Nothing is sent anywhere either way.";
+export const SAVE_UNAVAILABLE_LINE =
+  "This browser isn't letting the site store anything, so there's nothing to keep. Everything above still works either way.";
+// THE ONE NEW STRING IN (g), and it is a label for the block in its new
+// home rather than a claim: in the door the block needs no heading
+// because it sits under "Welcome back." inside a panel that is entirely
+// about the reader's own state; on the map it is one block among six and
+// arrives with no context. Four plain words, no instruction (the note
+// already says what the switch does), no promise.
+export const KEEP_BLOCK_HEADING = "Keeping your answers";
+
+// Returns "" when there is nothing to keep — a switch offering to keep
+// nothing is a dead control, and this is the door's own shipped render
+// condition (figures in play), moved inside the builder so both sites
+// cannot disagree about it. It keeps rendering once ticked: un-ticking
+// un-saves, so the control has to stay on screen to be un-ticked.
+//
+// THE TICK MARK IS THE STATE OF THE DEVICE, read fresh on every render —
+// not a local flag a handler sets. A checkbox whose checked-ness is a
+// guess about what is stored is the same class of lie as a switch with no
+// un-save behind it.
+//
+// THE NOTE DOES NOT GO BEHIND A FOLD, on either surface: disclosure that
+// arrives after the ask is a receipt, not disclosure.
+//
+// THE HEADING REUSES .door-resume-kicker — the shipped class for the
+// door's own "Welcome back." label — rather than a new class of its own.
+// One visual vocabulary for one kind of thing, and css/ stays untouched
+// by this build.
+export function keepBlockHtml({ id, heading = "" } = {}) {
+  if (!loadOwnNumbers()) return "";
+  const available = isReaderStorageAvailable();
+  const kept = readerKeepsOnDevice();
+  return `
+      <div class="own-save" id="${id}-block">
+        ${heading ? `<p class="door-resume-kicker">${escapeHtml(heading)}</p>` : ""}
+        <p class="door-resume-line">${escapeHtml(kept ? KEEP_HEADING_KEPT : KEEP_HEADING)}</p>
+        <label class="priority-choice own-choice">
+          <input type="checkbox" id="${id}-toggle"${kept ? " checked" : ""}${available ? "" : " disabled"}>
+          <span>${escapeHtml(SAVE_LABEL)}</span>
+        </label>
+        <p class="own-field-note">${escapeHtml(SAVE_NOTE)}</p>
+        ${available ? "" : `<p class="own-field-note">${escapeHtml(SAVE_UNAVAILABLE_LINE)}</p>`}
+      </div>`;
 }
 
+// `onChanged` re-renders whatever surface the block is sitting in, so the
+// state line and the tick mark both come back from the device rather than
+// from a flag. Un-ticking leaves the VISIT copies exactly where they are:
+// the reader un-ticked "keep this", not "forget this", so the map in
+// front of them does not change.
+export function wireKeepBlock(root, id, onChanged) {
+  const toggle = root ? root.querySelector(`#${id}-toggle`) : null;
+  if (!toggle) return;
+  toggle.addEventListener("change", () => {
+    if (!toggle.checked) {
+      stopKeepingReaderAnswers();
+      if (onChanged) onChanged();
+      return;
+    }
+    if (!keepReaderAnswersOnDevice()) {
+      toggle.checked = false;
+      toggle.disabled = true;
+      return;
+    }
+    if (onChanged) onChanged();
+  });
+}
+
+// applyStoredCustomWeights() IS RETIRED. It layered the reader's stored
+// weight vector onto the built store for personaIndex("custom", …) to
+// read; with the vector gone there is nothing to layer, and a function
+// that only ever set `null` would be a dormant path. js/data.js's own
+// reader branch now reads the general index directly — the identical
+// number that branch already returned whenever no vector was stored.
 // The one place precedence between an explicit URL persona, the
 // explicit-general session flag, and a stored custom weight vector gets
 // decided (the original ruling, later extended for the new middle
@@ -624,19 +778,15 @@ export function applyStoredCustomWeights(store) {
 // everything saved; the reader identity is still the last fallback before
 // general.
 export function hasReaderInput() {
-  return !!(hasCustomProfile() || loadOwnNumbers() || loadNationality());
+  return !!(loadOwnNumbers() || loadNationality());
 }
 
-// Whether the reader's own weight vector exists. Gates every render of
-// CUSTOM_ESTIMATE_SUFFIX ("from your priorities"), which is a claim about
-// priorities the reader set and is false for a reader who gave only
-// figures or only a passport. The COUNT the old wording carried ("seven
-// answers") went with the all-seven gate it described, which this build
-// retired — but the gate this function IS does not change: no priorities, no suffix.
-export function hasReaderWeights() {
-  return hasCustomProfile();
-}
-
+// hasReaderWeights() IS RETIRED, and with it every sentence it gated.
+// It answered "does the reader's own weight vector exist", a question
+// with one permanent answer once the step that built the vector is gone.
+// Its consumers are not re-pointed at a constant `false` — each one's
+// weighted arm is deleted and its already-written general arm is all that
+// is left, which is why nothing here needed new words.
 // RESTORED — the persona lens now carries across lists, location and
 // l/*.
 //
@@ -779,24 +929,11 @@ export function personaPossessiveLabel(id) {
   return `${id.charAt(0).toUpperCase() + id.slice(1)}'s`;
 }
 
-// The 21.6 item 2 disclosure suffix — appended wherever a custom-weighted
-// number renders (map tooltip, Lists column, location-page score readout),
-// the same idiom as the existing "(general figures)" suffix elsewhere on
-// this site. Wording finalized by the copy-voice pass,
-// replacing the earlier placeholder shape: names the provenance (which
-// answers produced it) rather than characterizing the estimate — a
-// stranger seeing it next to a score knows exactly how much weight to
-// give it. Same grammatical ride as "(general figures)". The load-bearing
-// decision is still the placement, next to the number itself, at every
-// call site.
-// "from your seven answers" was true while the questionnaire required
-// all seven; this build retired that gate, so a reader who answers one
-// question gets a real weight vector and a suffix claiming seven answers
-// they never gave. The replacement carries no count and is true of one
-// answer or seven. SIX render sites, measured: js/map.js 668, 1143, 2183;
-// js/lists.js 348, 720; js/location.js 342 — all six read this constant,
-// so the fix reaches all six.
-export const CUSTOM_ESTIMATE_SUFFIX = "from your priorities";
+// CUSTOM_ESTIMATE_SUFFIX ("from your priorities") IS RETIRED with the
+// weight vector it disclosed. Every one of its six render sites was gated
+// on hasReaderWeights(), so each becomes unreachable rather than false,
+// and each already carried a general-figures arm beside it — which is why
+// this is a deletion at six sites and not a rewrite at any of them.
 
 // Preserve the persona (and, when given, other params) across internal
 // navigation — the brief's "shareable profile URLs" rule, MVP-scoped to a
@@ -821,7 +958,7 @@ export function withPersona(path, extra = {}) {
 // stripped for plain-text rendering only; wording is verbatim from
 // source, not reworded here.
 const PERSONA_LABELS = {
-  waldo: "Waldo — A solo, location-independent worker living on about $2,500 a month with $120,000 saved toward a home — enough to clear most places outright, not enough for many of the popular ones. He wants a real, provable path to stay long-term, not just a good vacation. His fear: picking somewhere that looks affordable right up until the residency paperwork says otherwise.",
+  waldo: "Waldo — A solo, location-independent worker earning €3,850 a month, with $120,000 saved toward a home. He wants a real, provable path to stay long-term, not just a good vacation. His fear: picking somewhere that looks affordable right up until the residency paperwork says otherwise.",
   wenda: "Wenda — A 68-year-old retiree living on a $1,900 monthly pension with $95,000 set aside to buy. She's learned the hard way that some places will take her money but not her income type, so what she's really after is somewhere that recognizes a pension as real, qualifying income. Her fear: a country that looks perfect until the paperwork asks where the money comes from.",
   carmen: "Carmen — A 29-year-old freelancer earning about $1,300 a month from client work, with $25,000 put by and no interest in buying — she rents wherever she lands. She's not chasing residency, just somewhere she can legally stay for months at a stretch without a lease turning into a five-year commitment she never asked for. Her fear: a visa door that looks open right up until she learns it never actually leads anywhere.",
   adira: "Adira — A 27-year-old remote worker getting by on around $1,490 a month with barely $27,000 to her name — thin margins, and she knows it. She's open to almost anything, a short stay or a real home, if a place actually earns it, but she's learned her passport sometimes changes the rules in ways nobody mentions upfront. Her fear: a place that would say yes to someone else's passport and no to hers, and finding out only after she's committed.",
@@ -860,21 +997,30 @@ export const FIT_INDEX_DEFINITION =
 // depending on whether JS ran. Lists and the map already carry their own
 // sibling sentence for this state and are untouched.
 //
-// TWO strings, not one, because the no-lens state has two populations and
-// only one sentence is true of each. A reader can fill the box and then
-// switch the corner lens back to "nobody" — cornerLensValue() resolves to
-// nobody whenever no persona is active, regardless of what is saved — and
-// in that state the page still shows generalIndex(), the site's own
-// weighting. Telling that reader "you haven't told it what matters most to
-// you" would be a false statement about them, which is the exact failure
-// the perspective-disclosure law exists to prevent. The static prerender
-// can only ever emit the first: it has no localStorage to read, and any
-// reader who has saved priorities is by definition running JS, so
-// location.js replaces the static line before they see it.
+// ONE STRING, NOT TWO, as of the priorities retirement. It was two,
+// because the no-lens state had two populations: a reader with nothing
+// saved, and a reader who had saved priorities and then switched the
+// corner lens back to "nobody". The second population is gone with the
+// step that created it, so the second string is retired below rather than
+// left as a dormant branch. The static prerender always emitted only this
+// first one — it has no localStorage to read — so the static page and the
+// hydrated page now carry the same sentence in every state.
+//
+// LISTED AND NOT REWORDED: this sentence's "you haven't told it what
+// matters most to you, so nothing here is reweighted for you yet" is
+// still literally true of every reader (none of them has, and none of
+// them can until the capability is rebuilt), but "yet" now points at a
+// capability with no surface. No replacement copy is specified and none
+// is authored here; it is listed as owed copy.
 export const FIT_INDEX_DEFAULT_WEIGHTING_LINE =
   "This is the site's default weighting — you haven't told it what matters most to you, so nothing here is reweighted for you yet.";
-export const FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED =
-  "This is the site's default weighting, not your own — the priorities you gave reweight this number only while your own view is switched on.";
+// FIT_INDEX_DEFAULT_WEIGHTING_LINE_SAVED IS RETIRED. It was the second of
+// two strings here, for the one population that could reach it — a reader
+// with stored priorities looking at the no-lens page — and that population
+// no longer exists. The first string below stands alone and renders
+// unconditionally, which is what the prerendered no-JS twin in
+// tools/prerender-locations.mjs has always emitted, so the static page and
+// the hydrated page now agree by construction rather than by branch.
 
 // v8 Part 5: the scale-anchor disclosure — one canonical string, cited (not
 // restated) from this project's own internal scale-semantics ruling: a 5
@@ -1053,42 +1199,105 @@ function isPlacementBar(barKind) {
 // it: for a screen-reader reader inside a cluster knot the knot's own label
 // is the only path to the band, so leaving these two behind would ship the
 // true sentence to sighted readers and the false one to everyone else.
-const READER_ABOVE_BAR_CAPITAL_SHORT = "above the amount this route asks you to put in";
-const READER_ABOVE_BAR_CAPITAL_SHORT_WITH_MARGIN = (m) =>
-  `above the amount this route asks you to put in, by ${m}`;
-const READER_ABOVE_BAR_TAIL = " The other gates weren't read for you.";
-// And the same split for the at-the-line pair, whose shipped values are
-// likewise still exactly opener + tail. The ledger goes between them, and
-// the two tails are the only thing that differs
-// between the plain and the converted reading — so the opener is written
-// once and the pair cannot drift apart at the front.
-const READER_AT_LINE_OPENER = "Right at the line.";
-const READER_AT_LINE_TAIL =
-  " Where you're within about a tenth of a bar either way, the site says “right at the line” rather than yes or no — these figures are dated snapshots, and a rule can move by more than that.";
-const READER_AT_LINE_CONVERTED_TAIL =
-  " This route's bar was converted into your currency at the rate on file, and that rate is why the answer can't be tighter — within about a tenth of a bar either way, the site says “right at the line” rather than yes or no.";
-// AUTHORED JOIN, FLAGGED NOT SMUGGLED — the same disclosure, and the same
-// kind of join, this file's own READER_AT_LINE note already makes for the
-// sentence it was built from. The defect it closes: a row that sits at the
-// line on a CONDITIONAL bar dropped the condition entirely, because
-// js/reader-lens.js's readerStateForRow() branched on `result.conditional`
-// only on the `above` path. Three real rows reach it — Thailand's three
-// LTR reduced-bar routes at USD 40,000/year, whose `unit` carries the
-// CONDITIONAL token.
+// C1 — THE HELD-CAPITAL READING OF THE SAME STATE, and the diagnosis it
+// is built on was corrected before a byte was written. The defect (c)
+// names is a bare "$44,884" under an income-shaped sentence on
+// Thailand's DTV; the three *_CAPITAL_* constants around this line are
+// NOT on that path. isPlacementBar() is true only for
+// `placed_investment` / `real_estate_only`, and the DTV's
+// `capital_instrument_condition` is `bank_balance` — money HELD — so the
+// read falls through to READER_ABOVE_BAR_CLAIM and the income-shaped
+// short form. Touching the placement constants alone would have changed
+// nothing a reader can see.
 //
-// Both halves are transported word for word from strings already on this
-// page: "Right at the line" is READER_AT_LINE's own opener, and
-// "— but only with conditions this route sets in its own words" is
-// READER_ABOVE_CONDITIONAL's own second clause. Only the join is mine.
-// NO NEW STATE TOKEN, no new band, no new legend row: READER_AT_LINE keeps
-// all three and only the TEXT varies, by the same carried-summary
-// mechanism READER_BELOW_VARIANTS and the converted reading already use.
-// No specified string existed for this case — the defect was found after
-// the wording was set — so this is the one piece of copy here that is not
-// transported from a ratified one. Listed as such, and a single constant
-// to replace.
-const READER_AT_LINE_OPENER_CONDITIONAL =
-  "Right at the line — but only with conditions this route sets in its own words.";
+// THE CLAUSE IS TRANSPORTED VERBATIM from this file's own shipped
+// below-the-bar twin, READER_BELOW_VARIANTS.READER_BELOW_BAR.capital
+// ("— on capital, not income."). The site already has a phrase for this
+// exact distinction; a second phrase for one idea is how a vocabulary
+// splits.
+const READER_ABOVE_BAR_HELD_CAPITAL_CLAIM =
+  "Above the bar this route sets — on capital, not income.";
+const READER_ABOVE_BAR_CAPITAL_SHORT = "above the amount this route asks you to put in";
+// "of capital" ADDED (spec §C3, and marked there as the weaker case of
+// the three): "the amount this route asks you to put in" already implies
+// a lump, so this is belt-and-braces rather than a repair of a falsity.
+// It is here because (c)'s rule is that a capital margin never renders as
+// a bare figure WHEREVER it appears, and a reader whose map carries both
+// a Thai and a Guatemalan mark hears the two accessible names in one
+// queue. Droppable without touching C1/C2 if the gate reads it as
+// redundant.
+const READER_ABOVE_BAR_CAPITAL_SHORT_WITH_MARGIN = (m) =>
+  `above the amount this route asks you to put in, by ${m} of capital`;
+const READER_ABOVE_BAR_TAIL = " The other gates weren't read for you.";
+
+// ---------------------------------------------------------------------
+// THE AT-THE-LINE READER STATE IS RETIRED, STRINGS AND TOKEN BOTH.
+//
+// Cap, 2026-10-07/08 and carried into this box: "clearing the bar is
+// clearing, and within the band above it carries a note that it is
+// close. Below the bar does not clear, and the reader sees how far short
+// they are." A symmetric band that answered $141 OVER and $68 UNDER with
+// the same sentence — and filed both under a legend row headed "Not
+// settled" — cannot satisfy that, so the band splits by direction
+// (js/own-numbers-data.js's bandFor()) and READER_AT_LINE stops being a
+// reader state.
+//
+// THE FOUR RETIRED STRINGS, quoted so a reader meeting an older copy of
+// this file recognises them as dead rather than as evidence:
+//   READER_AT_LINE_OPENER            "Right at the line."
+//   READER_AT_LINE_TAIL              "… the site says “right at the line”
+//                                    rather than yes or no — these figures
+//                                    are dated snapshots …"
+//   READER_AT_LINE_CONVERTED_TAIL    "… that rate is why the answer can't
+//                                    be tighter …"
+//   READER_AT_LINE_OPENER_CONDITIONAL
+//                                    "Right at the line — but only with
+//                                    conditions this route sets in its own
+//                                    words."
+// Two of them are now false rather than merely unreachable: above the line
+// the site DOES say yes. The conditional opener's own ratified clause
+// survives intact inside READER_ABOVE_CONDITIONAL, which the near-line
+// population now uses, so nothing is lost. The converted tail's whole
+// content is superseded by the rate line further down this file, which
+// NAMES the rate instead of gesturing at it.
+//
+// NEAR_LINE_AMOUNT — the ENGINE's at-the-line state, computed into
+// derived/verdicts.jsonl and read by a persona's verdict — is untouched,
+// here and in js/map.js. Cap's ruling is about the reader's own read.
+// CONSEQUENCE, FLAGGED NOT HIDDEN: after this build the site describes
+// the at-the-line case two ways — a reader's own read resolves it, a
+// persona's does not — and that divergence is visible to anyone who
+// switches lenses. Routed to Cap (whether the engine follows); not fixed
+// here.
+// ---------------------------------------------------------------------
+// D3 — THE CLOSENESS NOTE, the one new string (d) needs, and it is a NOTE
+// AFTER THE FIGURES, never a qualifier inside the verdict sentence: Cap's
+// word is "carries a note that it is close", and the verdict-first order
+// this site holds (claim → ledger → trailing clause last) puts the answer
+// before its qualifications. Placing it as a clause would also have meant
+// a product of six claim strings — income / placement-capital /
+// held-capital × near / not-near × conditional — for one idea.
+//
+// Both halves are transported: "about a tenth" is the shipped hedge, and
+// "a move that small in either number would change the answer" is
+// verbatim from the shipped NEAR_LINE_AMOUNT sentence below. Only the join
+// is new.
+//
+// Opens with a space: it is appended to a finished sentence, never
+// rendered alone. THE BELOW SIDE GETS NO TWIN, and that is a decision,
+// not an omission — Cap gave the note to the band ABOVE, and the shortfall
+// figure ("You're $68 short") is better closeness information than any
+// hedge. A reader who saw "right at the line" yesterday has lost a
+// signal; that loss is the ruling's point.
+const READER_NEAR_LINE_NOTE =
+  " Your figure is within about a tenth of the bar, so a move that small in either number would change the answer.";
+// The short register's twin, appended LAST to whichever above-family short
+// form renders, so a screen-reader reader inside a cluster knot is not the
+// only reader who loses the closeness. Precedent for a comma-appended
+// qualifier in this register: READER_ABOVE_CONDITIONAL's own
+// ", with conditions".
+const READER_NEAR_LINE_SHORT_SUFFIX = ", only just";
+
 const READER_NONE_CLEARS_SOME_UNREAD_CLAIM =
   "No residency route the site could read here clears — some set a bar above your figure, and some don't take this kind of income.";
 
@@ -1096,6 +1305,33 @@ export const STATE_HEADLINE = {
   QUALIFIES_AND_CONVERTS: "Clears — and this route leads to permanent residency (PR).",
   QUALIFIES_CONDITIONAL: "Clears, with conditions attached.",
   UNCERTAIN_TYPE: "Possible — but whether this profile's income type qualifies for this route isn't confirmed yet.",
+  // THE SETTLED TWIN OF UNCERTAIN_TYPE ABOVE, and it shipped with no entry
+  // in this table at all — the exact failure the note further down this
+  // file describes for the four engine tokens: `stateHeadline()` falls back
+  // to the key itself, so an unregistered state ships the literal string
+  // FAILS_TYPE_CONFIRMED to a reader's screen. The registration is
+  // defensive rather than a live fix, and the count is why: in the export
+  // this crossing publishes (verdicts.jsonl generated_at
+  // 2026-10-13T16:12:32Z) the state appears 8 times, every one of them as
+  // `routes_detail[].composed_state`, and 0 times as `overall_state` — and
+  // no UI reads `composed_state`; `map.js` paints from `overall_state`
+  // alone (:1032, :1197, :1365). So nothing reaches a screen through this
+  // key today, and the entry is here so that the first row to promote it
+  // to `overall_state` renders a sentence instead of the token. The count
+  // is pinned to a named export on purpose — undated it rots on the next
+  // one, dated it stays true as history. Counted, not recalled:
+  //   grep -o 'FAILS_TYPE_CONFIRMED' derived/verdicts.jsonl | wc -l
+  //     -> 8
+  //   grep -o '"overall_state": "FAILS_TYPE_CONFIRMED"' \
+  //     derived/verdicts.jsonl | wc -l
+  //     -> 0
+  // Its band is hard_fail in STATE_HEADLINE_BAND below, which is
+  // not a judgement made here — the engine hard-codes that band in the same
+  // return that emits the state (gate_income_type_single, on the
+  // `explicitly_rejected` branch).
+  //
+  // Committed UI copy, landed verbatim and not reworded here.
+  FAILS_TYPE_CONFIRMED: "Confirmed no — this route doesn't take this profile's kind of income as qualifying income.",
   // Kind-neutral, same reason as the legend label: this state fires on
   // capital bars too, so the sentence names the bar and not its kind.
   FAILS_AMOUNT: "Doesn't clear the bar this route sets.",
@@ -1122,11 +1358,11 @@ export const STATE_HEADLINE = {
   // closing a door. A deletion, not a rewording: the sentence is true of
   // either bar kind without those three words.
   READER_ABOVE_BAR: READER_ABOVE_BAR_CLAIM + READER_ABOVE_BAR_TAIL,
-  // AUTHORED JOIN, flagged rather than smuggled: §6.3 specifies "v1's own
-  // chip text, verbatim: 'Right at the line' + the v1 band sentence's
-  // first clause" and does not write the joined sentence. Both halves are
-  // transported word for word; only the ". " between them is mine.
-  READER_AT_LINE: READER_AT_LINE_OPENER + READER_AT_LINE_TAIL,
+  // READER_AT_LINE's entry is retired with the state — see the block above
+  // the four strings. Both of this table's near-line populations now read
+  // the two entries either side of where it stood: at-or-above the bar is
+  // above the bar, with or without conditions, and the closeness arrives
+  // as a note after the figures.
   READER_ABOVE_CONDITIONAL: "Above the bar — but only with conditions this route sets in its own words.",
   // The kind-aware variants live in READER_BELOW_VARIANTS below; this
   // entry is the all-income reading, kept verbatim because it is true and
@@ -1386,18 +1622,11 @@ const READER_BELOW_SHORT_VARIANTS = {
   },
 };
 
-// Added by the conversion crossing: a comparison against a converted bar
-// that lands inside θ reads "right at the line" and names the rate as the
-// reason it cannot be tighter. Not a new state:
-// READER_AT_LINE keeps its token, its band and its legend row; only the
-// TEXT varies, selected by the same carried-field mechanism
-// READER_BELOW_VARIANTS uses (reader_bar_kind, set for this state by
-// js/reader-lens.js's atLineConversionSummary() to { converted: true }
-// when the deciding comparison was a currency conversion). Drops the
-// shipped sentence's "dated snapshots" clause on purpose: the rate is
-// named as THE reason, and two reasons in one headline reads as hedging.
-const READER_AT_LINE_CONVERTED =
-  READER_AT_LINE_OPENER + READER_AT_LINE_CONVERTED_TAIL;
+// READER_AT_LINE_CONVERTED retires here too. It was composed but never
+// referenced — the at-the-line headline built its opener and tail
+// directly — and the reading it carried ("that rate is why the answer
+// can't be tighter") is now carried, as a fact rather than a gesture, by
+// readerRateLine() below.
 
 // Added by the conversion crossing. READER_NOT_ENOUGH's sentence
 // used to be one cause-neutral string (see the long SUPERSEDED note on
@@ -1530,7 +1759,6 @@ const READER_MARGIN_CLOSER = {
 const READER_MARGIN_CLOSING = {
   READER_ABOVE_BAR: "over",
   READER_ABOVE_CONDITIONAL: "over",
-  READER_AT_LINE: "atLine",
   READER_BELOW_BAR: "plain",
   READER_BELOW_SOME_UNREAD: "partial",
   READER_NONE_CLEARS: "noneClears",
@@ -1566,20 +1794,87 @@ function readerMarginLedger(state, margin) {
     + ` The bar: ${marginBarFigure(margin)}, on ${margin.threshold_label}.`;
   let closing;
   if (closingKey === "over") {
-    closing = `You're ${marginDifference(margin)} over.`;
-  } else if (closingKey === "atLine") {
-    // The direction rule: difference === 0 implies direction "exact",
-    // which is what makes "by $0" structurally
-    // impossible rather than avoided by wording. "under" at the line and
-    // "short" on the failing states is deliberate — at-the-line is
-    // explicitly not a no, so it must not borrow the no's word.
+    // THE EXACT BRANCH MOVED HERE, VERBATIM, FROM THE RETIRING "atLine"
+    // CLOSING, and it had to: difference === 0 implies direction "exact",
+    // and the at-the-line closing was the only one that said so. Without
+    // the move, a reader whose figure is exactly the bar reads "You're $0
+    // over." — which the margin work's own note calls structurally
+    // impossible, and which this band change would have made possible for
+    // the first time. One ratified string, one table over, no new wording.
     closing = margin.direction === "exact"
       ? "The same figure."
-      : `You're ${marginDifference(margin)} ${margin.direction === "over" ? "over" : "under"}.`;
+      : `You're ${marginDifference(margin)} over.`;
   } else {
     closing = `You're ${marginDifference(margin)} short${READER_MARGIN_CLOSER[closingKey]}`;
   }
   return `${figures} ${closing}`;
+}
+
+// D3's note, rendered only where the row says the reader cleared the bar
+// from inside the band. Two gates, both of them structural rather than
+// stylistic: `nearLine` is set on the row's own summary and ONLY ever on
+// the above-family states (js/reader-lens.js's aboveBarKindSummary()), and
+// the ledger must actually have rendered — a closeness note about figures
+// that are not on screen states nothing a reader can check.
+function readerNearLineNote(state, barKind, margin) {
+  if (!barKind || !barKind.nearLine) return "";
+  if (!margin || margin.status !== "ok") return "";
+  if (!READER_MARGIN_CLOSING[state]) return "";
+  return READER_NEAR_LINE_NOTE;
+}
+
+// ---------------------------------------------------------------------
+// (f) THE READER SEES WHICH RATE WAS USED — the second half of Cap's own
+// fx ruling ("the table on file first … and the hover says which rate was
+// used"), which has never been built: `rate`/`rateAsOf`/`rateSource` have
+// been computed on every converted comparison and rendered nowhere.
+//
+// THE ONE-RATE FORM, AND ONLY THAT FORM. convertAmount() reports ONE
+// rate — the single non-base table entry its conversion consulted — and
+// a EUR reader against a THB bar genuinely consumes two. The two-rate
+// form is specified (spec §F2) and is NOT built here: the engine does not
+// carry the second entry, and inventing one would be a fact I do not
+// have. Listed as owed rather than faked.
+//
+// THE CODE, NOT THE SYMBOL. "USD" and not "$": a rate is not a price, and
+// a euro reader must not meet a dollar sign in a line about their own
+// conversion. The base currency is named because the table is USD-based
+// and the reader never picked it.
+//
+// THE FIGURE PRINTS UNROUNDED. This is a provenance disclosure, and a
+// reader who re-does the arithmetic has to be able to land on the figures
+// above it. The readability cost of 0.0302326 is real and accepted.
+//
+// THE DATE RIDES INSIDE THE SOURCE STRING, which already ends "(fetched
+// 2026-09-14)" on every entry in the row — the house rule is that a
+// source is quoted, not paraphrased, and printing the date twice was the
+// first draft. If an entry ever carries a source without its date, the
+// date slot becomes explicit; stated here so the omission is a decision.
+//
+// THE AGE IS STATED INSIDE THE RULE THAT GOVERNS IT — "27 days old,
+// inside the 30 days this site will use a rate for" — rather than as a
+// bare age that invites a reader to supply their own threshold and alarm.
+// It is structurally safe: past stale_after_days the comparison does not
+// happen at all (fxEntryFor() returns null and the read lands
+// UNCERTAIN_FX_UNAVAILABLE), so this line can only ever render beside a
+// rate inside its own freshness window. It can never be the line that
+// announces rot.
+//
+// EVERY SLOT COMES OFF THE ROW. `stale_after_days` is interpolated, never
+// written into the string — the same value-copy rule BAND = 0.10 carries.
+// `ageDays` is computed here, from the row's date against the page clock,
+// and never stored. If any slot is missing the line does not render: a
+// provenance disclosure with a hole in it is worse than one absent.
+function readerRateLine(state, margin) {
+  if (!margin || margin.status !== "ok" || !margin.converted) return "";
+  if (!READER_MARGIN_CLOSING[state]) return "";
+  const { rate, rate_currency: code, rate_source: source, rate_as_of: asOf } = margin;
+  const staleAfter = margin.rate_stale_after_days;
+  if (rate == null || !code || !source || !asOf || !Number.isFinite(staleAfter)) return "";
+  const ageDays = Math.floor((Date.now() - Date.parse(asOf + "T00:00:00Z")) / 86400000);
+  if (!Number.isFinite(ageDays) || ageDays < 0) return "";
+  return ` Converted at the rate on file — 1 ${code} = USD ${rate} (${source}),`
+    + ` ${ageDays} days old, inside the ${staleAfter} days this site will use a rate for.`;
 }
 
 // The claim half of a reader state — the shipped sentence with its trailing
@@ -1599,28 +1894,23 @@ function readerStateClaim(state, barKind) {
     return phrase ? variants.capitalWithPhrase(phrase) : variants.capital;
   }
   if (state === "READER_ABOVE_BAR") {
-    return isPlacementBar(barKind)
-      ? readerAboveBarCapitalClaim(barKind.condition)
-      : READER_ABOVE_BAR_CLAIM;
+    // THREE OUTCOMES, in order of how specific the claim is. A placement
+    // bar says the money must be put IN; a held-capital bar (bank balance,
+    // total assets) says it must be HELD, which the income-shaped sentence
+    // silently claimed was earned; an income bar keeps the shipped
+    // sentence byte for byte.
+    if (isPlacementBar(barKind)) return readerAboveBarCapitalClaim(barKind.condition);
+    if (barKind && barKind.kind === "capital") return READER_ABOVE_BAR_HELD_CAPITAL_CLAIM;
+    return READER_ABOVE_BAR_CLAIM;
   }
   if (state === "READER_BELOW_SOME_UNREAD") return READER_BELOW_SOME_UNREAD_CLAIM;
   if (state === "READER_NONE_CLEARS_SOME_UNREAD") return READER_NONE_CLEARS_SOME_UNREAD_CLAIM;
   return STATE_HEADLINE[state] || state;
 }
 
-// The at-the-line reading, composed rather than tabulated: opener × tail is
-// 2 × 2 and a table of four would be four places for one word to go stale.
-// The opener carries whether the deciding bar attaches CONDITIONS (Cap's
-// fold-in), the tail carries whether the comparison was CONVERTED (the
-// conversion crossing's own reading), and the ledger goes between them —
-// which is exactly the shape the two specified sentences are written in.
-function readerAtLineHeadline(barKind, margin) {
-  const opener = barKind && barKind.conditional
-    ? READER_AT_LINE_OPENER_CONDITIONAL
-    : READER_AT_LINE_OPENER;
-  const tail = barKind && barKind.converted ? READER_AT_LINE_CONVERTED_TAIL : READER_AT_LINE_TAIL;
-  return opener + readerMarginLedger("READER_AT_LINE", margin) + tail;
-}
+// readerAtLineHeadline() retires with its state. Nothing composes an
+// opener and a tail around the ledger any more: the near-line reading is
+// an above-the-bar claim, the ledger, then D3's note.
 
 // `{MARGIN}` for the short register, by the same three figure rules the
 // long one uses: the figure, the bar's period in prose, and "about" when a
@@ -1647,7 +1937,20 @@ const READER_SHORT_WITH_MARGIN = {
 // carried into the short register: it is true under a tie, true when
 // unique, and in fact the stronger claim — the named bar is the smallest
 // shortfall, so every other bar is further.
-const READER_BELOW_SHORT_WITH_MARGIN = {
+//
+// RENAMED FROM READER_BELOW_SHORT_WITH_MARGIN, because it now holds both
+// families and a table called BELOW holding an above entry is two
+// vocabularies in one name. C2's entry is a MIRROR, not a mechanism: the
+// clause "on capital not income" is transported verbatim from the below
+// twin directly beneath it, and the same kindVariants branch of
+// readerShortWithMargin() reads both. This is the string that reaches the
+// CLUSTER-KNOT accessible name (js/map.js's readerShort), which is the
+// surface (c) names and the one place a screen-reader reader meets
+// nothing else.
+const READER_SHORT_WITH_MARGIN_BY_KIND = {
+  READER_ABOVE_BAR: {
+    capital: (m) => `above the bar, on capital not income, by ${m}`,
+  },
   READER_BELOW_BAR: {
     capital: (m) => `below the bar, on capital not income, at least ${m} short`,
     mixed: (m) => `below the bar, on income and on capital, at least ${m} short`,
@@ -1657,23 +1960,36 @@ const READER_BELOW_SHORT_WITH_MARGIN = {
 // Returns the short form WITH the distance in it, or null where there is
 // no distance to state — in which case readerStateShort() falls back to
 // the shipped string, unchanged.
+// ORDER IS LOAD-BEARING, most specific first: a placement bar, then the
+// kind-keyed table (which is where C2's held-capital above form lives),
+// then the kind-blind income forms. Test the kind table AFTER the
+// placement branch and BEFORE READER_SHORT_WITH_MARGIN, exactly as the
+// below family already is, or the income form keeps winning.
+//
+// THE THREE AT-THE-LINE SHORT FORMS RETIRED WITH THE STATE, and one of
+// them was carrying a case nobody noticed: `right at the line, exactly on
+// the bar`, the difference === 0 reading. THAT CASE IS NOW REACHABLE
+// HERE, because "clearing the bar is clearing" sends exactly-equal to the
+// above family — and I FOUND IT BY DRIVING THE SERVED SITE, after writing
+// a comment in this very function claiming it could not arise:
+// $2,000/month against Guatemala's $2,000 bar rendered "above the bar, by
+// $0 a month, only just".
+//
+// NO NEW STRING ANSWERS IT, and none is needed: a difference of zero is
+// "no distance to state", which is this function's own documented
+// contract for returning null — readerStateShort() then falls back to the
+// shipped kind-blind form ("above the bar") and the closeness suffix
+// still attaches, giving "above the bar, only just". The long register
+// says it exactly, in the ratified words that moved one table over:
+// "The same figure."
 function readerShortWithMargin(state, barKind, margin) {
   if (!margin || margin.status === "unavailable") return null;
-  if (state === "READER_AT_LINE") {
-    // The three at-the-line forms. The conditional suffix is NOT specified
-    // copy — see READER_AT_LINE_OPENER_CONDITIONAL's own note; it is here
-    // because this string is a pin's accessible name, and stating the
-    // condition in the tooltip while dropping it from the screen-reader
-    // label is exactly the asymmetry this short table exists to prevent.
-    const conditions = barKind && barKind.conditional ? ", with conditions" : "";
-    if (margin.direction === "exact") return `right at the line, exactly on the bar${conditions}`;
-    return `right at the line, ${shortMarginText(margin)} ${margin.direction === "over" ? "over" : "under"}${conditions}`;
-  }
+  if (margin.difference === 0) return null;
   if (state === "READER_ABOVE_BAR" && isPlacementBar(barKind)) {
     return READER_ABOVE_BAR_CAPITAL_SHORT_WITH_MARGIN(shortMarginText(margin));
   }
-  const kindVariants = barKind && READER_BELOW_SHORT_WITH_MARGIN[state];
-  if (kindVariants && (barKind.kind === "capital" || barKind.kind === "mixed")) {
+  const kindVariants = barKind && READER_SHORT_WITH_MARGIN_BY_KIND[state];
+  if (kindVariants && kindVariants[barKind.kind]) {
     return kindVariants[barKind.kind](shortMarginText(margin));
   }
   const form = READER_SHORT_WITH_MARGIN[state];
@@ -1694,7 +2010,6 @@ function readerShortWithMargin(state, barKind, margin) {
 // can pass either, and only a reader row can carry one.
 export function stateHeadline(state, barKind, margin) {
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
-  if (state === "READER_AT_LINE") return readerAtLineHeadline(barKind, margin);
   if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughSentence(barKind);
   // THE ONE STATE WHOSE TEXT TURNS ON A FACT ABOUT THE ROUTES IT DID NOT
   // READ. Same token, same band, same legend row, no registry churn — the
@@ -1714,8 +2029,15 @@ export function stateHeadline(state, barKind, margin) {
   if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
     return READER_WRONG_TYPE_ACCEPTING_UNREAD;
   }
+  // THE FIXED ORDER FOR THE WHOLE SENTENCE, so nobody re-derives it:
+  // claim → margin ledger → closeness note (D3) → rate line (F1) →
+  // trailing clause LAST. Every one of the middle three returns "" where
+  // it does not apply, so a caller with no margin gets exactly the string
+  // that shipped.
   return readerStateClaim(state, barKind)
     + readerMarginLedger(state, margin)
+    + readerNearLineNote(state, barKind, margin)
+    + readerRateLine(state, margin)
     + (READER_STATE_TAIL[state] || "");
 }
 
@@ -1731,6 +2053,16 @@ export function stateHeadline(state, barKind, margin) {
 // — an INTENTIONAL asymmetry with the long register (A1 rule 5), stated
 // here so nobody later "harmonises" it.
 export function readerStateShort(state, barKind, margin) {
+  const base = readerStateShortBase(state, barKind, margin);
+  // D3's short twin, appended LAST — after the distance and after any
+  // trailing clause the form carries: "above the bar, by $141 a month,
+  // only just". ONE attachment point, deliberately, so it cannot be
+  // forgotten on one branch of five — including the no-distance fallback,
+  // which is where the exactly-on-the-bar reading lands.
+  return base && barKind && barKind.nearLine ? base + READER_NEAR_LINE_SHORT_SUFFIX : base;
+}
+
+function readerStateShortBase(state, barKind, margin) {
   const withMargin = readerShortWithMargin(state, barKind, margin);
   if (withMargin) return withMargin;
   // Same split as stateHeadline()'s: a pin whose tooltip says the unread
@@ -1777,6 +2109,12 @@ export const STATE_HEADLINE_BAND = {
   QUALIFIES_AND_CONVERTS: "clean",
   QUALIFIES_CONDITIONAL: "uncertain_or_conditional",
   UNCERTAIN_TYPE: "uncertain_or_conditional",
+  // Registered with its STATE_HEADLINE sentence, not after it: the note on
+  // that table's four engine tokens is explicit that a state lands in both
+  // or "the legend and the banding would disagree". hard_fail is the
+  // engine's own hard-coded band for this state, copied from the emit, not
+  // chosen here.
+  FAILS_TYPE_CONFIRMED: "hard_fail",
   FAILS_AMOUNT: "hard_fail",
   DEAD_END_BLOCKING: "hard_fail",
   GAP_INSUFFICIENT_DATA: "data_gap",
@@ -1784,7 +2122,13 @@ export const STATE_HEADLINE_BAND = {
   // band, same as every engine state above. Registered here so the map
   // legend, the Lists banding and the location chip all read one table.
   READER_ABOVE_BAR: "clean",
-  READER_AT_LINE: "uncertain_or_conditional",
+  // READER_AT_LINE's row retires with the state. Its population did not
+  // vanish — it split, by direction: at-or-above the bar now bands
+  // "clean" under READER_ABOVE_BAR (or uncertain under
+  // READER_ABOVE_CONDITIONAL, unchanged), and below the bar bands
+  // hard_fail under READER_BELOW_BAR. That split is Cap's ruling, and it
+  // is what makes the legend's "Above the bar" row true of both
+  // populations with no edit to the row itself.
   READER_ABOVE_CONDITIONAL: "uncertain_or_conditional",
   READER_BELOW_BAR: "hard_fail",
   READER_WRONG_TYPE: "hard_fail",
@@ -1847,7 +2191,6 @@ export const STATE_HEADLINE_BAND = {
 export const READER_STATE_SHORT = {
   READER_ABOVE_BAR: "above the bar",
   READER_ABOVE_CONDITIONAL: "above the bar, with conditions",
-  READER_AT_LINE: "right at the line",
   READER_BELOW_BAR: "below the income bar",
   READER_WRONG_TYPE: "not this kind of income",
   READER_NONE_CLEARS: "no route clears",
@@ -2827,7 +3170,7 @@ export function renewalLifeExplainerLine() {
 // wording, verbatim — nothing here is authored prose, only the
 // mechanism selecting which already-worded string applies to a given
 // real routes_detail row. Ground truth for field shapes: §8AK
-// (`assessed`, `receipt`) and tools/visa-fit-engine.py's own four
+// (`assessed`, `receipt`) and the verdict engine's own four
 // location-gate functions, read directly this build, not inherited
 // from the spec's paraphrase.
 // ---------------------------------------------------------------------
@@ -3112,7 +3455,7 @@ function locationGateLinePhrase(gateName, rt, householdSize, countryId, location
 // toggle — 37.1's own instruction: "not an opt-in depth control"). The
 // deciding-gate marker (37.1/37.9) reproduces compose_location()'s own
 // worst-ranked-firing-gate rule client-side (LOCATION_BAND_RANK in
-// tools/visa-fit-engine.py: hard_fail beats uncertain_or_conditional,
+// the verdict engine: hard_fail beats uncertain_or_conditional,
 // first in canonical order wins a tie — this loop's own iteration order
 // over LOCATION_GATE_ORDER matches that exactly) against the public
 // `overall_band` fields already on both this row and its sibling

@@ -12,14 +12,15 @@
 // clearly labeled wherever it's shown, not a new fact and not a rules-engine
 // verdict.
 //
-// One honest exception to "transports and indexes what's already in
-// derived/," added when the reader-built weight vector shipped: a reader's
-// own locally-stored priority weights (store.customWeights, populated by
-// whichever module owns the localStorage read — see app-shared.js) are a
-// reader-authored input, not a derived/ file. This module still fetches and
-// authors nothing itself — that input is layered onto the already-built
-// store the same way its other runtime indexes are — but the module-level
-// claim above is no longer literally "everything," so it's qualified here
+// THE ONE HONEST EXCEPTION TO "transports and indexes what's already in
+// derived/" IS WITHDRAWN, 2026-10-12: it was added when the reader-built
+// weight vector shipped — a reader's own locally-stored priority weights,
+// layered onto the already-built store — and that vector is retired with
+// the step that wrote it. Nothing reader-authored is layered onto the
+// store any more, so the module-level claim above is literally
+// "everything" again. Kept as a note rather than deleted because the
+// shape of the exception is the thing to re-read if a reader-authored
+// input ever returns
 // rather than left to go quietly stale.
 
 import { siteUrl } from "./site-root.js";
@@ -174,7 +175,7 @@ async function buildStore(basePath) {
   // class 37.3 exists because of). `fact_key` is globally unique by
   // construction (country/location-prefixed), so one flat map over every
   // country's facts is exact, no per-country lookup needed. This mirrors
-  // tools/visa-fit-engine.py's own `by_key` index (gate_location_education())
+  // the verdict engine's own `by_key` index (gate_location_education())
   // exactly — same two lookups, same fact_key shapes, run client-side
   // against the same already-public fact rows, not a re-derivation of any
   // number the engine itself didn't already publish.
@@ -466,29 +467,29 @@ function resolvedCriterionValues(store, personaId, locationId) {
 // Wenda/Carmen have ONLY a verdict-shaped fixture (no criterion overrides),
 // per the runbook: rendered as "verification pending", never computed.
 //
-// Ruled at 8P.2: "custom" is a reserved personaId,
-// checked FIRST — the third door's own reader-built weight vector. It is
-// deliberately NOT one of the 8 curated personas in VALID_PERSONAS (never
-// flows through the URL-persona/switcher machinery those names feed) —
-// see app-shared.js's getActivePersona() for the one place that decides
-// when "custom" applies. Its value source is the plain scored row (a
-// reader-built profile has no specialist-authored fixture overrides,
-// same as the general reading); only its WEIGHT source differs, reading
-// the reader's own stored vector with a defensive per-key fallback to
-// this criterion's ordinary site-wide weight (belt-and-suspenders: the
-// vector is ruled to always carry all 13 keys at save time, but a stale
-// vector from before a future 14th criterion existed should degrade to
-// the normal weight for that one unrecognized key, not to a silent
-// zero-weight or an outright crash).
+// "custom" is a reserved personaId, checked FIRST — the reader's own
+// identity. It is deliberately NOT one of the 8 curated personas in
+// VALID_PERSONAS (never flows through the URL-persona/switcher machinery
+// those names feed) — see app-shared.js's getActivePersona() for the one
+// place that decides when "custom" applies.
+//
+// THE READER'S OWN WEIGHT VECTOR IS RETIRED (Cap, 2026-10-12 12:39 +00),
+// and this branch is what consumed it. It read store.customWeights with a
+// per-key fallback to each criterion's ordinary site-wide weight; with no
+// vector stored, every key took that fallback, which is exactly
+// generalIndex(). So the branch below returns the general index directly
+// rather than computing the identical number through a weight source that
+// can only ever be null — THE READER'S FIT VALUES DO NOT MOVE BY A
+// DECIMAL for anyone who had no stored vector, which is everyone from
+// this build on.
+//
+// `personaAdjusted: false` is the honest label and the same one the
+// fixture-less personas below already carry: the number is the general
+// one, and every call site says so in its own words.
 function personaIndex(store, personaId, locationId) {
   if (personaId === "custom") {
-    const weights = store.customWeights;
-    return weightedCriteriaAverage(
-      store,
-      locationId,
-      scoredValueFor,
-      (crit) => (weights && weights[crit.criterion_id] != null ? weights[crit.criterion_id] : defaultWeightForCriterion(crit))
-    );
+    const general = generalIndex(store, locationId);
+    return general ? { ...general, personaAdjusted: false } : null;
   }
   const perLoc = store.fixturesByPersona.get(personaId);
   const entry = perLoc ? perLoc.get(locationId) : null;

@@ -25,7 +25,7 @@ main();
 
 // Approved copy, embedded verbatim (register pass, Unit 1.1).
 const WHY_TEXT =
-  "Everything you tell this site — your answers, your priorities, your " +
+  "Everything you tell this site — your answers, your " +
   "passport pick — stays in your browser. We never see any of it. " +
   "That's by design, and it has one honest cost: we also can't see what " +
   "you need. We don't know which place you searched for and didn't " +

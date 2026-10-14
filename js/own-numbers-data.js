@@ -55,10 +55,17 @@ export const DURATION_BANDS = OWN_NUMBERS_DURATION_BANDS;
 // this reader read: one rule, one pipeline, no second copy with an
 // opinion of its own.
 //
-// SYMMETRIC, and the row says so in its own words: a read within this
-// fraction of its bar EITHER WAY is near the line and lands uncertain,
-// rather than clear or refused. A fail inside the band is as undecided
-// as a pass inside it.
+// SYMMETRIC AS A NUMBER, and the row says so in its own words: this
+// fraction measures nearness to a bar in either direction.
+//
+// WHAT IS NO LONGER SYMMETRIC IS THE READING BUILT ON IT, and the
+// distinction matters because the number here did not move. The shipped
+// reading was "a read within this fraction of its bar EITHER WAY is near
+// the line and lands uncertain, rather than clear or refused. A fail
+// inside the band is as undecided as a pass inside it." Cap ruled that
+// out (2026-10-07): a pass inside the band is a pass that carries a note,
+// and a fail inside it is a fail with a shortfall. bandFor() below is
+// where that split lives; this constant is untouched by it.
 //
 // WHAT THIS LINE STILL IS, stated plainly rather than papered over: a
 // value-copy. The site does not fetch `rules.jsonl` client-side yet, so
@@ -278,10 +285,40 @@ export function convertAmount(fxRates, amount, fromCurrency, toCurrency, nowMs =
   return { amount: out, rate: named.usd_per_unit, asOf: named.as_of, source: named.source };
 }
 
-// The near-the-bar band, applied only to a same-currency comparison.
+// THE BAND'S THREE STATES, AND THE ONE THING THAT CHANGED: the band is
+// no longer a verdict of its own.
+//
+// Cap, 2026-10-07: "clearing the bar is clearing, and within the band
+// above it carries a note that it is close. Below the bar does not clear,
+// and the reader sees how far short they are." The shipped band returned
+// "at" on BOTH sides of the bar, so $141 over and $68 under read the same
+// sentence and both filed under a legend row headed "Not settled" — a
+// symmetric answer standing where the ruling is asymmetric.
+//
+// So the middle return splits by DIRECTION, and the third state is a
+// qualifier on clearing rather than a refusal to answer:
+//   "above"       clears, and not close
+//   "above_near"  CLEARS — and carries a note that it is close
+//   "below"       does not clear; the reader sees the shortfall
+//
+// "above_near" is deliberately a third BAND VALUE and not a new state
+// token, a new field or a new flag on the result: the band string is
+// already carried on every row (`result.amountBand`), already read by
+// exactly one consumer (js/reader-lens.js's readerStateForRow()), and
+// already serialised into the row's own routes_detail. One carrier, three
+// values, no fourth thing to keep in step.
+//
+// EXACTLY EQUAL CLEARS. `>= threshold` is the whole of the asymmetry, and
+// it is the ruling's own word: clearing the bar is clearing.
+//
+// BAND is unchanged and must not change here — it is a value-copy of the
+// rules layer's own `near_line_band` and changes in the row, not in this
+// file. What changed is only what is DONE with the result: the comment on
+// BAND above still describes the number as symmetric, which it is; the
+// reading built on it no longer is.
 export function bandFor(readerAmount, threshold) {
   if (readerAmount >= threshold * (1 + BAND)) return "above";
-  if (readerAmount >= threshold * (1 - BAND)) return "at";
+  if (readerAmount >= threshold) return "above_near";
   return "below";
 }
 
@@ -525,14 +562,15 @@ export function evaluateRow(row, input, fxRates) {
   // already returned on this call, stored instead of dropped. bandFor()
   // below still reads the same pair off the same object.
   //
-  // ONE EXISTING CONSUMER STARTS WORKING BECAUSE OF THIS LINE, named here
-  // rather than left to be discovered: js/reader-lens.js's
-  // atLineConversionSummary() tests `gate2.comparable.converted`, which
+  // ONE CONSUMER THAT USED TO DEPEND ON THIS LINE IS GONE, and the note is
+  // kept because the dependency is the thing to understand: js/reader-lens.js's
+  // atLineConversionSummary() tested `gate2.comparable.converted`, which
   // could never be true while gate2 was null on every successful row — so
-  // READER_AT_LINE_CONVERTED (app-shared.js) has been unreachable since
-  // the conversion crossing shipped it. It becomes reachable here. That is
-  // that string's own shipped intent, not a behaviour this build invented,
-  // but it IS a visible change and it is flagged for the gate.
+  // READER_AT_LINE_CONVERTED was unreachable from the day it shipped.
+  // Both retired with the at-the-line state (2026-10-12). What the carry
+  // feeds now is the MARGIN: `rate`, `rateAsOf` and `rateSource` reach the
+  // reader as the rate line in app-shared.js, which is the disclosure the
+  // converted at-the-line sentence only ever gestured at.
   result.gate2 = g2;
   if (result.amountChipSuppressed) return result;
   result.amountBand = bandFor(g2.comparable.readerAmount, g2.comparable.threshold);

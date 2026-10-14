@@ -39,7 +39,12 @@
         <th data-sort="name">Location</th>
         <th data-sort="country">Country</th>
         <th data-sort="fit">Fit index</th>
-        <th>Persona verdict</th>
+        <!-- The no-lens string, which is also the no-JS and
+             lens-not-resolvable fallback. js/lists.js replaces it with
+             "Your own verdict" / "Wenda's verdict" where a lens is
+             active — never "Persona verdict", which told a reader in
+             their own lens that this column held someone else's read. -->
+        <th id="verdict-col-header">Verdict — general figures</th>
         <th>Detail</th>
       </tr>
     </thead>

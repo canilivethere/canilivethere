@@ -21,13 +21,27 @@ import {
   OWN_NUMBERS_PERIODS, OWN_NUMBERS_DURATION_BANDS,
 } from "./app-shared.js";
 
-// Gate 0. The five countries the box reads. CR is Crete
+// Gate 0. The countries the box reads: EVERY country this site covers,
+// as of the 21-country crossing (Cap, 2026-10-20). CR is Crete
 // (derived/countries.jsonl: {"country_id":"CR","name":"Crete"}), not
 // Costa Rica. The refused set is never written down: it is derived at
-// runtime as every country in countries.jsonl minus these five — never a
+// runtime as every country in countries.jsonl minus this list — never a
 // fall-through — so a 22nd country appears as a refusal on day one
 // instead of vanishing.
-export const READ_SET = ["TH", "GT", "PT", "ES", "CR"];
+//
+// THE LIST IS STILL A LITERAL, AND THAT IS NOW LOAD-BEARING IN A SECOND
+// WAY. The reader-facing scope sentences no longer name five countries;
+// they claim "every country this site covers", which is a whole-set
+// claim that fails silently the first time a country is added to the
+// site and not added here. So those sentences are RENDERED FROM A
+// COMPARISON of this list against countries.jsonl rather than from a
+// literal (coverageLine() / inputScopeLine() in js/own-numbers.js): where
+// the two differ the sentence names the exceptions. A literal cannot
+// notice; a comparison can.
+export const READ_SET = [
+  "AL", "AR", "BG", "BZ", "CO", "CR", "EC", "EG", "ES", "GT", "ID",
+  "IN", "MA", "MX", "MY", "PT", "PY", "TH", "US", "VN", "ZA",
+];
 
 // The four vocabularies, taken from the storage module rather than
 // written out again here. Both files check a value against these lists —
@@ -159,7 +173,8 @@ export function barForRow(row) {
   };
 }
 
-// The slice is every ':route:'-kind row in the five read countries.
+// The slice is every ':route:'-kind row in the read countries (all 21
+// since the 21-country crossing; READ_SET is the one source).
 // ':visit:' rows are bare tier pointers with no threshold and
 // no income field — the tourist layer is the passport wing's answer, and
 // this box routes to it rather than answering it.

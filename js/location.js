@@ -12,9 +12,15 @@ import {
   stateHeadline, verdictDisclosureSentence, verdictConfidenceBadge,
   READER_DEPENDENCY_PENDING_LABEL, READER_DEPENDENCY_PENDING_PARAGRAPH,
   personaDisplayLabel, glossaryWrap, verdictProvenanceBadge,
-  READER_ID, READER_VERDICT_DISCLOSURE, READER_BASIS_DECLARED_LINE,
+  READER_ID, READER_VERDICT_DISCLOSURE_SCOPE, READER_VERDICT_DISCLOSURE_PASSPORT,
+  READER_BASIS_DECLARED_LINE,
   verdictChipMarkup, renewalLifeExplainerLine, loadNationality,
   sentenceCaseRuleParagraph, locationGateProvenanceHtml,
+  readerVerdictBlockClaim, readerClearedGroups, readerMissGroups,
+  readerRouteItemParts, readerMissToggleLabels,
+  readerUnreadLine, readerHeadlineBadgeSuppressed,
+  readerRendersBothClearedLists, READER_NOTHING_READ_LINE,
+  READER_GATES_DISCLOSURE_LINE, readerMissSummary, readerVerdictBlockCauses,
 } from "./app-shared.js";
 import {
   PORTRAITS, CHAPTER_INTROS,
@@ -295,12 +301,53 @@ function buildVerdictBlock(store, loc, country, persona) {
     const value = idx ? idx.value : null;
     if (readerVerdict) {
       const visual = bandVisual(readerVerdict.overall_band);
-      // Third argument is the row's own `reader_margin` — my number, the
-      // bar, and by how much, stated inside the state's own sentence. Null on every persona row and on every reader row whose
-      // state ran no comparison, and the sentence is then byte-identical
-      // to what shipped.
-      const stateText = stateHeadline(
-        readerVerdict.overall_state, readerVerdict.reader_bar_kind, readerVerdict.reader_margin
+      // THE SURFACE OF RECORD for the reader's own read, and the one
+      // surface that ENUMERATES: every route that clears, full width,
+      // uncapped, biggest clearance first, with the routes that do not
+      // clear beneath them. Cap, 2026-10-18 and 2026-10-20; specified in
+      // the information-design spec for this crossing, and worded in its copy
+      // deck; both are held outside this repo.
+      //
+      // THE BLOCK'S ORDER, which is the spec's and is not this file's
+      // to reshuffle:
+      //   1. the country claim — CLAIM ONLY, chip, tier badge, scope tag
+      //   2. the disclosure's SCOPE half — what the read covered
+      //   3. the cleared routes, income group then capital group
+      //   4. the miss line, below them, opening to the full list
+      //   5. the could-not-read disclosure, OUTSIDE that widget
+      //   6. the disclosure's PASSPORT half (B8, ruled 2026-10-20)
+      //   7. the standing gates disclosure, once
+      //   8. basisLine, redFlagBadge, renewalLifeExplainerLine(),
+      //      insteadLine, breakdownLink — unchanged, all in place
+      //
+      // B8 PUT ITEM 6 WHERE IT IS. The disclosure used to be one
+      // paragraph at position 2, and measured at 390 it was 14 visual
+      // lines and ~381px of caveat between the chip and the first route
+      // label — the largest single thing standing between a reader and
+      // his own figures once the 21-name perspective line was cut. The
+      // half that states what the read COVERED stays above the answer,
+      // because a reader has to know the scope before he reads a
+      // verdict. The half that caveats the read's SOURCING sits below
+      // the lists, where it is the consequence of an answer rather than
+      // a toll on the way to one. Still inside the block, still on every
+      // reader page, nothing hidden.
+      //
+      // THE LEDGER HAS MOVED OUT OF THE HEADLINE AND INTO THE ITEMS, so
+      // this surface calls readerVerdictBlockClaim() rather than
+      // stateHeadline(): the figures, the closeness note and the rate
+      // line now ride on the route they are about, and the trailing gates
+      // disclosure is lifted to a line of its own (item 6) so it cannot
+      // vanish when the lead item is conditional. The three compact
+      // surfaces still call stateHeadline() and still get the whole
+      // sentence, because one route is all they can hold.
+      const carry = readerVerdict.reader_margin;
+      const clearedGroups = readerClearedGroups(carry);
+      const clearedCount = clearedGroups.reduce((n, g) => n + g.items.length, 0);
+      const missGroups = readerMissGroups(carry);
+      const missCount = missGroups.reduce((n, g) => n + g.items.length, 0);
+      const stateText = readerVerdictBlockClaim(
+        readerVerdict.overall_state, readerVerdict.reader_bar_kind,
+        readerRendersBothClearedLists(carry)
       );
       // The same no-bare-no instead-line every other verdict branch on
       // this page carries, on the same gate: two pointers to content
@@ -314,7 +361,17 @@ function buildVerdictBlock(store, loc, country, persona) {
       // stays the only one: the tier a reader row shows is now the tier of
       // the very bar its sentence names, so there is no second case in
       // which a tier exists and is withheld.
-      const tierBadge = readerVerdict.overall_band === "data_gap"
+      //
+      // AND THE SECOND REASON IT CAN BE EMPTY, which is the iff rule: the
+      // headline badge renders if and only if NO list item renders one.
+      // Measured, mixed tiers inside one list in 3,380 reads and a
+      // tier-less lead beside a tiered sibling in 1,070 — so one badge
+      // over a five-item list would be a claim about one route standing
+      // where a reader reads it as a claim about five. The iff is what
+      // keeps the absence single-meaning: a reader never meets an absent
+      // headline badge on a page where tiers are present, because if any
+      // tier exists it is visible on the item that holds it.
+      const tierBadge = (readerVerdict.overall_band === "data_gap" || readerHeadlineBadgeSuppressed(carry))
         ? "" : verdictConfidenceBadge(readerVerdict.confidence_tier);
       // The reader's row is computed once for every location in this
       // country, not for this place specifically — the same disclosure a
@@ -331,9 +388,130 @@ function buildVerdictBlock(store, loc, country, persona) {
       const basisLine = readerBasisIsAssumed(store, loc)
         ? `<p class="fact-notes">${escapeHtml(READER_BASIS_DECLARED_LINE)}</p>`
         : "";
+      // ONE ITEM, AND NOTHING IS NUMBERED. A `<ul>`, never an `<ol>`: an
+      // ordinal is a ranking claim and would be false on a tie, and ties
+      // are the common case — Ecuador's three +190.5% items print the same
+      // bar and the same difference, which discloses the tie better than
+      // any sentence about ties could. Every part comes off the item's own
+      // state and its own summary, so the closeness note, the placement
+      // clause, the conditional clause and the tier each render against
+      // the route they were computed from.
+      const routeItem = (item) => {
+        const part = readerRouteItemParts(item);
+        const badge = part.confidence ? verdictConfidenceBadge(part.confidence) : "";
+        return `<li class="reader-route">`
+          + `<span class="reader-route-bar">${escapeHtml(part.label)}</span>${badge}`
+          + (part.claim ? `<span class="reader-route-claim">${escapeHtml(part.claim)}</span>` : "")
+          // What kind of income this route counts, in the box's own
+          // words. Clearing items only, and only for a reader who did
+          // not name a kind — both conditions decided upstream.
+          + (part.incomeKind ? `<span class="reader-route-kind">${escapeHtml(part.incomeKind)}</span>` : "")
+          + (part.ledger ? `<span class="reader-route-ledger">${escapeHtml(part.ledger)}</span>` : "")
+          + (part.note ? `<span class="reader-route-note">${escapeHtml(part.note)}</span>` : "")
+          + (part.rate ? `<span class="reader-route-rate">${escapeHtml(part.rate)}</span>` : "")
+          + `</li>`;
+      };
+      const routeGroup = (group) => `<div class="reader-route-group">`
+        + `<p class="reader-route-label">${escapeHtml(group.label)}</p>`
+        + `<ul class="reader-route-list">${group.items.map(routeItem).join("")}</ul>`
+        + `</div>`;
+      const clearedHtml = clearedGroups.map(routeGroup).join("");
+
+      // THE MISS SIDE: one line, below the cleared list, carrying the
+      // count and the nearest miss with its shortfall — and it OPENS to
+      // the full list. Cap's own words, 2026-10-20: "The page never says
+      // nothing opens without saying what would."
+      //
+      // OPEN ON ARRIVAL WHERE NOTHING CLEARS — Cap's B6, yes. THIS IS THE
+      // LINE THAT SETS IT: `clearedCount === 0`. A reader whose answer is
+      // "nothing opens" should not have to click to find out how close he
+      // came, and that is ~9,600 reads across every country carrying
+      // routes. Where something does clear, the widget arrives closed and
+      // the answer is what is open.
+      //
+      // WHAT THIS KNOWINGLY COSTS, built as specified rather than
+      // designed around: under an open-on-arrival widget the nearest miss
+      // PRINTS TWICE — once in the summary line Cap ruled must carry it,
+      // once as the first item of the list directly beneath, the same
+      // figure. The copy deck declined to fix it by dropping the figure from the
+      // summary, because the closed state is one click away and a summary
+      // that loses its shortfall on collapse breaks the requirement in
+      // the state it was written for. So the repetition ships, visibly,
+      // to be priced off a real screen by the seats that ruled it. The
+      // writer's view, recorded:
+      // if it goes, the honest cut is the list's first item, never the
+      // ruled summary.
+      //
+      // THE LABEL IS CSS-SWITCHED, NOT SCRIPTED: both strings are in the
+      // DOM and `details[open]` picks which one shows. No event wiring, so
+      // the label cannot fall out of step with the widget's actual state —
+      // and the closed label is the one a reader without CSS meets, which
+      // is the honest default because it names what is inside.
+      const missLabels = readerMissToggleLabels(carry);
+      const missSummary = readerMissSummary(readerVerdict.overall_state, carry);
+      // THE SUMMARY SAYS TWO DIFFERENT THINGS IN ITS TWO STATES, and both
+      // are in the DOM with `details[open]` picking between them — the
+      // same CSS mechanism the two labels already use, and deliberately
+      // NOT a toggle listener. A listener can fall out of step with the
+      // widget's real state; a selector cannot, and this block re-renders
+      // in place when the reader changes their figures. So the
+      // state-neutral fallback is not needed: the closed state keeps the
+      // figure Cap's ruling put there, and the open state drops it
+      // because the first item one line below is already printing it.
+      const missHtml = missCount
+        ? `<details class="reader-miss"${clearedCount === 0 ? " open" : ""}>`
+          + `<summary><span class="reader-miss-line">`
+          + `<span class="reader-miss-closed">${escapeHtml(missSummary.closed)}</span>`
+          + `<span class="reader-miss-open">${escapeHtml(missSummary.open)}</span>`
+          + `</span> <span class="reader-miss-toggle">`
+          + `<span class="reader-miss-toggle-closed">${escapeHtml(missLabels.closed)}</span>`
+          + `<span class="reader-miss-toggle-open">${escapeHtml(missLabels.open)}</span>`
+          + `</span></summary>`
+          + missGroups.map(routeGroup).join("")
+          + `</details>`
+        : "";
+
+      // POPULATION 3, OUTSIDE THE WIDGET AND AT THE SAME LEVEL AS THE MISS
+      // LINE. Cap, 2026-10-20: "unread routes are not noes." The widget
+      // counts noes; a route the site could not read is ignorance, not a
+      // no, and a reader who opens a list of eight noes must not then
+      // discover that eleven routes nobody read were never mentioned —
+      // Thailand reaches exactly that, all eleven of its route rows, on a
+      // reachable read. This line is why the count in the widget can
+      // honestly exclude them.
+      //
+      // WHERE NOTHING CLEARS AND NOTHING MISSES there is no shortfall in
+      // existence to show, and the page must still not be read as a no:
+      // the deck's two declaratives render instead of the count line. That is
+      // 39.6% of reads, 2.6 times the population Cap's own sentence was
+      // written against. What WOULD change it is already on the page in
+      // the engine's own cause sentence, which is the chip above.
+      const nothingRead = clearedCount === 0 && missCount === 0;
+      const unreadText = nothingRead
+        ? READER_NOTHING_READ_LINE
+        : readerUnreadLine(carry, { clearedPresent: clearedCount > 0 });
+      const unreadLine = unreadText
+        ? `<p class="reader-unread-line">${escapeHtml(unreadText)}</p>`
+        : "";
+
+      // The cause clauses leave the pill on this surface only. At
+      // Thailand that is a 250-character paragraph inside a coloured
+      // lozenge becoming a 49-character claim with its reasons in body
+      // ink beneath it — and on the one band where the pill is the whole
+      // answer, the pill also stops being white on sand (1.41:1) and
+      // becomes ink on it (12.18:1 light, 12.53:1 dark). Same words,
+      // same order, two containers.
+      const causeLine = readerVerdictBlockCauses(readerVerdict.overall_state, readerVerdict.reader_bar_kind);
+      const causeHtml = causeLine ? `<p class="reader-cause-line">${escapeHtml(causeLine)}</p>` : "";
       div.innerHTML = `
-        <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, null)}${tierBadge}${scopeNote}</p>
-        <p class="verdict-prose">${escapeHtml(READER_VERDICT_DISCLOSURE)}</p>
+        <p class="verdict-headline">${verdictChipMarkup(visual.color, stateText, null, { gapBand: visual.gap })}${tierBadge}${scopeNote}</p>
+        ${causeHtml}
+        <p class="verdict-prose">${escapeHtml(READER_VERDICT_DISCLOSURE_SCOPE)}</p>
+        ${clearedHtml}
+        ${missHtml}
+        ${unreadLine}
+        <p class="verdict-prose reader-passport-line">${escapeHtml(READER_VERDICT_DISCLOSURE_PASSPORT)}</p>
+        <p class="reader-gates-line">${escapeHtml(READER_GATES_DISCLOSURE_LINE)}</p>
         ${basisLine}
         ${redFlagBadge}
         ${renewalLifeExplainerLine()}

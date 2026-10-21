@@ -285,7 +285,9 @@ export function composeCountryState(routeStates) {
   // country with one refusing route and two unreadable ones printed a
   // sentence about all three. Measured on the shipped data over a
   // 1,800-country-read grid: 251 false sentences (a second grid on a
-  // different amount ladder measured 263), on all five read countries.
+  // different amount ladder measured 263), on all five of the countries
+  // the box read AT THE TIME — the grid is a dated measurement, not a
+  // statement of today's scope; the box reads all 21 since 2026-10-20.
   // GT at $300/month pension is the clean case: two of three routes have
   // no readable bar, and the page said "Below the bar every route here
   // sets."
@@ -598,25 +600,55 @@ const MARGIN_CANDIDATE_STATE = {
   [S_NONE_CLEARS_SOME_UNREAD]: S_BELOW,
 };
 
-// THE ONE SELECTOR FOR THE MARGIN, named once — nothing else anywhere may
-// pick the margin's route. Three clauses in order: the candidate set above;
-// the smallest RELATIVE distance from the bar; ties broken by data order.
+// THE ONE SELECTOR FOR THE LEAD, named once — nothing else anywhere may
+// pick the route the compact surfaces name. It KEEPS the lead and stops
+// being the whole answer: every other route that clears, and every route
+// that does not, now reaches the reader through composeReaderRoutes()
+// below. Three clauses in order: the candidate set above; the INCOME
+// instrument where it has a candidate; the biggest clearance, ties broken
+// by route_key.
 //
-// WHY RELATIVE AND NOT ABSOLUTE MONEY, measured: within one country every income bar shares one currency
-// and one period, so the reader's amount is constant across income
-// candidates and the two rankings give the identical answer — nothing is
-// lost. Across INSTRUMENTS they diverge and only relative is sound:
-// Guatemala carries a USD 100,000 capital bar beside two USD/month income
-// bars, and "$400 a month short" versus "$100,000 short" has no absolute
-// ordering at all.
+// THE RULE IT NO LONGER USES, kept here because the selector it replaced
+// shipped for a month and its output is in the record: the SMALLEST
+// relative distance from the bar — i.e. the route the reader barely
+// cleared. Cap's R4 (2026-09-24 12:26 +00) overtakes it: "nearest bar
+// means the route the reader is closest to clearing: if a route clears,
+// name a clearing one; otherwise the one with the smallest shortfall."
+// On the clearing side that is the LARGEST ratio, not the smallest
+// distance; on the miss side the two agree. So Ecuador's lead moves from
+// the investor bar it barely cleared (+24.5%, and the only one of five
+// that asks him to part with money) to the Professional visa route it
+// clears by +771.4%, and Portugal's from D8 (+2.2%) to D7 (+308.7%).
 //
-// TIES ARE THE COMMON CASE, NOT AN EDGE CASE, which is why the tiebreak is
-// named rather than left to the sort: Costa Rica's two income bars are
-// both €3,500, and Thailand's six are 80,000 ×3 and 40,000 ×3. The strict
-// `<` below is the tiebreak — the first candidate in data order wins and a
-// later equal never displaces it.
+// INCOME FIRST WHERE IT HAS A CANDIDATE — Cap's B1, 2026-10-20 ("yes,
+// income first"), on the reasoning that it follows the reader's own entry
+// order and the capital field's optionality. It is NOT a claim that an
+// income route is better; the two instruments are never ranked against
+// each other, here or in the lists.
 //
-// Empty candidate set → null → `reader_margin: null` → no clause renders.
+// WHY RELATIVE AND NOT ABSOLUTE MONEY, measured — AND WITH THIS COMMENT'S
+// OWN STATED REASON CORRECTED. It used to read "within one country every
+// income bar shares one currency and one period, so the reader's amount
+// is constant across income candidates". That premise is FALSE on the
+// live data: Indonesia and South Africa each carry one USD/month income
+// bar beside one USD/year income bar (ZA: Retired Person's $2,310/mo
+// against Remote Work's $40,589/yr), and Thailand's capital bars span THB
+// and USD. The CONCLUSION survives and now rests on a measurement rather
+// than on that premise: within one instrument, relative and absolute give
+// the identical order — 0 disagreements over 8,980 multi-item lists
+// measured on the shipped engine before this build started. Across
+// INSTRUMENTS they diverge and
+// only relative is even defined: Guatemala carries a USD 100,000 capital
+// bar beside two USD/month income bars, and "$400 a month short" versus
+// "$100,000 short" has no absolute ordering at all — which is why the two
+// instruments are two lists and this selector prefers one of them
+// outright instead of ranking across them.
+//
+// ONE SORT, SHARED WITH THE LISTS, so the lead and the first item of the
+// list it leads cannot be two different routes: both run
+// compareRouteSlots().
+//
+// Empty candidate set → null → no lead, no clause renders.
 export function decidingEntry(entries, countryState) {
   const want = MARGIN_CANDIDATE_STATE[countryState];
   if (!want) return null;
@@ -624,17 +656,11 @@ export function decidingEntry(entries, countryState) {
     (e) => e.state === want && e.result.gate2 && e.result.gate2.comparable
   );
   if (!candidates.length) return null;
-  let best = null;
-  let bestDistance = Infinity;
-  for (const e of candidates) {
-    const c = e.result.gate2.comparable;
-    const distance = Math.abs(c.readerAmount - c.threshold) / c.threshold;
-    if (distance < bestDistance) {
-      best = e;
-      bestDistance = distance;
-    }
-  }
-  return best;
+  const income = candidates.filter((e) => routeInstrument(e.row) === "income");
+  const pool = income.length ? income : candidates;
+  const slots = pool.map((e) => ({ entry: e, item: { route_key: e.row.route_key }, ratio: clearanceRatio(e) }));
+  slots.sort(compareRouteSlots);
+  return slots[0].entry;
 }
 
 // The margin's ten-key sub-object, composed once per country row.
@@ -755,6 +781,283 @@ function composeReaderMargin(chosen, input, fxRates) {
   return margin;
 }
 
+// ---------------------------------------------------------------------
+// EVERY ROUTE THAT CLEARS, AND EVERY ROUTE THAT DOES NOT — the ordered
+// lists.
+//
+// WHAT THIS REPLACED, so the defect is on the record beside its fix: one
+// route per country reached the reader, picked by the SMALLEST relative
+// distance from its bar — the route they barely cleared. Ecuador's
+// reader cleared four routes on income (one by nearly nine times) and
+// was told about none of them: his whole answer was a $48,200 investment,
+// because +24.5% of capital sorted ahead of +771.4% of income. Portugal
+// was the same defect the other way: D8 at +2.2% carried the answer with
+// a closeness note attached while D7 at +308.7% went unmentioned.
+//
+// THE RULINGS THIS EXECUTES, with pointers, because none of it is this
+// file's choice:
+//   R1  2026-10-18, Cap — "Every route that clears for the reader is
+//       shown, not just one."
+//   R2  2026-09-24 12:30 +00, Cap — "If several routes
+//       clear, list them all, biggest clearance first."
+//   R3  2026-09-24 11:59 +00, Cap — income against the
+//       nearest income bar AND capital against the nearest capital bar:
+//       two instruments, two lists, income list first (Cap's B1,
+//       2026-10-20).
+//   R4  2026-09-24 12:26 +00, Cap — "nearest bar" = a clearing one if
+//       any, otherwise the smallest shortfall. This is what retires the
+//       relative-distance selector below.
+//   B3  2026-10-20, Cap — the routes that do NOT clear ride too, nearest
+//       miss first, each with its shortfall.
+//   Also 2026-10-20, Cap — "unread routes are not noes": a route the
+//       site could not read is NOT counted among the routes that do not
+//       clear. It is disclosed separately, in its own words.
+//
+// Specified in the information-design spec for this crossing; worded in
+// its copy deck. Both are held outside this repo.
+// ---------------------------------------------------------------------
+
+// Which list a route's bar belongs in. TWO INSTRUMENTS, NEVER ONE
+// RANKING: "$3,718 a month" against "$11,800 once" has no comparison
+// operator, so ordering them against each other is not merely wrong, it
+// is undefined — which is exactly how a +24.5% capital bar came to
+// outrank a +771.4% income one. A bar of kind "none" states no figure at
+// all; it never reaches either list, it lands READER_NOT_ENOUGH, and it
+// is counted among the routes that could not be read.
+function routeInstrument(row) {
+  const bar = barForRow(row);
+  return bar && bar.kind === "capital" ? "capital" : "income";
+}
+
+// THE ONE ORDERING KEY FOR BOTH LISTS — one key, one direction, no second
+// rule for the miss side. `readerAmount / threshold`, off the comparable
+// the engine already computed:
+//   - biggest clearance first on the clearing side (R2);
+//   - smallest shortfall first on the miss side (R4) — the SAME sort,
+//     because the smallest shortfall is the largest ratio below 1.
+// RELATIVE, NOT ABSOLUTE MONEY, and the choice was measured rather than
+// argued: within one instrument the two keys give the identical order
+// (0 disagreements in 8,980 multi-item lists), and relative
+// is the only one that orders Thailand's THB-and-USD capital bars
+// without a second conversion. Null where no comparison ran.
+function clearanceRatio(entry) {
+  const c = entry.result.gate2 && entry.result.gate2.comparable;
+  if (!c || !(c.threshold > 0)) return null;
+  return c.readerAmount / c.threshold;
+}
+
+// TIES ARE THE COMMON CASE AND THE LIST IS NEVER NUMBERED. Equal
+// clearance means equal, so any order imposed on tied items carries no
+// information: Ecuador's DNV, pensionado and rentista are all +190.5% off
+// the same $1,446 bar, and Thailand's three unreduced LTR bars are 80,000
+// three times. `route_key` ascending is the tiebreak — stable, so a block
+// does not reshuffle between renders, and semantically empty by
+// construction. The tie DISCLOSES ITSELF: three items print the same bar
+// and the same difference, which is better disclosure than any sentence
+// about ties and costs nothing.
+//
+// An item with no ratio is a REFUSAL — read, and the route refuses this
+// kind of income, so no comparison ever ran and there is no shortfall to
+// order it by. Those sort after the figured items inside their own
+// instrument group, which keeps the figured run honestly ordered. That
+// placement is this build's, offered by the copy deck and not ruled; no
+// string anywhere promises an ordering, so nothing goes false if it moves.
+function compareRouteSlots(a, b) {
+  if (a.ratio == null && b.ratio == null) return a.item.route_key < b.item.route_key ? -1 : 1;
+  if (a.ratio == null) return 1;
+  if (b.ratio == null) return -1;
+  if (a.ratio !== b.ratio) return b.ratio - a.ratio;
+  return a.item.route_key < b.item.route_key ? -1 : 1;
+}
+
+// THE PER-ITEM SUMMARY, IN EXACTLY THE SHAPE THE ROW'S OWN
+// `reader_bar_kind` CARRIES — so every shipped selector that reads that
+// field (readerStateClaim(), readerNearLineNote(), isPlacementBar() in
+// js/app-shared.js) works on a list item unchanged, per item instead of
+// per country. That is the whole of the spec's §5 in one carry: the
+// closeness note, the placement clause and the condition clause travel
+// ON the route they were computed from and cannot reach a route they are
+// not true of.
+//
+// WHY THIS MATTERS AND IS NOT TIDINESS: Portugal. Leave `nearLine` at
+// country level and re-order the list, and the page prints "your figure
+// is within about a tenth of the bar" against a route that clears by
+// 308%. That falsity does not exist on the site today — the re-ordering
+// would have created it.
+function itemBarKind(entry) {
+  const bar = barForRow(entry.row);
+  const capital = !!(bar && bar.kind === "capital");
+  const nearLine = entry.result.amountBand === "above_near";
+  if (!capital && !nearLine) return null;
+  return {
+    ...(capital ? { kind: "capital", condition: entry.row.capital_instrument_condition || null } : {}),
+    ...(nearLine ? { nearLine: true } : {}),
+  };
+}
+
+// A ROUTE ON WHICH NO COMPARISON RAN, in the same key set as a margin, so
+// both lists hold ONE shape and no consumer has to ask which kind of item
+// it is holding. Two populations reach it, and they are two different
+// claims — kept apart by `state`, never by this shape:
+//   READER_WRONG_TYPE   — read, and the route refuses this kind of
+//                         income. A recorded negative with NO shortfall,
+//                         and none may be invented: the bar was never the
+//                         obstacle.
+//   READER_NOT_ENOUGH / UNCERTAIN_FX_UNAVAILABLE — the site could not
+//                         read the route at all. Ignorance, not a no.
+// Every figure is null, never a zero and never a placeholder, so the
+// render layer cannot have a number to print.
+function composeNoComparisonItem(entry, input) {
+  return {
+    status: "no_comparison",
+    route_key: entry.row.route_key,
+    threshold_label: entry.row.threshold_label,
+    direction: null,
+    reader_figure: null,
+    bar_figure: null,
+    difference: null,
+    currency: input.currency,
+    period: null,
+    converted: false,
+    rate: null,
+    rate_currency: null,
+    rate_as_of: null,
+    rate_source: null,
+    rate_stale_after_days: null,
+  };
+}
+
+// WHICH KINDS OF INCOME THIS ROUTE'S RECORD SAYS IT COUNTS — carried per
+// item so each clearing route can state it under its own heading, ruled
+// 2026-10-20: "where a reader did not name an income kind, each clearing
+// route states the kind it requires, from its record."
+//
+// THE POPULATION, DERIVED HERE RATHER THAN INHERITED. Over the 48 rows
+// that can clear (bar_kind income or capital): 22 can name an accepted
+// kind, 26 cannot, and the 26 split 4 + 22 — which is why there are two
+// gap forms and not one. The 22 is 20 granular rows plus the 2 whose
+// only acceptance is the bare coarse literal "Yes"; a granular-only
+// count gives 20, and the engine's own ratified coarse allowance gives
+// 22. Counted twice, independently, by two seats, and reconciled.
+//
+// ONLY THE RATIFIED TOKENS AND THE TWO BARE LITERALS FEED THIS. Ten
+// coarse values are free text ("No (pension/annuity only)",
+// "Yes (rental income, dividends and interest …)"), and parsing one into
+// a reader-facing kind is fact-authoring in a browser — the same line
+// gate1()'s own coarse fallback already draws by scoping itself "to the
+// two literal values, so a coarse field can never answer a question it
+// was not asked". The cost is real and named: four routes' recorded
+// nuance renders as "the record doesn't say". The fix is the granular
+// fields, which are clean and simply unpopulated on those rows.
+//
+// NULL WHERE THE READER NAMED A KIND. The condition is Cap's own
+// scoping, and it is applied here rather than at the render so one place
+// decides it: a reader who named a kind has already been gated on it, so
+// the clause would tell them what they just told the box.
+function itemIncomeKinds(row, input) {
+  if (!input || input.income_type !== "unspecified") return null;
+  // NOT ON A CAPITAL-ONLY ROUTE, ruled 2026-10-20. The clause was built
+  // on every clearing item as the ruling read, and measured there: on an
+  // asset requirement the gap form renders "The record doesn't say which
+  // kind of income this route counts" under a ledger comparing the
+  // reader's CAPITAL, which implies an income test the route may not
+  // have. Live on Egypt's three tiers, Ecuador's investor visa and both
+  // MM2H tiers before this.
+  //
+  // "CAPITAL-ONLY" IS EVERY CAPITAL ROW ON TODAY'S DATA, measured rather
+  // than assumed: the definition is a capital bar with no income bar
+  // anywhere on the same route, and NO route_key spans both bar kinds
+  // (0 of 55 in the reader's slice). So there is no second population
+  // for this condition to distinguish, and the simple test is the exact
+  // test.
+  //
+  // IT SUPPRESSES THE AFFIRMATIVE FORM TOO, which is the edge worth
+  // stating because two capital rows do carry granular tokens — the DTV
+  // (remote_active) and the O-X (passive + remote_active). Their clause
+  // was true. It is still suppressed, for two reasons: the implicature
+  // is not confined to the gap form — "Counts remote work … as
+  // qualifying income" printed under "Your capital: $60,000. The bar:
+  // about $14,873" invites a reader to take the income kind for the
+  // thing they just cleared — and keying the rule on whether a field
+  // happens to be populated would mean a route silently gaining a clause
+  // on a capital bar the day someone fills one in. The fact is not lost:
+  // both rows' own `documentation_shape` renders in the visa chapter of
+  // the location page, in the route's own words.
+  const bar = barForRow(row);
+  if (bar && bar.kind === "capital") return null;
+  const accepted = ["pension", "passive", "remote_active", "local_active"]
+    .filter((t) => row["income_type_" + t] === "primary_accepted");
+  if (!accepted.length && row.accepts_passive_income === "Yes") accepted.push("passive");
+  if (accepted.length) return { accepted, refuses_passive: false };
+  return { accepted: [], refuses_passive: row.accepts_passive_income === "No" };
+}
+
+function composeRouteItem(entry, input, fxRates) {
+  const comparable = !!(entry.result.gate2 && entry.result.gate2.comparable);
+  const margin = comparable
+    ? composeReaderMargin(entry, input, fxRates)
+    : composeNoComparisonItem(entry, input);
+  return {
+    ...margin,
+    // The route's own state token, so the item renders its own claim
+    // sentence — which is what brings the conditional clause with it,
+    // per route, with no new string anywhere.
+    state: entry.state,
+    instrument: routeInstrument(entry.row),
+    bar_kind: itemBarKind(entry),
+    // The tier of THIS route, copied verbatim off this route's own row —
+    // never averaged, because an average of two tiers is a tier nobody
+    // recorded. Mixed tiers inside one list are measured at 3,380 reads,
+    // and in 1,070 the lead carries no tier while another listed route
+    // does, which is why one badge over a list cannot stand.
+    confidence: entry.row.confidence || null,
+    income_kinds: itemIncomeKinds(entry.row, input),
+  };
+}
+
+// THE CARRY: two ordered clearing lists, two ordered miss lists, and the
+// routes that could not be read — all five off ONE pass over the
+// entries, so no two of them can disagree about which route went where.
+// The three populations are mutually exclusive per read, which is why
+// Thailand's page holds at most nine items in total and not seventeen.
+//
+// `lead` is the ONE route the compact surfaces name, and it is drawn
+// from decidingEntry() — the composed state's own candidate population,
+// unwidened. That invariant is why the claim sentence, the pin colour and
+// the ledger can never describe two different things, and §4.3 of the
+// spec argues it at length: reach across state tokens for the biggest
+// clearance and Thailand's hover becomes a conditional route while its
+// pin stays green.
+function composeReaderRoutes(entries, overallState, deciding, input, fxRates) {
+  const cleared = { income: [], capital: [] };
+  const missed = { income: [], capital: [] };
+  const unread = [];
+  for (const entry of entries) {
+    const band = STATE_BAND[entry.state];
+    const item = composeRouteItem(entry, input, fxRates);
+    const slot = { item, ratio: clearanceRatio(entry) };
+    if (entry.state === S_ABOVE || entry.state === S_ABOVE_CONDITIONAL) {
+      cleared[item.instrument].push(slot);
+    } else if (band === "hard_fail") {
+      missed[item.instrument].push(slot);
+    } else {
+      unread.push(slot);
+    }
+  }
+  const ordered = (slots) => slots.sort(compareRouteSlots).map((s) => s.item);
+  return {
+    lead: deciding ? composeReaderMargin(deciding, input, fxRates) : null,
+    cleared: { income: ordered(cleared.income), capital: ordered(cleared.capital) },
+    missed: { income: ordered(missed.income), capital: ordered(missed.capital) },
+    // Population 3, carried as a list and never as a count, so every
+    // number on screen is a rendered list's own length at the call site.
+    // It is disclosed OUTSIDE the miss widget: the widget counts noes,
+    // and a reader who opens a list of eight noes must not then discover
+    // that eleven other routes were never read and nothing said so.
+    unread: unread.sort(compareRouteSlots).map((s) => s.item),
+  };
+}
+
 // Build the reader's verdict rows: one per country in the read set, in
 // the engine's own row shape.
 //
@@ -857,7 +1160,7 @@ export function buildReaderVerdictRows(store, input) {
           : overallState === S_WRONG_TYPE_SOME_UNREAD
             ? wrongTypeUnreadSummary(entries)
             : null;
-    const readerMargin = composeReaderMargin(deciding, input, store.fxRates);
+    const readerMargin = composeReaderRoutes(entries, overallState, deciding, input, store.fxRates);
     // THE BADGE AND THE NAMED BAR ARE NOW THE SAME ROUTE, by construction:
     // `deciding` above is the entry the margin names, and the tier below is
     // read off that same entry. The build this replaces could name one
@@ -895,28 +1198,61 @@ export function buildReaderVerdictRows(store, input) {
       // what it holds; renaming the field is a schema change and is
       // deliberately not taken here, inside a copy repair.
       reader_bar_kind: readerBarKind,
-      // THE MARGIN — my number, the bar, and by how much. One sub-object,
-      // ten keys — not five top-level fields (js/map.js copies reader fields onto pinEntries one scalar
-      // at a time, and ten of those is ten chances to forget one), not
-      // inside `routes_detail` (a JSON string by design), not a fourth
-      // shape behind `reader_bar_kind`'s one name. Null where no margin
-      // applies at all; `status: "unavailable"` where one applies and
-      // could not be expressed. Per COUNTRY, naming the route it came
-      // from — per-route reader margins are outcome 3 and are not built
-      // here; the socket for them is routes_detail's `reader_reading`.
+      // THE MARGINS — my number, the bar, and by how much, FOR EVERY
+      // ROUTE THE SITE READ. One sub-object, five keys, composed by
+      // composeReaderRoutes() above:
+      //
+      //   lead     the ONE route the compact surfaces name (the map
+      //            tooltip, the pin's accessible name, the Lists chip) —
+      //            the ten-key margin this field used to hold on its own,
+      //            unchanged in shape so every one of those surfaces
+      //            keeps reading exactly what it read before.
+      //   cleared  { income: [...], capital: [...] } — every route that
+      //            clears, biggest clearance first, income list first.
+      //   missed   { income: [...], capital: [...] } — every route that
+      //            was read and does not clear, smallest shortfall first.
+      //   unread   the routes the site could not read at all. NOT noes
+      //            (Cap, 2026-10-20) and never counted among them.
+      //
+      // IT IS A LIST BECAUSE CAP RULED A LIST. "Every route that clears
+      // for the reader is shown, not just one" (2026-10-18) and "if
+      // several routes clear, list them all, biggest clearance first"
+      // (2026-09-24 12:30 +00). The one-sub-object version of this field
+      // carried a single route per country, and §0 of the spec measures
+      // what that cost a real reader in Ecuador.
+      //
+      // Every list item is a margin object plus four already-computed
+      // facts (`state`, `bar_kind` with its own nearLine/condition,
+      // `instrument`, `confidence`) — all four existed one layer down on
+      // `entries[]` and were discarded at this composer's door. No figure
+      // is computed, converted or rounded here or anywhere downstream;
+      // `status: "unavailable"` still means a bar that could not be
+      // expressed in the reader's currency, and `status: "no_comparison"`
+      // means no comparison ran at all.
+      //
+      // STILL NOT inside `routes_detail` (a JSON string by design) and
+      // still not a fifth shape behind `reader_bar_kind`'s one name.
       reader_margin: readerMargin,
       companion_disclosure: null,
       cadence: null,
       cadence_burden: null,
       // The per-route reading, in the engine's own entry shape plus one
-      // reader sub-object. NOTHING RENDERS THIS TODAY — the only shipped
-      // parser of routes_detail filters on group_kind "location_gate" and
-      // never fires on a country-scope row. It is carried because B8 (the
-      // verdict block's per-route ordering for a reader) is the surface it
-      // belongs on and is held, and re-deriving it there would mean
-      // running the gates twice. Flagged rather than left to be
-      // discovered: the reader's per-route detail is COMPUTED and not yet
-      // SHOWN.
+      // reader sub-object.
+      //
+      // THE PER-ROUTE DETAIL IS NOW SHOWN — but NOT from this field, and
+      // the distinction is worth stating because this comment used to
+      // read "NOTHING RENDERS THIS TODAY" and the obvious reading of the
+      // ruling was that this socket would get the consumer. It did not.
+      // `reader_margin` above does, because it carries the same per-route
+      // facts as live objects with their figures already composed, while
+      // this field is a JSON STRING by design and a render surface would
+      // have to parse it to get back what the row already holds. So:
+      // the reader's per-route reading reaches the location page, the
+      // Lists subheader, the tooltip and the pin name through
+      // `reader_margin`'s four ordered lists; this field stays the
+      // serialized per-route socket, and the only shipped parser of it
+      // still filters on group_kind "location_gate" and still never
+      // fires on a country-scope row. Nothing renders THIS field.
       routes_detail: JSON.stringify(entries.map((e) => ({
         route_key: e.row.route_key,
         composed_state: e.state,
@@ -1099,22 +1435,28 @@ export function readerPinPaint(store, loc) {
   };
 }
 
-// The read set's country names, in the read set's own order, resolved
-// from the store rather than written out — a name typed here would be a
-// fact authored in a render file, and it would rot the day the set grows.
-export function readCountryNames(store) {
-  return READ_SET
-    .map((id) => store.countriesById.get(id))
-    .filter(Boolean)
-    .map((c) => c.name);
-}
+// readCountryNames() IS DELETED HERE, 2026-10-20, and the deletion is
+// recorded rather than silent because the function was exported and a
+// future reader will meet its name in older files. It resolved READ_SET
+// into display names for the two sentences that listed the countries the
+// box reads. Both stopped listing them this crossing — the perspective
+// line and the Lists context line now say "every country this site
+// covers", because the box reads all 21 and a 21-name list told a reader
+// nothing while costing nine visual lines at 390px. With no caller left,
+// an exported function is a promise nobody keeps.
+//
+// CHECKED, NOT ASSUMED, and the two are deliberately not treated the
+// same: joinList() below has TWO live consumers and stays — the
+// named-exceptions fallback of the box's coverage guard
+// (js/own-numbers.js) and the dimension list a few lines down. A grep
+// sees callers and not reflection, so this tree was also searched for a
+// dynamic reference by name; there is none, and nothing here is reached
+// by string.
 
-// "a, b, c and d" — the join the perspective line uses in two places, and
-// now the Lists context line too — the same readCountryNames(store),
-// joined the same way the perspective line joins it.
+// "a, b, c and d" — the join the coverage guard's exception clause uses,
+// and the reader's own dimension list.
 // EXPORTED rather than copied: two joiners would be two ways to write the
-// same list of the same five countries on two surfaces a reader moves
-// between.
+// same list on two surfaces a reader moves between.
 export function joinList(parts) {
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
@@ -1219,7 +1561,9 @@ export function perspectiveLineParts(store, persona) {
       return { text, meta: LINE_E_META };
     }
     if (numbers) {
-      const names = readCountryNames(store);
+      // This sentence stopped naming countries on 2026-10-20 (see the
+      // meta string below), and the helper that named them is deleted
+      // above rather than left exported with no caller.
       // Both variants, one substitution.
       //
       // WHY THIS IS IN SCOPE HERE, SAID OUT LOUD: it carried no
@@ -1255,7 +1599,43 @@ export function perspectiveLineParts(store, persona) {
         // cause-neutral on purpose: it covers all four mechanisms above in
         // one breath and diagnoses none, which is the pattern this file
         // already chose over an enumerated list.
-        meta: `Your numbers are read against residence routes in ${joinList(names)} — income bars and capital bars, where a route states one this site can compare; elsewhere they aren't read yet, and each page says so. Pin colors and the ranking are ${fitClause}, everywhere.`,
+        // THIRD AND FOURTH CORRECTIONS, 2026-10-20, and the second is not
+        // a count fix.
+        //
+        // The country list goes: "every country this site covers", the
+        // wording already landed on the box's two scope strings and on
+        // the verdict disclosure. Measured in a real browser before and
+        // after: 444 characters with the names joined, 226 after. Measured
+        // in a browser at 390px: NINE visual lines and 177px down to five
+        // and 98px; at 1128px, five lines down to three. It renders on
+        // every page of the site, and on a location page it was the
+        // largest single term standing between a reader and his own
+        // figures — the verdict block's top moved from 940px to 861px at
+        // 390 on that cut alone.
+        //
+        // AND THE CLAUSE "; elsewhere they aren't read yet, and each page
+        // says so" IS DELETED, which a count fix alone would not reach.
+        // There is no elsewhere: READ_SET is every covered country. The
+        // clause's whole content was a limit that no longer exists, and
+        // leaving it would be a promise about an empty set. The precedent
+        // is the struck limits line in js/own-numbers.js: "there is no
+        // honest version of a sentence whose whole content was a limit
+        // that no longer exists."
+        //
+        // NOTHING RELOCATES, unlike the box's coverage line: the
+        // route-level honesty this sentence needs is already inside it —
+        // "where a route states one this site can compare", the landed
+        // three-surface condition — so the deletion is pure.
+        //
+        // THE ONE PLACE A FUTURE WIDENING FAILURE WOULD BE INVISIBLE, and
+        // it is named rather than left to be found: after this deletion
+        // the sentence holds nothing for the coverage guard to compare.
+        // The guard in js/own-numbers.js catches the two box strings by
+        // comparing READ_SET against countries.jsonl; this string will no
+        // longer contain a list, a count or an exception clause, so if a
+        // country is ever added to the site and not to READ_SET, this
+        // sentence goes quiet about it and nothing here can notice.
+        meta: `Your numbers are read against residence routes in every country this site covers — income bars and capital bars, where a route states one this site can compare. Pin colors and the ranking are ${fitClause}, everywhere.`,
       };
     }
     // The only population left here is a reader who gave a passport and no

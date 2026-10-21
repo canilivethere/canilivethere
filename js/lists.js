@@ -1,5 +1,5 @@
 import { loadStore, verdictHeadline, resolveVerdict } from "./data.js";
-import { applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readCountryNames, joinList, readerBasisIsAssumed } from "./reader-lens.js";
+import { applyReaderLens, renderPerspectiveSlot, hasReaderVerdicts, readerBasisIsAssumed } from "./reader-lens.js";
 import { scoreToColor, indexToColor, calibrateIndexBands, verdictVisual, bandVisual, RAMP_VALUE_ATTR, RAMP_KIND_ATTR } from "./colors.js";
 import {
   applyStoredTheme, renderTopBar,
@@ -11,6 +11,7 @@ import {
   personaDisplayLabel, verdictProvenanceBadge, verdictChipMarkup, initLocationSearch,
   READER_ID, loadViewIndex, saveViewIndex, personaPossessiveLabel,
   READER_BASIS_DECLARED_LINE,
+  readerListsMissLine, readerListsEnumeratedView, readerRouteItemParts,
 } from "./app-shared.js";
 import { siteUrl } from "./site-root.js";
 import { loadFxRates } from "./app-shared.js";
@@ -382,9 +383,13 @@ function readerContextLine(store, rows) {
   // tell a reader which, which is what they can act on; and a rule that
   // gains an exception on its first day is not a rule.
   //
-  // The names come from readCountryNames(store) through reader-lens's own
-  // joinList — the same list, joined the same way, as the perspective line
-  // eight inches above it on this page.
+  // THE NAMES ARE GONE TOO, 2026-10-20. That argument — "the five NAMES
+  // tell a reader which" — held while the box read five countries. It
+  // reads every country the site covers now, so a 21-name list tells a
+  // reader nothing he cannot see in the table beneath it, and it cost
+  // 251 characters here and nine visual lines on the perspective line.
+  // The count stays struck for its own four reasons above; the names are
+  // struck for a fifth that did not exist when they were chosen.
   //
   // NAMED, NOT DECIDED HERE: BAND_ORDER puts "Not checked yet" last, so a
   // 4.5-fit place in an unread country sorts BELOW a hard-fail in a read
@@ -393,7 +398,40 @@ function readerContextLine(store, rows) {
   // still open, and a flat fit-ranked alternative is specified and
   // waiting if it is wanted.
   const readerFitPhrase = "the general figures";
-  return `${rankingClause} Your own read is shown per row where this box has read the country — ${joinList(readCountryNames(store))} — grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries this box hasn't read against your figures and the ones where the record doesn't reach an answer; neither is a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
+  // REWRITTEN 2026-10-20 FOR A SITE THAT READS EVERY COUNTRY. Measured:
+  // 682 characters with the names expanded, 431 now. Three changes:
+  //
+  //   1. THE SECOND 21-NAME PRINT ON THE SITE GOES. "per row where this
+  //      box has read the country — {21 names} —" becomes "on every
+  //      row", which is now simply the fact. The perspective line lost
+  //      the same list one surface over; this one was still printing it.
+  //   2. THE EMPTY HALF OF THE "Not checked yet" SENTENCE GOES. "the
+  //      countries this box hasn't read against your figures and" names
+  //      a set with no members now that READ_SET is every covered
+  //      country, so the band holds exactly one population and
+  //      "neither" becomes "not". A count fix could not have reached
+  //      this half: it was never a count, it was a promise about an
+  //      empty set.
+  //   3. THE GATES DISCLOSURE WAS SPECIFIED TO ARRIVE HERE, ONCE FOR THE
+  //      TABLE, AND IT DOES NOT — the measurement refused it, and the
+  //      measurement was asked for in advance by the writer who proposed
+  //      the move. The risk she named was "a reader arriving mid-table
+  //      may never see the context line". Measured at 390: the line
+  //      occupies document y 843-1203, the first country subheader it
+  //      governs starts at y=1716, and the last at y=6954. A scroll
+  //      position showing both the line and a row exists only for the
+  //      FIRST 331px of a 5,238px table — one and a half country blocks
+  //      of twenty-one — and the site's own location search ends in
+  //      `row.scrollIntoView({ block: "center" })`, which was measured
+  //      landing a reader at scrollY 3988 with this line at viewport
+  //      y = -3145. A disclosure that governs every row while being
+  //      reachable from almost none of them is not a disclosure.
+  //
+  //      So the fallback rides: the tail stays on the chip, 38
+  //      characters per chip, and the row gets its height from
+  //      structure or not at all. The chip is 284 characters instead of
+  //      246, measured.
+  return `${rankingClause} Your own read is shown on every row, grouped below as Clears, Near-miss, Doesn't clear, and Not checked yet. Not checked yet holds the countries where the record doesn't reach an answer — not a place that did badly, and every row's Fit index is ${readerFitPhrase} either way.`;
 }
 
 function buildRows(store, persona) {
@@ -700,10 +738,25 @@ function buildVerdictHtml(store, row, persona) {
     // comment cites).
     const visual = bandVisual(row.engineVerdict.overall_band);
     // Second and third arguments are the reader row's own bar-kind summary
-    // and its margin, both undefined on every persona row. See
-    // stateHeadline()'s own note.
+    // and its margin carry, both undefined on every persona row. See
+    // stateHeadline()'s own note. The chip keeps the lead route's own
+    // ledger here, deliberately: the items that follow it are capped at
+    // three and the ledger's instrument clause is anchored to the figures
+    // directly after it, so B4's deletion (which the location page
+    // applies) has nothing to repair on this surface.
+    // TWO SURFACE FLAGS, AND BOTH ARE DELETIONS OF A DOUBLE. The chip's
+    // others-clause would say what the counts line beneath it says, one
+    // line higher; and 170 characters of rate provenance in a table cell
+    // becomes the short twin, with the exact rate and its source still on
+    // the location page and in the tooltip. The chip keeps its ledger —
+    // on this surface the chip IS item 1, which is why nothing is
+    // enumerated beneath it.
+    const listsSurface = persona === READER_ID;
     const stateText = stateHeadline(
-      row.engineVerdict.overall_state, row.engineVerdict.reader_bar_kind, row.engineVerdict.reader_margin
+      row.engineVerdict.overall_state, row.engineVerdict.reader_bar_kind, row.engineVerdict.reader_margin,
+      // gatesTail is NOT suppressed here: see readerContextLine()'s own
+      // note for the measurement that refused that move.
+      listsSurface ? { othersClause: false, rateTwin: true } : undefined
     );
     // Sourcing-confidence tier badge, same skip-on-data-gap rule as
     // location.js's own verdict block (a data-gap band already says "not
@@ -733,7 +786,7 @@ function buildVerdictHtml(store, row, persona) {
     const basisLine = persona === READER_ID && readerBasisIsAssumed(store, row.loc)
       ? `<div class="verdict-prose">${escapeHtml(READER_BASIS_DECLARED_LINE)}</div>`
       : "";
-    return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure)} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${basisLine}`;
+    return `${verdictChipMarkup(visual.color, stateText, row.engineVerdict.companion_disclosure, { gapBand: visual.gap })} ${verdictProvenanceBadge(false, displayName)}${tierBadge}${basisLine}`;
   }
   return "";
 }
@@ -755,9 +808,78 @@ function renderCountrySubheader(store, sourceRow, count, tbody, persona) {
   // states the scope explicitly rather than leaving it to indentation
   // alone — the perspective-disclosure law's own point (a grouping is
   // itself a claim about what the number covers).
-  td.innerHTML = `<span class="country-subheader-label">${escapeHtml(sourceRow.country.name)} — one verdict, applying to every location below.</span> ${buildVerdictHtml(store, sourceRow, persona)}`;
+  // THE READER'S OWN ROUTE LIST, at the country subheader and nowhere
+  // else on this page. The location rows beneath already render "—" for
+  // the verdict (suppressVerdict), so there is exactly one home per
+  // country and no duplication to manage, and the subheader's own copy
+  // already says the scope out loud.
+  //
+  // CAPPED AT THREE, AND THE CAP IS REASONED RATHER THAN RULED. At the
+  // first test reader 7 of the 8 multi-clear countries hold exactly 2,
+  // Thailand holds 4 and Ecuador 5: a cap of 4 truncates one country, a
+  // cap of 3 truncates two. A cap that almost never fires is not a cap,
+  // it is an untested branch that first fires on a reader nobody watched.
+  // The spec's own wobble on it stands — 4 is defensible.
+  //
+  // NO SURFACE MAY SHOW A TRUNCATED LIST WITHOUT SAYING SO, and that is
+  // the one rule above all four surfaces: a surface may show one item of
+  // nine; it may not show one item of nine and look like a surface
+  // showing one item of one. The remainder line is that disclosure, and
+  // it carries no link target because it does not need one — the verdict
+  // is countrywide and renders identically on every location page under
+  // this subheader, so "each place's page lists them all" is true of
+  // whichever row the reader picks.
+  //
+  // THE MISS LINE, NO WIDGET. A <details> inside a colSpan=5 table row is
+  // a layout risk on a comparison surface, and Lists' job is relative
+  // standing — the enumeration lives on the page, and the line says so.
+  td.innerHTML = `<span class="country-subheader-label">${escapeHtml(sourceRow.country.name)} — one verdict, applying to every location below.</span> ${buildVerdictHtml(store, sourceRow, persona)}${readerRouteListHtml(sourceRow, persona)}`;
   tr.appendChild(td);
   tbody.appendChild(tr);
+}
+
+// The reader's cleared items, the remainder line and the miss line, for
+// one country subheader. Empty string for every persona and for every
+// reader row that read nothing — so no other lens on this page changes by
+// a byte.
+// EVERY ROUTE THAT CLEARS, ENUMERATED, AND SHORTENING IS DEFERRED —
+// ruled 2026-10-20: "Lists rows show every route that clears, each with
+// the income kind it needs; shortening comes later."
+//
+// THE RULING WAS MADE AGAINST THE MEASUREMENT, NOT IN IGNORANCE OF IT.
+// Both forms were built and photographed first: a counts form (chip +
+// one counts line + the miss line) measured 11 of 21 subheaders over
+// nine visual lines at 390, worst row 13 lines and 236px; this form, at
+// a cap of two, measured 14 of 21 and a worst row of 23 lines and 478px.
+// Uncapped it is longer again. The height was accepted on purpose, so
+// the counts branch is DELETED rather than kept as a dormant option —
+// a branch nobody renders is a branch nobody tests, and the measurement
+// that would justify reviving it is in the build record.
+//
+// THE CHIP IS ITEM 1. It carries the lead route with its own figures, so
+// the list beneath starts at the second route and nothing is printed
+// twice. With every remaining route shown there is no remainder, and so
+// no remainder line: the surface withholds nothing and therefore has
+// nothing to disclose.
+function readerRouteListHtml(sourceRow, persona) {
+  if (persona !== READER_ID) return "";
+  const verdict = sourceRow.engineVerdict;
+  const carry = verdict && verdict.reader_margin;
+  if (!carry) return "";
+  const missLine = readerListsMissLine(verdict.overall_state, carry);
+  const line = (text) => (text ? `<p class="reader-unread-line">${escapeHtml(text)}</p>` : "");
+  const items = readerListsEnumeratedView(carry).shown.map((item) => {
+    const part = readerRouteItemParts(item);
+    return `<li class="reader-route">`
+      + `<span class="reader-route-bar">${escapeHtml(part.label)}</span>`
+      + (part.claim ? `<span class="reader-route-claim">${escapeHtml(part.claim)}</span>` : "")
+      + (part.incomeKind ? `<span class="reader-route-kind">${escapeHtml(part.incomeKind)}</span>` : "")
+      + (part.ledger ? `<span class="reader-route-ledger">${escapeHtml(part.ledger)}</span>` : "")
+      + `</li>`;
+  }).join("");
+  if (!items && !missLine) return "";
+  const list = items ? `<ul class="reader-route-list reader-route-list-compact">${items}</ul>` : "";
+  return `<div class="reader-route-group reader-route-group-compact">${list}${line(missLine)}</div>`;
 }
 
 // One row (+ its expand-row sibling) — factored out of render() so both

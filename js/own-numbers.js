@@ -1,8 +1,10 @@
 // CanILiveThere — step 1 of the door's one process: "Your numbers".
 //
 // DOOR V2. This file used to be a whole wing: an input
-// screen, a visit panel, and a result screen that listed five countries'
-// route readings, sixteen refusals, and a way out. The result screen is
+// screen, a visit panel, and a result screen that listed the route
+// readings of the five countries the box read at the time, sixteen
+// refusals, and a way out. (The box reads all 21 since 2026-10-20; the
+// five is this sentence's own history, not today's scope.) The result screen is
 // RETIRED — it was the second welcome page the reader walked into instead
 // of the map, and the line it ended on ("your figures stay in this box;
 // the map and the lists show the general view, not your numbers") was the
@@ -45,22 +47,45 @@
 //      reader is asked for anything.
 
 import { escapeHtml } from "./app-shared.js";
-import { assertRouteBarFields, convertAmount, countRoutesWithNoTypeRecord } from "./own-numbers-data.js";
+import { assertRouteBarFields, convertAmount, countRoutesWithNoTypeRecord, READ_SET } from "./own-numbers-data.js";
+import { joinList } from "./reader-lens.js";
 
 // ---------------------------------------------------------------------
 // Copy table. The wording is the spec's, not this file's: none of these
 // strings may lose a clause without going back to the spec.
 // ---------------------------------------------------------------------
 
-// CHANGED. The old line promised the reader a
-// reading inside the box — "the site will show you what the residence
-// routes in five countries actually ask of someone with that … It reads
-// the routes; it doesn't decide anything." The box no longer shows them
-// anything; the map, the lists and every place's page do. A scope line
-// that describes a screen the reader will never see is a false promise,
-// so it now names the surfaces that actually answer.
-export const INPUT_SCOPE_LINE =
-  "What you live on, and how long you're going for. The map, the lists and every place's page will read the residence routes in five countries against it.";
+// CHANGED TWICE, and both changes are recorded because the second one
+// repairs something the first left standing.
+//
+// FIRST: the old line promised the reader a reading inside the box —
+// "the site will show you what the residence routes in five countries
+// actually ask of someone with that … It reads the routes; it doesn't
+// decide anything." The box no longer shows them anything; the map, the
+// lists and every place's page do. A scope line that describes a screen
+// the reader will never see is a false promise, so it names the surfaces
+// that actually answer.
+//
+// SECOND, 2026-10-20, AND MORE MOVES THAN THE COUNT:
+// "the residence routes in five countries" was a universal claim about
+// every route in every named country, and it was false INSIDE the named
+// countries independently of the number — the same defect found in two
+// scope strings on 15 September and fixed with the comparability
+// condition now landed on three surfaces. So two things move: the
+// universal "the" goes, and the ratified condition clause arrives. The
+// widening is what put this sentence back in front of a writer; it is
+// not what made that clause wrong.
+//
+// AND IT IS RENDERED FROM THE DATA, NOT FROM A LITERAL. See
+// coverageLine() below for the whole of that argument: this family has
+// gone false twice on a hand-maintained number, and "every country this
+// site covers" is a stronger claim than "five" that fails SILENTLY the
+// first time a country is added to the site and not to READ_SET.
+export function inputScopeLine(store) {
+  return "What you live on, and how long you're going for. The map, the lists"
+    + " and every place's page will read it against residence routes in"
+    + ` ${coveredCountriesPhrase(store)} — where a route states a bar this site can compare.`;
+}
 
 // The privacy paragraph. Sits ABOVE the first input, never below the
 // button: a stranger asked for their income needs to know where it goes
@@ -218,8 +243,52 @@ const FIELD_D_INCOMPLETE_NOTE =
 // disclosed at the verdict, by the rate line in js/app-shared.js. The
 // retired sentence's job is not quietly re-assigned to a new sentence in
 // this box.
-const COVERAGE_LINE =
-  "This box reads Thailand, Guatemala, Portugal, Spain and Crete. Everywhere else, it says so instead of guessing.";
+// THE GUARD, AND IT IS THE ONE PLACE THIS BUILD WAS ASKED FOR A RENDER
+// CONDITION RATHER THAN A STRING. The sentence that just went false said
+// five names out loud and was right for months; the replacement's claim
+// is "all of them", which cannot be checked by reading it. So the scope
+// clause is rendered from a COMPARISON of READ_SET against the country
+// ids in derived/countries.jsonl, and where they differ it names the
+// exceptions through the existing joinList() helper. A literal cannot
+// notice a 22nd country; a comparison can.
+//
+// Measured at build: 21 ids in countries.jsonl, 21 in READ_SET, 0
+// exceptions — so the all-covered wording is what renders today, and the
+// except-wording is a branch that exists so the sentence can go stale
+// LOUDLY instead of silently.
+function coveredCountriesPhrase(store) {
+  const exceptions = store && store.countriesById
+    ? [...store.countriesById.values()]
+      .filter((c) => !READ_SET.includes(c.country_id))
+      .map((c) => c.name)
+    : [];
+  return exceptions.length
+    ? `every country this site covers except ${joinList(exceptions)}`
+    : "every country this site covers";
+}
+
+// THE COVERAGE LINE, both halves replaced.
+//
+// THE FIRST HALF is a whole-set claim and is rendered against the data —
+// see the guard above.
+//
+// THE SECOND HALF IS RELOCATED, NOT DELETED. "Everywhere else, it says so
+// instead of guessing" was a promise about COUNTRIES. After the widening
+// there is no elsewhere at country level — but the promise is needed more
+// than ever one level down, because the thing the box cannot read is now a
+// ROUTE, not a country: 39.6% of reads reach a country where nothing could
+// be read at all. The promise moves to where the ignorance actually lives.
+// Dropping it instead would have been the flattering deletion: a box that
+// reads everywhere and never says what it couldn't read.
+//
+// "a bar" stands in for "one" because this sentence position has no
+// antecedent noun for "one" to point at — a grammar change forced by the
+// position, not a meaning change, and named rather than left to look like
+// a fourth variant of a one-wording clause.
+function coverageLine(store) {
+  return `This box reads ${coveredCountriesPhrase(store)}.`
+    + " Where a route states no bar it can read against your figures, it says so instead of guessing.";
+}
 
 // The "not now, and why" limits — the ones that are not rendered at a
 // point of selection, in the spec's own order.
@@ -236,7 +305,38 @@ const LIMITS_LINES = [
   // the same thing READER_BASIS_DECLARED_LINE says at the verdict.
   "One person's figures. Where a route scales its bar for a partner or children, the box doesn't do that arithmetic for you.",
   "This is about the bars a route sets, not what life costs once you're there.",
-  "Staying long enough to use one of these routes usually makes you tax-resident, and these five countries treat that very differently. This box doesn't read any of that.",
+  // A CONTENT CHANGE, NOT A COUNT CHANGE, and the deletion is the point
+  // The old line made three claims: that staying long
+  // enough usually makes you tax-resident (count-free, ratified,
+  // TRANSPORTED VERBATIM); that "these five countries treat that very
+  // differently" (a comparative claim about the variance in tax treatment
+  // across a named set); and that the box doesn't read any of it.
+  //
+  // THE MIDDLE CLAIM COULD NOT BE RE-POINTED AT TWENTY-ONE. Swapping the
+  // number in would assert that twenty-one tax systems treat tax residency
+  // very differently from one another — a variance claim over a named set
+  // that nobody on this project has derived. The rows exist (63 tax rows
+  // across 20 of 21 countries, 45 of them rendering in the visa chapter of
+  // country pages today); the AGGREGATE does not. A softer version
+  // ("treatment differs from country to country") would be a smaller
+  // version of the same authored fact. So the clause is deleted, and the
+  // deletion rests on the derivation being absent rather than the facts
+  // being absent — which stays true however much the facts layer holds.
+  //
+  // THE LIMIT IS RESTATED IN THE SITE'S OWN EXISTING WORDS, transported
+  // from COPY_C6_BEFORE_TAX on the cost-comparison surface ("what you'd
+  // keep depends on where you'd be taxed, which this site doesn't work
+  // out"), with "this site" → "this box" because the box genuinely reads
+  // less than the site does. One idea, one wording: a second tax
+  // vocabulary in the box is the drift that cost six strings in September.
+  //
+  // WHAT THE READER LOSES, stated at its honest size: the warning that the
+  // answer VARIES, arriving at the input where the figure is being typed.
+  // The site does not go quiet on tax — the box does; the treatment facts
+  // still render on every country page. No replacement warning is
+  // manufactured here, because a hedge invented to fill the gap would be
+  // as dishonest as a claim invented to fill it.
+  "Staying long enough to use one of these routes usually makes you tax-resident. What you'd keep depends on where you'd be taxed, and this box doesn't work that out.",
 ];
 
 // SAVE_LABEL, SAVE_NOTE and SAVE_UNAVAILABLE_LINE MOVED to
@@ -339,7 +439,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
 
   container.innerHTML = `
     <div class="own-numbers-box">
-      <p class="door-passport-scope">${escapeHtml(INPUT_SCOPE_LINE)}</p>
+      <p class="door-passport-scope">${escapeHtml(inputScopeLine(store))}</p>
 
       <div class="own-privacy">
         <p class="own-privacy-heading">${escapeHtml(PRIVACY_HEADING)}</p>
@@ -385,7 +485,7 @@ export function createOwnNumbersStep({ container, store, prefill, onValidity }) 
         </div>
       </div>
 
-      <p class="own-field-note">${escapeHtml(COVERAGE_LINE)}</p>
+      <p class="own-field-note">${escapeHtml(coverageLine(store))}</p>
       <div class="own-limits">${LIMITS_LINES.map((l) => `<p>${escapeHtml(l)}</p>`).join("")}</div>
     </div>`;
 

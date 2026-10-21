@@ -1314,6 +1314,26 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .btn-chip { border: 1px solid var(--line); cursor: pointer; }
 .expand-toggle { background: none; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
 .verdict-chip { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; color: #fff; }
+/* THE ONE BAND WHERE WHITE IS UNREADABLE, and the rule above is why it
+   survived: `color: #fff` is band-BLIND, applied over a per-band inline
+   background. On three of the four bands the fill is dark and white is
+   right. On `data_gap` the fill is --gap-bg (#E4D8BC) and white measures
+   **1.41:1** in light mode — against WCAG AA's 4.5:1 — while measuring
+   14.02:1 in DARK mode, which is exactly why it never showed up: the
+   defect only exists in one theme.
+
+   The token pair for that fill was validated on 2026-07-12 against INK,
+   never against white (`--gap-bg` … 12.18:1 ink-on-it), and .badge-gap
+   one file over already uses the validated pair. Re-measured this
+   session, both themes: **--ink on --gap-bg = 12.18:1 light, 12.53:1
+   dark.** Existing tokens, no new custom property.
+
+   Not --gap-ink (4.67:1 / 5.13:1): it passes, but 0.17 above the AA
+   floor at 13.6px on a textured paper background is thin for the one
+   chip that is the WHOLE ANSWER on 39.6% of reads. The gap voice's
+   "recessed, not a verdict" meaning is carried by the pale fill; the
+   text does not have to be faint to say it. */
+.verdict-chip-gap { color: var(--ink); }
 /* Part 24.2 (§13.9's mandatory disclosure): the
    two-segment split pill for a composed verdict where a visit-layer
    headline is the ONLY thing standing between a reader and "every
@@ -1331,6 +1351,11 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
    ones. */
 .verdict-chip-split { display: inline-flex; align-items: stretch; border-radius: 10px; overflow: hidden; vertical-align: middle; }
 .verdict-chip-split-seg { display: inline-flex; align-items: center; padding: 0.1rem 0.5rem; font-size: 0.75rem; color: #fff; white-space: nowrap; }
+/* The split pill's segment and its divider follow the band ink on the one
+   band whose fill is pale — the divider too, because a 60%-white rule on
+   #E4D8BC is as invisible as the text was. */
+.verdict-chip-gap .verdict-chip-split-seg { color: var(--ink); }
+.verdict-chip-gap .verdict-chip-split-seg:first-child { border-right-color: rgba(38, 34, 29, 0.35); }
 /* The divider itself: geometry, not meaning — a fixed white-based line
    (not a themed token) since it has to read against whichever two
    saturated fill colors land on either side of it, in either theme. */
@@ -1465,6 +1490,136 @@ table.rank-table th[aria-sort="descending"]::after { content: " ▼"; }
 .verdict-block .verdict-chip { font-size: 0.85rem; padding: 0.15rem 0.65rem; }
 .verdict-block .verdict-chip-split-seg { font-size: 0.85rem; padding: 0.15rem 0.65rem; }
 .verdict-block .verdict-prose { font-size: 0.95rem; color: var(--ink); max-width: 40em; margin: 0.4rem 0; }
+
+/* ---------- the reader's own route lists (the several-clearing-routes
+   crossing, 2026-10-20). Cap: "Per country, cleared routes first, full
+   width, biggest clearance first. Below them one line: how many routes he
+   does not clear, and the nearest miss with its shortfall in his
+   currency."
+
+   FULL WIDTH IS A LAYOUT INSTRUCTION, NOT A TYPOGRAPHIC ONE — read that
+   way deliberately, and the distinction is a measured one. A block with
+   no max-width measured ~1128px and 166 characters per line in this very
+   block, which is a line nobody finishes. So the blocks below are
+   full-width (nothing beside them, no column, no sidebar) and every
+   prose line inside them is held to a measure.
+
+   THE MEASURE IS 36em, AND IT WAS PICKED OFF A RENDER RATHER THAN AN
+   ARGUMENT. Measured at 1128 on the nine-item page, with the column
+   applied in the page and discarded: 46em gives 93 characters, 36em
+   gives 76, 32em gives 68. The acceptance was ~75, so 32em and 36em both
+   clear it on that number alone — and 32em was the one recommended,
+   because a cut ledger line (67 characters) was expected to fit it on
+   one line. MEASURED, IT DOES NOT: at 32em that ledger wraps to two
+   lines and at 36em it stays on one. The ledger is the line a reader
+   scans, so 36em is the measure that satisfies both the character count
+   and the thing the character count was standing in for.
+
+   AND IT IS SCOPED TO THE VERDICT COLUMN, ruled 2026-10-20 after the
+   measurement that priced it: these .reader-* classes also render inside
+   a Lists table cell, and 36em there is NARROWER than the cell, so it
+   wrapped lines the cell had room for — measured at 390, one country and
+   one line worse than leaving it alone (10 of 21 subheaders over nine
+   visual lines against 9 of 21). Every max-width below is therefore
+   under .verdict-block; Lists keeps its own measure, which is the cell. */
+
+/* NO COLOUR ON A BAR, and this is the same rule .own-chip states above:
+   green on "clears" and red on "doesn't" would render a legal threshold
+   as a personal score, which is exactly the claim the copy is forbidden
+   to make. Colour must not say what the words may not. The only colour
+   in these lists is the confidence badge's, which is about SOURCING and
+   already means that everywhere else on the site. */
+.reader-route-group { margin: 0.6rem 0 0.2rem; }
+.verdict-block .reader-route-label {
+  font-family: "Fraunces", serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0.6rem 0 0.3rem;
+  max-width: 36em;
+}
+/* A <ul>, and list-style: none — the list is NEVER NUMBERED. An ordinal is
+   a ranking claim and it would be false on a tie, and ties are the common
+   case rather than an edge one (three Ecuadorean routes at an identical
+   +190.5%, three Thai bars at 80,000). The order is real and the markup
+   carries it; the numbers that would assert it are not printed. */
+.reader-route-list { list-style: none; margin: 0; padding: 0; }
+.reader-route { border-top: 1px solid var(--line); padding: 0.5rem 0; }
+.reader-route:first-child { border-top: none; padding-top: 0.2rem; }
+.reader-route-bar { font-weight: 600; font-size: 0.92rem; display: inline; }
+.reader-route .badge { margin-left: 0.4rem; }
+.reader-route-claim,
+.reader-route-ledger,
+.reader-route-note,
+.reader-route-rate { display: block; }
+/* What kind of income this route counts, in the box's own words. Body
+   size, because it is part of the answer rather than a note about it —
+   a reader comparing what they picked against what the route takes is
+   reading, not scanning. */
+.reader-route-kind { display: block; font-size: 0.9rem; }
+.verdict-block .reader-route-kind { max-width: 36em; }
+.reader-route-list-compact .reader-route-kind { font-size: 0.85rem; }
+
+.verdict-block .reader-route-claim,
+.verdict-block .reader-route-ledger,
+.verdict-block .reader-route-note,
+.verdict-block .reader-route-rate { max-width: 36em; }
+.reader-route-claim { font-size: 0.92rem; margin-top: 0.2rem; }
+.reader-route-ledger { font-size: 0.95rem; margin-top: 0.2rem; }
+/* The closeness note and the rate line are both notes ABOUT the figures
+   above them, so they sit under the figures in meta type — a reason placed
+   above the thing it qualifies is a maze (.own-route-meta's own rule). */
+.reader-route-note,
+.reader-route-rate { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+
+/* The miss widget. Closed-and-opening by Cap's ruling, and OPEN ON
+   ARRIVAL where nothing clears (his B6, yes) — that is set in
+   js/location.js, on `clearedCount === 0`, not here.
+
+   The summary carries the whole miss line, because the single most useful
+   fact on the miss side is not allowed behind the click: the count and
+   the nearest miss with its shortfall are in the CLOSED state. That is
+   what makes this a summary rather than a hiding place. */
+.verdict-block .reader-miss { margin: 0.7rem 0 0.2rem; max-width: 36em; }
+.reader-miss > summary { cursor: pointer; padding: 0.2rem 0; }
+.reader-miss-line { font-size: 0.95rem; color: var(--ink); }
+.reader-miss-toggle { font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
+/* Both labels live in the DOM and `details[open]` picks which one shows —
+   CSS, not script, so the label can never fall out of step with the
+   widget's real state. The closed label is the one a reader with no CSS
+   meets, which is the honest default: it names what is inside. */
+.reader-miss-closed { display: inline; }
+.reader-miss-open { display: none; }
+.reader-miss[open] > summary .reader-miss-closed { display: none; }
+.reader-miss[open] > summary .reader-miss-open { display: inline; }
+.reader-miss-toggle-open { display: none; }
+.reader-miss[open] > summary .reader-miss-toggle-closed { display: none; }
+.reader-miss[open] > summary .reader-miss-toggle-open { display: inline; }
+.reader-miss .reader-route-group { margin-left: 0.2rem; }
+
+/* The Lists variant: the same items in a five-column comparison row, one
+   notch smaller, with no group labels (the chip beside them already names
+   the instrument through the ledger it carries) and no rate line. Lists is
+   a comparison surface, not the surface of record. */
+.reader-route-group-compact { margin: 0.3rem 0 0; }
+.reader-route-list-compact .reader-route { padding: 0.3rem 0; }
+.reader-route-list-compact .reader-route-bar { font-size: 0.85rem; }
+.reader-route-list-compact .reader-route-claim,
+.reader-route-list-compact .reader-route-ledger { font-size: 0.85rem; }
+
+/* The could-not-read cause clauses, lifted out of the pill. Body ink,
+   body size, the same move the ledger makes one block up: the pill
+   carries the claim, the detail sits beneath it. At Thailand this is the
+   difference between a 250-character paragraph inside a coloured lozenge
+   and a 49-character one. */
+.verdict-block .reader-cause-line { font-size: 0.95rem; color: var(--ink); max-width: 36em; margin: 0.3rem 0 0.4rem; }
+
+/* The routes the site could not read, and the no-shortfall-exists line.
+   OUTSIDE the widget and at the same level as the miss line, because
+   neither is a list of noes: "unread routes are not noes" (Cap). */
+.verdict-block .reader-unread-line { font-size: 0.85rem; color: var(--muted); max-width: 36em; margin: 0.5rem 0 0.2rem; }
+/* The standing gates disclosure, once, after both lists — lifted out of
+   the state's trailing clause so a conditional lead cannot drop it. */
+.verdict-block .reader-gates-line { font-size: 0.85rem; color: var(--muted); max-width: 36em; margin: 0.4rem 0 0.2rem; }
 
 /* Part 37 — the location-scope gate-provenance block ("This location").
    Deliberately plain: no colored pills, no second scoring system next
@@ -1656,6 +1811,7 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
      just oriented vertically; the divider moves with it. */
   .verdict-chip-split { flex-direction: column; align-items: flex-start; }
   .verdict-chip-split-seg:first-child { border-right: none; border-bottom: 2px solid rgba(255, 255, 255, 0.6); }
+  .verdict-chip-gap .verdict-chip-split-seg:first-child { border-bottom-color: rgba(38, 34, 29, 0.35); }
 }
 
 /* ==========================================================================

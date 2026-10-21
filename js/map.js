@@ -1286,6 +1286,20 @@ function renderMap(store, lenses) {
         // Third argument is the row's own `reader_margin` — the FIRST of
         // the three surfaces Cap named for "my number, the bar, and by how
         // much", in the state's own sentence rather than a line of its own.
+        //
+        // IT IS NOW THE WHOLE CARRY, NOT ONE MARGIN, and this surface
+        // gains exactly one clause from that: the others-clause, naming
+        // how many MORE routes clear here and pointing at the page that
+        // holds them. stateHeadline() reads the lead out of the carry and
+        // composes the clause; nothing here picks a route.
+        //
+        // WHY THIS SURFACE DOES NOT ENUMERATE, argued rather than
+        // asserted: it is plain text in a title-style tip, it cannot be
+        // scrolled, focused or re-read, it is already four lines deep for
+        // a read country, and this file's own comment below ranks it as
+        // the copy to drop first if it crowds. A hover preview cannot be
+        // the surface of record. It can perfectly well be the surface
+        // that tells you a record exists — and with the count it is.
         const stateText = stateHeadline(
           readerVerdict.overall_state, readerVerdict.reader_bar_kind, readerVerdict.reader_margin
         );

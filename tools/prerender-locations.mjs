@@ -514,8 +514,18 @@ const {
 // claim this page cannot make.
 // ONE STRING ON ALL 38, NOT TWO. The footer's list of what the
 // interactive version adds named "your own figures read against this
-// place" on all 38 pages; the box reads five countries, which is 12 of
-// them, so it was false on 26.
+// place" on all 38 pages; at the time the box read five countries, which
+// was 12 of them, so it was false on 26.
+//
+// THAT ARITHMETIC IS NOW SPENT, and the string stays retired anyway. The
+// box reads all 21 countries since 2026-10-20, so the sentence this note
+// is about would be true on all 38 today — the count was never the whole
+// reason it went. The reason that outlives it is the one below: the
+// footer is a static snapshot's description of the INTERACTIVE version,
+// not a promise about this reader, and the test a replacement has to pass
+// is "true on all 38, with numbers, with priorities only, with a passport
+// only, or with nothing entered". The widening removes the falsity; it
+// does not reinstate the string.
 //
 // An earlier shape split the sentence in two and picked by READ_SET —
 // true on every page, and the reason it goes anyway is this: the footer

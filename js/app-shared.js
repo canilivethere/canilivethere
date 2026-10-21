@@ -1430,7 +1430,9 @@ export const STATE_HEADLINE = {
   // currencies x 2 periods x 5 income types) read against the five read
   // countries = 1,800 country reads: 251 of them shipped a false
   // sentence (89 "below the bar every route", 162 "none of the routes
-  // here take it"), on all five countries. A second grid measured 263
+  // here take it"), on all five of the countries the box read AT THE TIME
+  // (a dated measurement, not today's scope — the box reads all 21 since
+  // 2026-10-20). A second grid measured 263
   // on the same shape — the amount ladder differs, the income-type count
   // is identical at 162 because that refusal never depends on the amount.
   //
@@ -1679,15 +1681,47 @@ const READER_NOT_ENOUGH_CLAUSES = {
 // sentence that names no specific cause, never the old, now-false,
 // cause-neutral string.
 function composeNotEnoughSentence(causes) {
-  if (!causes) return STATE_HEADLINE.READER_NOT_ENOUGH;
+  const split = composeNotEnoughParts(causes);
+  return split.causes ? `${split.lead} ${split.causes}` : split.lead;
+}
+
+// THE SAME SENTENCE, AT ITS OWN SEAM — the lead, and the cause clauses
+// that follow it. Nothing here is a new string: the seam is the full
+// stop this sentence already has, and "What stopped it:" stays the first
+// words of the second half exactly as it is written above.
+//
+// WHY IT NEEDED A SEAM. On Thailand this sentence reaches ~250
+// characters — three cause clauses joined by semicolons — and it renders
+// inside a verdict PILL, which is eight lines of reversed-out text in a
+// coloured lozenge at 390px. The pill is the wrong container for a
+// paragraph. So the location page puts the LEAD in the pill and the
+// causes directly beneath it in body ink, in the same words: the move
+// the verdict block already makes for the ledger (claim in the chip,
+// figures beneath), applied to the one band where the chip is a
+// paragraph.
+//
+// THE COMPACT SURFACES ARE UNTOUCHED. The tooltip and the pin name are
+// text with no pill to overflow, and they keep the whole composed
+// sentence through composeNotEnoughSentence() above — one string, one
+// meaning, two containers.
+export function composeNotEnoughParts(causes) {
+  const leadOnly = { lead: STATE_HEADLINE.READER_NOT_ENOUGH, causes: "" };
+  if (!causes) return leadOnly;
   const present = [];
   if (causes.hasA) present.push("A");
   if (causes.hasB) present.push("B");
   if (causes.hasC) present.push("C");
-  if (!present.length) return "The site couldn't read this against your figures.";
+  if (!present.length) return leadOnly;
   const form = present.length === 1 ? "sole" : "among";
   const clauses = present.map((k) => READER_NOT_ENOUGH_CLAUSES[k][form]);
-  return `${READER_NOT_ENOUGH_LEAD} ${clauses.join("; ")}.`;
+  // READER_NOT_ENOUGH_LEAD is the lead sentence plus "What stopped it:".
+  // Split at the one full stop it contains, so neither half is retyped
+  // here and a reword of the constant travels to both.
+  const cut = READER_NOT_ENOUGH_LEAD.indexOf(". ") + 1;
+  return {
+    lead: READER_NOT_ENOUGH_LEAD.slice(0, cut),
+    causes: `${READER_NOT_ENOUGH_LEAD.slice(cut).trim()} ${clauses.join("; ")}.`,
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -1704,6 +1738,16 @@ function composeNotEnoughSentence(causes) {
 // two rounded integers, done in the composer, so the three numbers on
 // screen add up.
 // ---------------------------------------------------------------------
+
+// THE ONE ROUTE THE COMPACT SURFACES NAME, read off the carry. Kept as a
+// named accessor rather than a property read at four call sites, because
+// `reader_margin` changed shape when Cap ruled a list and every one of
+// those call sites would otherwise have had to be found by grep. A caller
+// that still passes a bare margin object gets null and therefore no
+// ledger — fail-visible, not a silent half-sentence.
+function marginLead(carry) {
+  return carry && carry.lead ? carry.lead : null;
+}
 
 // The figure rule: reader's chosen currency, symbol-prefixed, thousands
 // separator, no decimals, no "≈". OWN_NUMBERS_CURRENCIES is ["USD","EUR"]
@@ -1784,14 +1828,46 @@ function readerMarginUnavailableClause(label) {
 // would not know which of their own two numbers a bare "Yours:" was
 // showing. "Capital" is the reader's own word — the box asks for it in
 // those words.
-function readerMarginLedger(state, margin) {
+//
+// THE CLOSER IS NOW A PARAMETER, AND THAT SPLIT IS A FIX, NOT A TIDY-UP.
+// The superlative closer used to be CONCATENATED into the shortfall
+// closing, which was sound while exactly one route per country reached a
+// reader and false the instant a list did: rendered per item, Ecuador's
+// opened miss list printed "— no bar here is closer" FOUR TIMES, about
+// figures sitting directly above each other on one screen. The four
+// closer strings are untouched; only the join moved.
+//
+// WHERE THE CLOSER IS TRUE, and it is the same rule stated two ways:
+// where a SINGLE route carries the claim. That is the map tooltip, the
+// pin's short form, the Lists chip, and the miss line's own named nearest
+// miss — and there it is precisely what makes a one-route summary honest
+// under a tie ("nothing is closer; something is equal"). Per item it is
+// false on every item but the first, so per item it does not render and
+// the sentence takes its own full stop instead.
+//
+// THE ROUTE CLAUSE IS ALSO A PARAMETER NOW, AND IT IS THE SAME CLASS OF
+// FIX ONE SLOT OVER. `, on {threshold_label}` names the route inside the
+// ledger — correct, and the only carrier of the name, on the country
+// headline, the map tooltip, the pin name and the Lists chip. INSIDE A
+// LABELLED LIST ITEM it is the second print of a name the bold heading
+// one line above has already given: measured on the built tree, that
+// clause alone is 88 characters on Thailand's items, three visual lines
+// at 390, nine times on one page. The name is not removed from the
+// surface; it is printed once instead of twice.
+//
+// THE RULE, so a later caller does not have to guess: the clause rides
+// wherever the ledger is the ONLY carrier of the route name, and drops
+// wherever a heading carries it. If a surface ever renders this ledger
+// without its heading, the clause must come back there — that is the
+// condition, not the call site.
+function readerMarginLedger(state, margin, { closer = true, routeClause = true } = {}) {
   if (!margin) return "";
   const closingKey = READER_MARGIN_CLOSING[state];
   if (!closingKey) return "";
   if (margin.status === "unavailable") return readerMarginUnavailableClause(margin.threshold_label);
   const own = margin.period ? "Your income" : "Your capital";
   const figures = ` ${own}: ${marginMoney(margin.reader_figure, margin.currency)}${marginPeriodSuffix(margin)}.`
-    + ` The bar: ${marginBarFigure(margin)}, on ${margin.threshold_label}.`;
+    + ` The bar: ${marginBarFigure(margin)}${routeClause ? `, on ${margin.threshold_label}` : ""}.`;
   let closing;
   if (closingKey === "over") {
     // THE EXACT BRANCH MOVED HERE, VERBATIM, FROM THE RETIRING "atLine"
@@ -1805,7 +1881,12 @@ function readerMarginLedger(state, margin) {
       ? "The same figure."
       : `You're ${marginDifference(margin)} over.`;
   } else {
-    closing = `You're ${marginDifference(margin)} short${READER_MARGIN_CLOSER[closingKey]}`;
+    // The closer's own strings end in a full stop and open with " — ", so
+    // without one the sentence needs its own stop. "You're $246 a month
+    // short." is the shipped over-form's own punctuation, one table row
+    // across; no word of either string changes.
+    closing = `You're ${marginDifference(margin)} short`
+      + (closer && READER_MARGIN_CLOSER[closingKey] ? READER_MARGIN_CLOSER[closingKey] : ".");
   }
   return `${figures} ${closing}`;
 }
@@ -1875,6 +1956,726 @@ function readerRateLine(state, margin) {
   if (!Number.isFinite(ageDays) || ageDays < 0) return "";
   return ` Converted at the rate on file — 1 ${code} = USD ${rate} (${source}),`
     + ` ${ageDays} days old, inside the ${staleAfter} days this site will use a rate for.`;
+}
+
+// ---------------------------------------------------------------------
+// (g) EVERY ROUTE THAT CLEARS, AND EVERY ROUTE THAT DOES NOT — the words
+// for the lists.
+//
+// WHOSE WORDS THESE ARE. Every claim sentence, every ledger clause, the
+// closeness note, the conditional clause, the placement clause, the four
+// superlative closers and the gates disclosure are ALREADY RATIFIED AND
+// SHIPPED above; nothing here rewrites one. The strings below are the
+// genuinely new ones, and they come from
+// the crossing's copy deck, transported verbatim. The shapes are the
+// information-design spec's. Both are held outside this repo.
+//
+// EVERY COUNT ON SCREEN IS A RENDERED LIST'S OWN `length`, read at the
+// call site. There is no count field on the row, no ratio and no
+// hand-maintained number anywhere in this section — which is the
+// distinction against the two places this tree forbids a count (the
+// unread-country count in js/reader-lens.js and the income-type gap note
+// in js/own-numbers-data.js): both of those count things that are NOT on
+// screen and both replaced a hand-maintained figure the data outgrew.
+// These count the items of a list the reader is being told about, and
+// they exist to stop a truncated list reading as a whole one. Each has a
+// COUNT-FREE FALLBACK beside it, so if that distinction is read the other
+// way the repair is one argument, not a rewrite.
+// ---------------------------------------------------------------------
+
+// The two labels over the clearing lists. Required, not decorative: a
+// bare list of five routes under a verdict reads as "these are the
+// routes", and in Guatemala it would be 2 of 3 with the third silently
+// refusing. The label states what the list is OF and whose lens it shows
+// — the perspective-disclosure law applied to a grouping, because a
+// grouping is itself a claim about what it covers. "Capital" is the
+// reader's own word, the one the box asked them for.
+const READER_CLEARED_LIST_LABEL = {
+  income: "Routes that clear on your income",
+  capital: "Routes that clear on your capital",
+};
+
+// The miss groups, and they are DELIBERATELY NOT SYMMETRICAL with the two
+// labels above. A refusal sits in these groups — a route that refuses the
+// reader's KIND of income, stopped at gate 1 before any bar was read — and
+// "don't clear ON YOUR INCOME" would assert a comparison that never
+// happened, on exactly the items whose honesty is most delicate. An
+// instrument label is true of every member whichever gate stopped it, and
+// the enclosing line already says these are the routes that don't clear.
+const READER_MISS_GROUP_LABEL = {
+  income: "Income routes",
+  capital: "Capital routes",
+};
+
+// THE STANDING GATES DISCLOSURE, LIFTED TO BLOCK LEVEL. Identical words to
+// READER_ABOVE_BAR_TAIL's, without its leading space, because on the
+// location page it is a line of its own under both lists rather than the
+// tail of one sentence.
+//
+// WHY IT IS LIFTED RATHER THAN LEFT AS A TAIL, measured: the tail rides on
+// READER_ABOVE_BAR and NOT on READER_ABOVE_CONDITIONAL, so the moment a
+// list's lead item is conditional the disclosure vanishes — silently, on
+// the one surface that enumerates. And §2.1 of the spec is why it matters
+// more than it looks: the longest lists belong to the reader who declined
+// to name an income type (16 of 21 countries clear at "a mix, or I'd
+// rather not say" against 9 at remote_active), so this one sentence
+// carries the most weight exactly where there is most to disclose.
+export const READER_GATES_DISCLOSURE_LINE = READER_ABOVE_BAR_TAIL.trim();
+
+// The others-clause, long register, for the map tooltip. The
+// count, the path to the page, and closeness where a non-lead item is near
+// the line. No figure: the figure belongs to the item, and the item is not
+// on this surface.
+//
+// "only just" and not "by a hair": `, only just` is the shipped short twin
+// of READER_NEAR_LINE_NOTE and the site already has a word for this.
+// "all of them on this place's page" rather than "see this place's page":
+// it states that the whole list exists there, which is the content
+// requirement, without an imperative a reader in a hover tip did not ask
+// for.
+//
+// THE SINGULAR MODIFIERS ARE GRAMMAR, NOT NEW COPY, and they are named as
+// this build's rather than left to look ratified: the deck gives the
+// plural modifiers and the singular stem ("1 more route clears here…",
+// "it's on this place's page"). ", with conditions" is
+// READER_ABOVE_CONDITIONAL's own shipped clause and ", only just" is
+// READER_NEAR_LINE_SHORT_SUFFIX, both verbatim; only the plural-to-
+// singular agreement is mine.
+const READER_OTHERS_MODIFIER = {
+  plural: { conditional: ", some with conditions", near: ", one of them only just", both: ", some with conditions and one only just" },
+  singular: { conditional: ", with conditions", near: ", only just", both: ", with conditions and only just" },
+};
+function readerOthersModifier(count, conditional, near) {
+  const table = count === 1 ? READER_OTHERS_MODIFIER.singular : READER_OTHERS_MODIFIER.plural;
+  if (conditional && near) return table.both;
+  if (conditional) return table.conditional;
+  if (near) return table.near;
+  return "";
+}
+
+// The same clause in the short register, for the pin's
+// accessible name. Spoken inside a queue of up to twelve, so the whole
+// register's rule is direction and distance and no more: the count, no
+// route name, no figure. WHERE TWO MODIFIERS CO-OCCUR ONLY THE CLOSENESS
+// ONE SHIPS — the writer's judgement, on the ground that a spoken queue is where
+// length costs most and closeness is the fact that changes what a reader
+// does next.
+//
+// THE PLURAL CLOSENESS FORM IS ", one only just" AND NOT ", only just",
+// and the difference is a measured overclaim rather than a preference.
+// The deck gives ", and 1 more clears, only just" (singular) and
+// ", and 3 more clear, with conditions" (plural, conditions) — it does
+// not give a plural closeness form, and the obvious one goes false:
+// "and 8 more clear, only just" reads as all eight being only just, when
+// on Thailand's nine-item page exactly three of the eight are. The word
+// is lifted from her own plural long-register modifier (", one of them
+// only just"), shortened for a register whose whole rule is length.
+// Named as this build's agreement, not as her copy.
+function readerOthersShortModifier(count, conditional, near) {
+  if (near) return count === 1 ? ", only just" : ", one only just";
+  if (conditional) return ", with conditions";
+  return "";
+}
+
+// readerListsRemainderLine() and readerClearedCount() ARE DELETED HERE,
+// 2026-10-20, with the Lists cap they served. Lists now enumerates every
+// clearing route, so there is no remainder to count and no count to
+// print. The deletion is recorded rather than silent because both were
+// live for three builds and a reader of an older file will meet their
+// names: the remainder line said "and 2 more clear — each place's page
+// lists them all", and it existed to stop a truncated list reading as a
+// whole one. With nothing truncated it has nothing to say.
+//
+// The same rule as every other retirement this crossing: a function with
+// no caller is a promise nobody keeps, and the measurement that would
+// justify reviving it is in the build record, not in a dormant branch.
+
+// The miss line, closed state, on the location page. Cap's own
+// sentence: "how many routes he does not clear, and the nearest miss with
+// its shortfall in his currency."
+//
+// WHAT THE COUNT IS, AND IT IS RULED RATHER THAN CHOSEN. Routes read and
+// below the bar, plus routes read and refused on the reader's income kind.
+// Routes the site COULD NOT READ are not in it — Cap, 2026-10-20: "the
+// count of routes he does not clear stands, unread routes are not noes."
+// Thailand reaches ELEVEN unreadable routes in one read, every route row it
+// has; counting those would publish eleven noes the record does not
+// support, inside a sentence whose whole purpose is to be trusted. They are
+// disclosed separately, outside the widget, by readerUnreadLine() below.
+//
+// THREE BRANCHES, because the reader's situation has three shapes:
+//   (i)     at least one counted miss has a shortfall — the ruled shape.
+//   (i-two) one shortfall per instrument, the cross-instrument case. TWO
+//           figures in one line, because a monthly shortfall and a capital
+//           lump have no comparison operator and picking one would be an
+//           invented ranking. No closer in this form: with two bars named,
+//           "no bar here is closer" has two referents and claims neither.
+//   (ii)    the count is non-zero and NO shortfall exists anywhere in the
+//           set — every counted miss is a refusal. No figure may be
+//           invented, and the honest answer is that the obstacle is not a
+//           number. It does not advise: naming which kind of income would
+//           qualify would be built on a classification the reader never
+//           gave us.
+// Held from the verb onward so the singular and the plural read the same
+// sentence: "{N} routes here don't" / "1 route here doesn't" + this.
+const READER_MISS_LINE_NO_FIGURE =
+  "clear, and no figure would change that: these routes don't take the kind of income you named, whatever the amount.";
+
+// The nearest miss on one instrument: the first item that actually carries
+// a figure. The guard is cheap and it is deliberate — the line names a
+// nearest miss ONLY where that item's margin is `status: "ok"`, so it can
+// never promise a figure it cannot produce.
+function readerNearestMiss(items) {
+  for (const item of items || []) if (item.status === "ok") return item;
+  return null;
+}
+function readerMissCount(carry) {
+  if (!carry || !carry.missed) return 0;
+  return carry.missed.income.length + carry.missed.capital.length;
+}
+// THE COMPACT REGISTER, AND IT REPLACED A LONGER LINE ON A MEASUREMENT
+// RATHER THAN AN ARGUMENT. The first build named the route and carried
+// the closer: measured at 390 it ran 125 characters on Colombia's
+// one-figure form, 175 on its two-figure form and ~235 on Thailand's,
+// and reached SIX visual lines. Everything in that sentence that is not
+// a route label is about 75 characters — the labels are the length, and
+// they are data this file may not shorten (Thailand's needs "(reduced
+// bar, conditional)" or it names the wrong bar).
+//
+// SO THE NAME COMES OUT AND NOTHING ELSE DOES. The count stays, the
+// figure stays, the instrument stays. "at least" is the shipped
+// compact-register repair (READER_SHORT_WITH_MARGIN's own form), true
+// under a tie and the stronger claim, because the named floor is the
+// smallest shortfall and every other bar is further.
+//
+// THE CLOSER GOES WITH THE NAME, and that reverses this file's own
+// earlier reasoning on purpose: the closer existed to make a NAMED
+// route's superlative tie-safe. With no name there is no superlative,
+// and "at least" already carries the tie-safe claim — printing both
+// would say one thing twice.
+//
+// WHERE THE ROUTE NAME WENT, because it did not leave the surface: on
+// every nothing-clears read the widget arrives OPEN (B6, ruled) and the
+// first item one line below names the route with its exact shortfall.
+// Where something clears, the widget is closed and the name is one click
+// behind a label that says what is behind it. Hierarchy, not
+// concealment.
+//
+// THE INSTRUMENT MAY NOT BE CUT — it is the bottom rung of the spec's
+// own ladder and it is marked dishonest there: a figure whose meaning
+// depends on the item beneath it is not a summary.
+//
+// THE FLOOR BECAME THE NEAREST ROUTE'S OWN SHORTFALL, ruled 2026-10-20,
+// AND THE ROUTE NAME CAME BACK WITH IT. "You're at least $705 short"
+// claimed a bound over a set; "the smallest shortfall is $705 a month,
+// on {route}" claims a per-item exact figure and says where it occurs.
+//
+// AND IT IS TIE-SAFE BY CONSTRUCTION RATHER THAN BY A QUALIFIER, which
+// is why no closer had to come back. Colombia is the live trap: its
+// first two misses tie at one $1,705 bar, so $705 is the shortfall of
+// TWO routes. "The nearest route is…" would name one of two as uniquely
+// nearest — the exact falsity READER_MARGIN_CLOSER's own note retired.
+// "The smallest shortfall IS $705 a month" is true under a tie: the
+// smallest shortfall is that figure, and two routes holding it does not
+// make it two figures. "on {route}" then says where it occurs — true and
+// incomplete, never false — and the opened list prints both items with
+// identical figures, disclosing the tie the way every tie in this
+// crossing is disclosed. THE SUPERLATIVE ATTACHES TO THE FIGURE, NOT TO
+// THE ROUTE.
+//
+// "at least" DOES NOT LEAVE THE SITE. It stays in the pin's short form
+// (READER_SHORT_WITH_MARGIN), which names no route and where a floor is
+// still the honest claim. One phrase, two surfaces, two different jobs —
+// stated so nobody later reads the pair as a drift.
+function readerMissSmallest(item) {
+  return `${marginDifference(item)}${marginPeriodSuffix(item)}, on ${item.threshold_label}`;
+}
+// `state` is no longer read here: the closer it used to select is gone
+// with the route name. The argument it encoded survives in the ledger,
+// where READER_MARGIN_CLOSING still carries a closer only for the states
+// where nothing clears — which is the only place "no bar here is closer"
+// is true.
+export function readerMissLine(state, carry) {
+  const count = readerMissCount(carry);
+  if (!count) return "";
+  const noun = count === 1 ? "1 route here doesn't" : `${count} routes here don't`;
+  const income = readerNearestMiss(carry.missed.income);
+  const capital = readerNearestMiss(carry.missed.capital);
+  if (income && capital) {
+    // THE TWO-FIGURE FORM IS 206 CHARACTERS AND IT IS THE ONE STRING IN
+    // this family handed over rather than defended. Naming two routes in
+    // one line is what blows it; the figures and the instruments are not
+    // the problem. The priced fallback, if the length is refused: this
+    // branch keeps the instrument-only shape ("at least $705 a month
+    // short on income, and at least $138,859 short on capital", 113) and
+    // the single-figure branch keeps the named route — one sentence
+    // shape for 98% of reads and a second for the 2%.
+    return `${noun} clear. The smallest shortfall on income is ${readerMissSmallest(income)};`
+      + ` on capital it's ${readerMissSmallest(capital)}.`;
+  }
+  const one = income || capital;
+  if (one) return `${noun} clear. The smallest shortfall is ${readerMissSmallest(one)}.`;
+  // No figure anywhere in the set. Branch (ii) where every counted miss is
+  // a refusal — its wording is a claim about the kind of income, so it may
+  // only render where that is what every item actually is. Anything else
+  // (believed unreachable: a below-bar item whose bar could not be
+  // expressed back into the reader's currency) gets the count alone, which
+  // is the first clause of the same ratified sentence and claims nothing
+  // about a cause.
+  const allRefusals = ["income", "capital"].every((k) =>
+    carry.missed[k].every((item) => item.state === "READER_WRONG_TYPE"));
+  return allRefusals ? `${noun} ${READER_MISS_LINE_NO_FIGURE}` : `${noun} clear.`;
+}
+
+// THE SUMMARY'S TWO STATES. The figure rides in the CLOSED state and the
+// count alone in the OPEN one, and the reason is a ruling rather than a
+// preference: the single most useful fact on the miss side is not allowed
+// behind the click, and the closed state is the only state that ruling
+// was written for. Open, the ruled fact is one line below in its own
+// item, with its own route name and its own exact figure — so the open
+// summary repeating it would print one claim twice on one screen.
+//
+// NO ORDERING PROMISE IN EITHER STATE. "Nearest miss first" is true
+// within an instrument group and false across them, so no string here
+// says it.
+//
+// BRANCH (ii) KEEPS ITS CAUSE CLAUSE CLOSED AND DROPS IT OPEN. Closed, a
+// bare count would promise shortfalls that do not exist behind the
+// control — the clause IS what replaces the figure there, not a second
+// figure. Open, every refusal item already carries the ratified
+// wrong-type sentence, so the clause would print once plus N times.
+export function readerMissSummary(state, carry) {
+  const count = readerMissCount(carry);
+  if (!count) return null;
+  const noun = count === 1 ? "1 route here doesn't" : `${count} routes here don't`;
+  return { closed: readerMissLine(state, carry), open: `${noun} clear.` };
+}
+
+// The control's own label. The closed state and the open state
+// are both written, and both were re-read against an OPEN-ON-ARRIVAL
+// widget rather than assumed to transfer, because Cap ruled B6 yes: where
+// the cleared list is empty the widget arrives open. Open on arrival
+// renders the OPEN label and it reads true — the list is expanded, hiding
+// is the action available, and the label still names what is inside.
+//
+// WHAT THE LABEL DOES NOT PROMISE, and this is a measured refusal rather
+// than an omission: an ordering. "Nearest miss first" is true WITHIN an
+// instrument group and false across them (income group before capital
+// group), so a control label promising it would be false whenever both
+// groups render.
+export function readerMissToggleLabels(carry) {
+  const count = readerMissCount(carry);
+  if (!count) return null;
+  const anyFigure = !!(readerNearestMiss(carry.missed.income) || readerNearestMiss(carry.missed.capital));
+  const shortfalls = anyFigure ? ", with their shortfalls" : "";
+  const closed = count === 1
+    ? "Show the 1 that doesn't clear"
+    : `Show all ${count}${shortfalls}`;
+  const open = count === 1
+    ? "Hide the 1 that doesn't clear"
+    : `Hide the ${count} that don't clear`;
+  const neutral = count === 1
+    ? `The 1 that doesn't clear${shortfalls}`
+    : `All ${count} that don't clear${shortfalls}`;
+  return { closed, open, neutral };
+}
+
+// The routes that could not be read, OUTSIDE the widget and at
+// the same level as the miss line. This line is why the count in the
+// widget can honestly exclude them: a reader who opens a list of eight
+// noes must not then discover that eleven routes nobody read were never
+// mentioned.
+//
+// TWO FORMS, ONE CONDITION. The second clause ("the answer above is a no
+// on what was read, not on everything") is the ratified wording of
+// STATE_HEADLINE.PARTIAL_READ_NO_CLEAR, and it qualifies a NO — so it
+// renders only where the answer above actually is one. Where routes clear,
+// the line carries one fact and no inherited clause.
+//
+// THE CAUSE IS NOT RESTATED HERE, deliberately: the composed
+// READER_NOT_ENOUGH sentence already names which gate stopped the read, in
+// the engine's own words, and one of those causes is something the reader
+// can act on ("you haven't entered a capital figure"). A line of this
+// file's own saying "what's missing is a record" would be true of two
+// causes and false of that one.
+export function readerUnreadLine(carry, { clearedPresent = false } = {}) {
+  const count = carry && carry.unread ? carry.unread.length : 0;
+  if (!count) return "";
+  const stem = count === 1
+    ? "1 more route here was never read against your figures"
+    : `${count} more routes here were never read against your figures`;
+  return clearedPresent
+    ? `${stem}.`
+    : `${stem} — the answer above is a no on what was read, not on everything.`;
+}
+
+// The case neither Cap's sentence nor the miss line can
+// reach: nothing clears AND nothing misses, because every route was either
+// refused on the reader's income kind or could not be read at all. There is
+// no shortfall in existence to show. Measured at 24,960 of 63,000
+// reads (39.6%) — 2.6 times the population Cap's own sentence was written
+// against.
+//
+// TWO SHORT DECLARATIVES AND NOTHING MORE. His rule is "the page never says
+// nothing opens without saying what would", and in this population the page
+// is NOT saying nothing opens — it is saying it could not read, which is a
+// different claim, and the single most important thing to tell a stranger
+// is that the two are not the same. What WOULD change it is already on the
+// page in the engine's own sentence: the named gate. This line names no
+// cause of its own, because a line saying "what's missing is a record"
+// would be false on the cause where what is missing is the reader's own
+// figure.
+export const READER_NOTHING_READ_LINE =
+  "This isn't a no. Nothing here was read against your figures, so there is no shortfall to show.";
+
+// The Lists miss line. The COMPACT form, and the deck declared the
+// deviation from the spec's own table rather than taking it silently: Lists is a
+// comparison surface inside a five-column row that already carries the chip
+// and up to three cleared items, and a route label like "Long-Term Resident
+// (LTR) Highly Skilled Professional" is 52 characters on its own. "at least
+// {FIG} short" is the compact register's own deliberate repair — true under
+// a tie, and the stronger claim, because the named bar is the smallest
+// shortfall.
+// THE REGISTER DISPUTE IS SETTLED AND THIS IS NOW ONE SENTENCE IN TWO
+// PLACES rather than two sentences saying the same thing. The compact
+// form the Lists row was given first is the form the location page now
+// uses too, so Lists composes it and adds the one thing that is true
+// only here: the surface of record is one row down.
+export function readerListsMissLine(state, carry) {
+  const line = readerMissLine(state, carry);
+  return line ? `${line} Each place's page lists them all.` : "";
+}
+
+// ---------------------------------------------------------------------
+// The clearing lists, read off the carry. Four helpers, one rule: the two
+// instruments are two lists, income first where it is non-empty, and no
+// item is ever ranked against an item in the other list. The order between
+// the two lists is NOT a ranking claim — it follows the order the box asks
+// in, income being the required field and capital the optional one — and
+// the labels carry the instrument so a reader reads "on your income" and
+// "on your capital", never "better" and "worse".
+// ---------------------------------------------------------------------
+
+export function readerClearedGroups(carry) {
+  if (!carry || !carry.cleared) return [];
+  return ["income", "capital"]
+    .filter((k) => carry.cleared[k].length)
+    .map((k) => ({ instrument: k, label: READER_CLEARED_LIST_LABEL[k], items: carry.cleared[k] }));
+}
+
+export function readerMissGroups(carry) {
+  if (!carry || !carry.missed) return [];
+  return ["income", "capital"]
+    .filter((k) => carry.missed[k].length)
+    .map((k) => ({ instrument: k, label: READER_MISS_GROUP_LABEL[k], items: carry.missed[k] }));
+}
+
+// Everything that clears EXCEPT the one route the compact surfaces name —
+// which is what the others-clause and the Lists remainder line are both
+// counting. The lead is identified by its own route_key, never by position,
+// so the clause cannot drift out of step with the sentence above it.
+function readerOtherClearedItems(carry) {
+  if (!carry || !carry.cleared) return [];
+  const leadKey = carry.lead ? carry.lead.route_key : null;
+  return [...carry.cleared.income, ...carry.cleared.capital].filter((i) => i.route_key !== leadKey);
+}
+
+// The tooltip's clause. Count-free fallback supplied beside it
+// rather than after a Block: if the count is read as the thing this tree
+// forbids, READER_OTHERS_COUNT_FREE is the one-line swap and every
+// surface still satisfies the no-truncation-without-disclosure rule.
+export function readerClearedOthersClause(carry) {
+  const others = readerOtherClearedItems(carry);
+  if (!others.length) return "";
+  const n = others.length;
+  const conditional = others.some((i) => i.state === "READER_ABOVE_CONDITIONAL");
+  const near = others.some((i) => i.bar_kind && i.bar_kind.nearLine);
+  const mod = readerOthersModifier(n, conditional, near);
+  return n === 1
+    ? ` 1 more route clears here${mod} — it's on this place's page.`
+    : ` ${n} more routes clear here${mod} — all of them on this place's page.`;
+}
+export const READER_OTHERS_COUNT_FREE = " More routes clear here — all of them on this place's page.";
+
+// The pin's clause, appended to the short form.
+export function readerClearedOthersShort(carry) {
+  const others = readerOtherClearedItems(carry);
+  if (!others.length) return "";
+  const n = others.length;
+  const conditional = others.some((i) => i.state === "READER_ABOVE_CONDITIONAL");
+  const near = others.some((i) => i.bar_kind && i.bar_kind.nearLine);
+  const mod = readerOthersShortModifier(n, conditional, near);
+  return n === 1 ? `, and 1 more clears${mod}` : `, and ${n} more clear${mod}`;
+}
+
+// WHAT LISTS RENDERS, AND IT STOPPED ENUMERATING — measured, not
+// preferred. The first build capped the list at three items and the
+// subheader measured 18 visual lines on Ecuador and 32 on Thailand at
+// 390, in a five-column table whose job is comparison across 21
+// countries. The cuts that got there are four, and three of them are
+// deletions of something the row was printing twice:
+//
+//   1. THE DOUBLED LEAD. The chip's own ledger already names the lead
+//      route and its figures; item 1 beneath printed the same route and
+//      the same figures. THE CHIP IS ITEM 1. The count below starts from
+//      the second route.
+//   2. THE DOUBLED COUNT. The chip's others-clause and the remainder
+//      line said the same thing one line apart, so the chip renders
+//      without the clause here and the counts line is the Lists form of
+//      it.
+//   3. THE RATE LINE becomes the short twin (readerRateTwin()).
+//   4. The per-item route clause — moot once no items render.
+//
+// NOTHING IS SILENT. Every route not shown is counted, and the surface
+// of record is named in the same sentence. This is the shape every
+// compact surface on this site already carries: a surface may show one
+// of nine so long as it says so.
+//
+// THE COUNT STARTS AT THE CHIP, which is the one arithmetic trap here.
+// `cleared - 1`, because the chip is the lead item. A count of `cleared`
+// would promise one more route than the page holds.
+// WHAT LISTS ENUMERATES: every clearing route the chip has not already
+// named. No cap, and therefore no remainder — the surface withholds
+// nothing, so it has nothing to disclose. The chip is item 1, which is
+// the one trap here: starting the list at the first route would print
+// the lead twice, once in the chip's own ledger and once beneath it.
+//
+// THE TWO CLEARED-GROUP LABELS DO NOT TRAVEL HERE. On the location page
+// the lists are grouped by instrument under "Routes that clear on your
+// income" / "…capital"; in a table cell one flat list under one chip has
+// no grouping to label, and each item's own ledger says "Your income:"
+// or "Your capital:" anyway.
+export function readerListsEnumeratedView(carry) {
+  const flat = [];
+  for (const g of readerClearedGroups(carry)) for (const item of g.items) flat.push(item);
+  return { shown: flat.slice(1) };
+}
+
+// ---------------------------------------------------------------------
+// One list item, in parts, so each surface can wrap them in its own
+// markup. Every part is a shipped string selected by THIS item's own
+// state and THIS item's own summary — which is the whole of §5: a
+// closeness note, a placement clause, a condition clause and a confidence
+// tier each render against the route they were computed from, and cannot
+// travel to a route they are not true of.
+// ---------------------------------------------------------------------
+
+// WHAT KIND OF INCOME THIS ROUTE COUNTS, under the route's own heading.
+//
+// THE KIND NAMES ARE THE BOX'S OWN OPTION LABELS, SHIFTED TO SECOND
+// PERSON AND OTHERWISE WORD FOR WORD. That is the whole value of the
+// clause and it is not a style choice: the reader picked one of those
+// five sentences minutes earlier, and an exact match lets them compare
+// what they said against what this route counts without learning a
+// second vocabulary. Shorter forms read better and break the match —
+// "investment, rental or other income you don't work for" is long
+// BECAUSE the clause that makes it precise is the one about not working
+// for it.
+const READER_INCOME_KIND_LABEL = {
+  pension: "a pension or retirement income",
+  passive: "investment, rental or other income you don't work for",
+  remote_active: "remote work or freelance, paid from outside the country",
+  local_active: "work or a business inside the country",
+};
+
+// "COUNTS", NOT "REQUIRES", AND THE SUBSTITUTION IS DELIBERATE AND
+// MEASURED. The ruling asked for "the kind it requires". The record's
+// vocabulary is acceptance — the field value is `primary_accepted` — and
+// NINE OF THE 22 AFFIRMATIVE ROUTES ACCEPT MORE THAN ONE KIND, so
+// "requires a pension" on a route that also accepts remote work is
+// false. "Counts … as qualifying income" says what the record says and
+// is true on all 22. A wording change that protects a fact's meaning,
+// flagged rather than slipped in: the literal form is writable and would
+// need a second branch ("requires" where exactly one kind is accepted),
+// which is two strings for one idea.
+//
+// TWO GAP FORMS, NOT ONE, and the split is the reason. Form A is a
+// silence; form B is a RECORDED REFUSAL with the acceptance side still
+// unknown. A reader living on investment income learns from form B that
+// this specific route is not for them — which is the difference between
+// a gap and an answer, and one blended sentence would throw away the
+// only thing those four records actually say. Form B's second sentence
+// is what stops it reading as an answer.
+//
+// FORM A COVERS TWO MECHANICALLY DIFFERENT SILENCES ON PURPOSE — no
+// field at all, and a record that states the source was silent. "The
+// record doesn't say" is true of both; "no record yet" would be false on
+// the second. The cost is that a reader cannot tell whether anyone has
+// looked, and that distinction belongs to the confidence tier, which is
+// already on the item.
+const READER_INCOME_KIND_GAP_A =
+  "The record doesn't say which kind of income this route counts.";
+const READER_INCOME_KIND_GAP_B =
+  "The record says this route doesn't count investment, rental or other income you don't work for."
+  + " It doesn't say which kind it does.";
+
+// CLEARING ROUTES ONLY, which is the ruling's own scope ("each clearing
+// route states the kind it requires"). On a miss item the kind is not
+// the reader's question — the shortfall is — and on a refused item the
+// composed wrong-type sentence already says the kind was the obstacle.
+export function readerIncomeKindClause(item) {
+  if (!item || (item.state !== "READER_ABOVE_BAR" && item.state !== "READER_ABOVE_CONDITIONAL")) return "";
+  const k = item.income_kinds;
+  if (!k) return "";
+  if (!k.accepted.length) return k.refuses_passive ? READER_INCOME_KIND_GAP_B : READER_INCOME_KIND_GAP_A;
+  const names = k.accepted.map((t) => READER_INCOME_KIND_LABEL[t]).filter(Boolean);
+  if (!names.length) return READER_INCOME_KIND_GAP_A;
+  return `Counts ${joinKinds(names)} as qualifying income.`;
+}
+// Serial comma deliberately absent at two, present at three or more —
+// the house join, and the same shape joinList() uses one module over.
+function joinKinds(names) {
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]}, and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+// The claim sentence for one item, or "" where the item's own state has no
+// per-item claim to make.
+//
+// READER_BELOW_BAR IS DELIBERATELY SILENT HERE and the reason is a falsity
+// avoided: its shipped sentence is "Below the bar every route here sets —
+// on income", a claim about EVERY route in the country, and printing it
+// against one item of five would be false four times over. The item's own
+// ledger already says what it has to say in the ratified words — "Your
+// income: … The bar: … You're $X short." — so nothing is lost.
+//
+// READER_WRONG_TYPE IS THE ONE PLACE I TRANSPORTED A STRING ACROSS
+// REGISTERS, and it is named rather than slipped in. Its long sentence is
+// also a country claim ("none of the routes here take it as the qualifying
+// kind") and is false per item for the same reason. A refusal must still
+// say why it is in a list of routes that don't clear, or a reader reads the
+// absent figure as a shortfall nobody computed — so the item carries
+// READER_STATE_SHORT's own already-ratified phrase for exactly this state,
+// "not this kind of income", sentence-cased under §25.8's rule that
+// verbatim binds the words and never the leading letter's case or the
+// terminal punctuation. No new words. Flagged for the copy and design seats: if the
+// register is wrong, the fix is one string in one place.
+function readerItemClaim(item) {
+  if (item.state === "READER_ABOVE_BAR" || item.state === "READER_ABOVE_CONDITIONAL") {
+    const claim = readerStateClaim(item.state, item.bar_kind);
+    // THE TWO KIND-ONLY ABOVE CLAIMS ARE SUPPRESSED ON AN ITEM, because
+    // the group label directly above it already says exactly what they
+    // say: "Routes that clear on your income" / "…on your capital". Five
+    // items each repeating "Above the bar this route sets." under a label
+    // that says they clear is five lines of noise, and both specs' own
+    // walked examples print the claim line on an item ONLY where it
+    // carries something the label does not — the conditional clause, or
+    // the placement clause ("it asks you to put that money in, not just
+    // have it"). The test is a string comparison against the two
+    // constants rather than a list of states, so a new above-family
+    // claim starts rendering by default instead of being silently
+    // swallowed.
+    if (claim === READER_ABOVE_BAR_CLAIM || claim === READER_ABOVE_BAR_HELD_CAPITAL_CLAIM) return "";
+    return claim;
+  }
+  if (item.state === "READER_WRONG_TYPE") {
+    const short = READER_STATE_SHORT.READER_WRONG_TYPE;
+    return short.charAt(0).toUpperCase() + short.slice(1) + ".";
+  }
+  return "";
+}
+
+export function readerRouteItemParts(item) {
+  return {
+    label: item.threshold_label,
+    claim: readerItemClaim(item),
+    // One clause per clearing item, under the item's own heading. Empty
+    // on every miss item and on every read where the reader named an
+    // income kind — see itemIncomeKinds() for where that is decided.
+    incomeKind: readerIncomeKindClause(item),
+    // No closer and no route clause: see readerMarginLedger()'s own two
+    // notes. The heading above this ledger IS the route name, and the
+    // closer would be a superlative about one item of several. The
+    // figures and the distance, nothing else.
+    ledger: readerMarginLedger(item.state, item, { closer: false, routeClause: false }).trim(),
+    note: readerNearLineNote(item.state, item.bar_kind, item).trim(),
+    rate: readerRateLine(item.state, item).trim(),
+    confidence: item.confidence || null,
+  };
+}
+
+// THE HEADLINE CONFIDENCE BADGE RENDERS IF AND ONLY IF NO LIST ITEM
+// RENDERS ONE, and the iff is what keeps an absent badge single-meaning.
+// An absent badge already means "no tier exists"; one absence cannot carry
+// two meanings where the reader cannot tell which is which. Measured:
+// mixed tiers inside one list in 3,380 reads, and in 1,070 the lead route
+// carries no tier while another listed route does — so a single badge over
+// a five-item list would be a claim about one route standing where the
+// reader reads it as a claim about five. Ecuador is the live test of the
+// awkward half: lead tier-less, three items Medium — the headline badge
+// drops, three Medium badges show, nothing is hidden.
+//
+// SCOPED TO EVERY RENDERED ITEM, CLEARED AND MISSED, and that scope was
+// decided by a measurement rather than by reading the rule twice. §5.1
+// was written over the clearing list, and the first instinct was to
+// leave the miss list out of it — until Colombia at $1,000/month, $60,000
+// rendered with NOTHING clearing: the headline badge showed "Medium
+// confidence" from the nearest miss while all four miss items showed
+// their own badges underneath it. That is exactly the defect the iff rule
+// exists to prevent — one route's tier standing above four items where a
+// reader reads it as a claim about all of them — so the rule follows the
+// items, not the list they happen to sit in.
+export function readerHeadlineBadgeSuppressed(carry) {
+  if (!carry) return false;
+  const all = [];
+  for (const side of ["cleared", "missed"]) {
+    if (!carry[side]) continue;
+    all.push(...carry[side].income, ...carry[side].capital);
+  }
+  return all.some((i) => !!i.confidence);
+}
+
+// Does this read render BOTH clearing lists? The one condition B4's
+// settlement turns on, settled between the design and copy seats: where
+// both render, the
+// country claim drops its instrument clause and the two labels carry the
+// instruments, because "— on capital, not income" one line above a label
+// reading "Routes that clear on your income" is a page contradicting
+// itself to a stranger. Where only the capital list renders, the clause is
+// true and load-bearing and stays.
+export function readerRendersBothClearedLists(carry) {
+  return !!(carry && carry.cleared && carry.cleared.income.length && carry.cleared.capital.length);
+}
+
+// THE SHORT RATE TWIN — the rate line's Lists form, and the finding that
+// came with it is worth more than the saving.
+//
+// The full line is 149 characters of provenance in a table cell. The cut
+// asked for was "converted + age, nothing else", and NOTHING ELSE CANNOT
+// BE WRITTEN HONESTLY: a bare age is the one form this project already
+// decided against, in readerRateLine()'s own note — "rather than as a
+// bare age that invites a reader to supply their own threshold and
+// alarm". So the governing rule rides with the age, or the age goes.
+//
+// AND IT READS AS A POINTER, NOT A REPLACEMENT. A demoted disclosure
+// that sounds complete is the failure mode, so the clause that survives
+// names what is missing and where it is. That pointer is what costs:
+// measured in this tree the full line is 178 characters, so dropping the
+// rate and its source saves ~128 and saying where they went spends ~28
+// of it back. The honesty tax on moving a fact is saying where it went.
+//
+// IT DROPS THE RATE'S AGE, AND THAT OVERRULES THIS FILE'S OWN EARLIER
+// REASONING ON ONE SURFACE ONLY. The longer twin kept the age inside its
+// governing rule ("8 days old, inside this site's 30-day limit", 104
+// characters) because readerRateLine()'s own note rejects a bare age —
+// "a bare age invites a reader to supply their own threshold and alarm".
+// That argument is about a BARE age; this line carries none at all, and
+// the reason it can is structural rather than editorial: past the
+// freshness window the comparison does not happen (fxEntryFor() returns
+// null and the read lands UNCERTAIN_FX_UNAVAILABLE), so a converted
+// figure anywhere on this site is INSIDE the window by construction. The
+// guarantee is the useful fact; the number is detail, and a comparison
+// table is the one surface where detail is what goes.
+//
+// NOT ON THE LOCATION PAGE. There the full line renders, with the rate,
+// the source, the age and the rule — the surface of record keeps the
+// record. If the age is wanted back here, the 104-character form is one
+// line and it fits the chip at 300 characters.
+function readerRateTwin(state, margin) {
+  if (!margin || margin.status !== "ok" || !margin.converted) return "";
+  if (!READER_MARGIN_CLOSING[state]) return "";
+  return " Converted — rate and source on this place's page.";
 }
 
 // The claim half of a reader state — the shipped sentence with its trailing
@@ -2003,12 +2804,45 @@ function readerShortWithMargin(state, barKind, margin) {
 // (fail-visible: a new engine state should look wrong on screen, not
 // silently borrow another state's sentence).
 //
-// `barKind` is the reader row's own `reader_bar_kind` summary and `margin`
+// `barKind` is the reader row's own `reader_bar_kind` summary and `carry`
 // its `reader_margin` sub-object. BOTH ARE OPTIONAL: every existing
 // `stateHeadline(state)` call keeps working unchanged and keeps getting
 // exactly the sentence that shipped — only a caller holding a reader row
 // can pass either, and only a reader row can carry one.
-export function stateHeadline(state, barKind, margin) {
+//
+// `carry` IS NOW THE WHOLE CARRY, NOT ONE MARGIN. `reader_margin` holds
+// the ordered lists (see js/reader-lens.js's note on the field); the
+// single margin this sentence has always named is `carry.lead`, read
+// through marginLead() below. The lead is the composed state's own
+// candidate population, unwidened — which is what keeps this sentence,
+// the pin colour and the ledger describing one and the same route.
+//
+// `options` IS THE SURFACE'S, NOT THE STATE'S. Two flags, both for the
+// Lists country subheader and nowhere else, and each is a deletion of
+// something that row prints twice or prints in the wrong register:
+//   othersClause:false — Lists carries its own counts line beneath the
+//     chip, and the chip's own clause would say the same thing one line
+//     higher.
+//   rateTwin:true — 178 characters of rate provenance in a table cell
+//     becomes the short twin; the figure keeps its own "about" marker,
+//     and the exact rate and its source stay on the location page and in
+//     the tooltip, unchanged. A disclosure demoted one click, not
+//     deleted — named as a hierarchy call because it is one.
+//   gatesTail:false — BUILT, MEASURED AND NOT USED. The standing gates
+//     disclosure was specified to leave the chip and render once for the
+//     whole table in the context line above it: the same move the
+//     location page makes at block level, applied to the surface whose
+//     block is the table, worth 38 characters off each of 21 chips. The
+//     writer who proposed it named its risk and asked for a measurement
+//     rather than an argument, and the measurement refused it — at 390px
+//     a scroll position showing both the context line and a row it
+//     governs exists for the first 331px of a 5,238px table, and the
+//     site's own location search lands a reader 3,145px below the line.
+//     The option stays because the question is a ruling and not a fact:
+//     if the table ever gains a sticky header, this flag is the one line
+//     that makes the move honest.
+export function stateHeadline(state, barKind, carry, { othersClause = true, rateTwin = false, gatesTail = true } = {}) {
+  const margin = marginLead(carry);
   if (state === null || state === undefined) return STATE_HEADLINE_LOCATION_CAPPED;
   if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughSentence(barKind);
   // THE ONE STATE WHOSE TEXT TURNS ON A FACT ABOUT THE ROUTES IT DID NOT
@@ -2029,16 +2863,71 @@ export function stateHeadline(state, barKind, margin) {
   if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
     return READER_WRONG_TYPE_ACCEPTING_UNREAD;
   }
-  // THE FIXED ORDER FOR THE WHOLE SENTENCE, so nobody re-derives it:
+  // THE FIXED ORDER FOR THE WHOLE SENTENCE, so nobody re-derives it, and
+  // IT IS SIX SLOTS NOW, NOT FIVE:
   // claim → margin ledger → closeness note (D3) → rate line (F1) →
-  // trailing clause LAST. Every one of the middle three returns "" where
-  // it does not apply, so a caller with no margin gets exactly the string
-  // that shipped.
+  // OTHERS-CLAUSE → trailing clause LAST. Every one of the middle four
+  // returns "" where it does not apply, so a caller with no carry gets
+  // exactly the string that shipped.
+  //
+  // THE OTHERS-CLAUSE GOES FIFTH, after the rate line and before the
+  // tail, for one reason: every figure-adjacent note stays adjacent to
+  // its own figures, and the standing gates disclosure stays last. It is
+  // the one thing on a compact surface that stops a sentence about one
+  // route of nine looking like a sentence about one route of one — "a
+  // surface may show one item of nine; it may not show one item of nine
+  // and look like a surface showing one item of one."
   return readerStateClaim(state, barKind)
     + readerMarginLedger(state, margin)
     + readerNearLineNote(state, barKind, margin)
-    + readerRateLine(state, margin)
-    + (READER_STATE_TAIL[state] || "");
+    + (rateTwin ? readerRateTwin(state, margin) : readerRateLine(state, margin))
+    + (othersClause ? readerClearedOthersClause(carry) : "")
+    + (gatesTail ? (READER_STATE_TAIL[state] || "") : "");
+}
+
+// THE COUNTRY CLAIM, CLAIM ONLY — the location page's own chip, where the
+// ledger has moved OUT of the headline and INTO the items. Everything
+// stateHeadline() composes after the claim is deliberately absent here:
+// the ledger, the closeness note and the rate line now ride on the item
+// whose figures they are about, the others-clause has nothing to count
+// against on a surface that enumerates, and the trailing gates disclosure
+// is lifted to block level so it cannot vanish when the lead item is
+// conditional (READER_GATES_DISCLOSURE_LINE).
+//
+// THE TWO COMPOSED STATES KEEP THEIR COMPOSERS, because on this surface
+// they ARE the claim: READER_NOT_ENOUGH's cause sentence is the only thing
+// the 39.6% read has to say, and the wrong-type partial's split claim is
+// the one state whose text turns on a fact about the routes it did not
+// read.
+//
+// `bothLists` IS B4's SETTLEMENT (settled between the design and copy
+// seats and not escalated): on a country that renders BOTH clearing
+// lists the above-family claim drops its instrument clause and the two
+// list labels carry the instruments. The precedent is a shipped defect
+// already repaired once — a pin name reading "below the bar, on capital
+// not income" under a prefix its own value cancelled — and the fix then
+// was to delete the contradicted words, not to compose a cleverer
+// sentence. Where only the capital list renders, the clause is true and
+// load-bearing and stays.
+export function readerVerdictBlockClaim(state, barKind, bothLists) {
+  // The cause clauses render as prose beneath the chip on this surface
+  // (readerVerdictBlockCauses() below), so the chip carries the lead.
+  if (state === "READER_NOT_ENOUGH" && barKind) return composeNotEnoughParts(barKind).lead;
+  if (state === "READER_WRONG_TYPE_SOME_UNREAD" && barKind && barKind.acceptingUnread) {
+    return READER_WRONG_TYPE_ACCEPTING_UNREAD;
+  }
+  if (bothLists && (state === "READER_ABOVE_BAR" || state === "READER_ABOVE_CONDITIONAL")) {
+    return readerStateClaim(state, null);
+  }
+  return readerStateClaim(state, barKind);
+}
+
+// The half of the could-not-read sentence that leaves the pill. Empty
+// string on every other state and on a row with no cause summary, so the
+// caller renders nothing rather than an empty paragraph.
+export function readerVerdictBlockCauses(state, barKind) {
+  if (state !== "READER_NOT_ENOUGH" || !barKind) return "";
+  return composeNotEnoughParts(barKind).causes;
 }
 
 // Same contract for the compact form: optional extra arguments, identical
@@ -2052,14 +2941,25 @@ export function stateHeadline(state, barKind, margin) {
 // screen and the distance is the only rate-derived number in the sentence
 // — an INTENTIONAL asymmetry with the long register (A1 rule 5), stated
 // here so nobody later "harmonises" it.
-export function readerStateShort(state, barKind, margin) {
+export function readerStateShort(state, barKind, carry) {
+  const margin = marginLead(carry);
   const base = readerStateShortBase(state, barKind, margin);
   // D3's short twin, appended LAST — after the distance and after any
   // trailing clause the form carries: "above the bar, by $141 a month,
   // only just". ONE attachment point, deliberately, so it cannot be
   // forgotten on one branch of five — including the no-distance fallback,
   // which is where the exactly-on-the-bar reading lands.
-  return base && barKind && barKind.nearLine ? base + READER_NEAR_LINE_SHORT_SUFFIX : base;
+  //
+  // THE OTHERS-CLAUSE IS APPENDED AFTER IT, LAST — the count, no route
+  // name, no figure. The parity test this surface has to pass: a
+  // screen-reader reader inside a cluster knot learns that the country
+  // clears, by how much on the named route, THAT MORE ROUTES CLEAR AND
+  // HOW MANY, and whether one of them is close. That is the same four
+  // facts the sighted hover reader gets. What is refused here is
+  // enumeration: five route names times twelve knot members in one spoken
+  // queue is not disclosure, it is a wall.
+  const withNear = base && barKind && barKind.nearLine ? base + READER_NEAR_LINE_SHORT_SUFFIX : base;
+  return withNear ? withNear + readerClearedOthersShort(carry) : withNear;
 }
 
 function readerStateShortBase(state, barKind, margin) {
@@ -2278,6 +3178,24 @@ export const READER_LABEL_READ_PREFIX = "Your own read:";
 // corrected for. A stale number left beside a corrected sentence makes the
 // file argue with itself.
 //
+// THE SCOPE PHRASE, 2026-10-20: "in five countries" OUT, "in every
+// country this site covers" IN. Three words out, five in, one
+// prepositional phrase, and EVERY OTHER BYTE OF THIS CONSTANT IS
+// UNTOUCHED — not the route-axis clause, not the comparability
+// condition, not "Nothing else yet.", not the nationality-sourcing
+// paragraph, not the closing instruction. Authorised by Cap in as many
+// words ("everywhere the site is still written for five countries is
+// updated for 21 in this crossing"), and the final string is the copy
+// deck's, transported.
+//
+// A PURE DELETION WAS WEIGHED AND REJECTED, by her, so it is not
+// re-litigated here: this sentence's whole job is stating what the read
+// covered, and striking the scope phrase would leave it silent on the one
+// thing it exists to say — the instruction was "updated for 21", not
+// "stop saying". The cost she took deliberately is the echo: "this site"
+// now appears three times in one sentence, against minting a fourth
+// phrasing of a clause whose value is being identical on every surface.
+//
 // Sentences three to five are the shipped sentence's own, verbatim.
 // THE FIRST TWO NOW NARROW AND WIDEN AT ONCE, and the test this comment
 // sets is met on the axis that matters: the ROUTE axis narrows twice (the
@@ -2286,8 +3204,60 @@ export const READER_LABEL_READ_PREFIX = "Your own read:";
 // are named where they were not — but that is a correction of an
 // undercount, not a new promise: capital bars were already being read, and
 // one of them produced the defect this crossing repaired.
+// SPLIT IN TWO ON CAP'S B8 RULING, 2026-10-20 — "yes, move them". The
+// paragraph was the largest single term between a reader and his own
+// figures: measured at 390, 14 visual lines and ~381px sitting between
+// the chip and the first route label. The two halves answer two
+// different questions and only one of them has to be read before the
+// answer.
+//
+// THE SCOPE HALF STAYS ABOVE THE LISTS. It states what the read covered,
+// which is the thing a reader has to know BEFORE he reads a verdict.
+// "Nothing else yet." stays with it, deliberately: it qualifies the
+// scope clause and means nothing beside a passport caveat.
+//
+// THE PASSPORT HALF MOVES BELOW THE LISTS, above the gates line, still
+// inside the block and still on every reader page. It is a caveat about
+// the read's sourcing, not about its scope, and it is the consequence of
+// an answer rather than a precondition for reading one.
+//
+// WHAT THE MOVE IS WORTH, AND WHAT IT IS NOT. The 348px this buys at 390
+// is the RELOCATION. The copy cut inside the passport half is five
+// characters (297 to 292, three sentences to two) — a relocation must
+// not be reported as a compression, and the writer who made the cut said
+// so first.
+export const READER_VERDICT_DISCLOSURE_SCOPE =
+  "This read is computed from this site's documented visa and residency rules, checked against the figures you entered on this device — the income and capital bars on residence routes in every country this site covers, where a route states one this site can compare. Nothing else yet.";
+
+// THREE SENTENCES TO TWO, AND THE TWO THAT STAYED ARE NOT THE SHORT ONES.
+// Cap's test was "as few as stay true", not "as few as possible":
+//   - the lawyer's-opinion disclaimer is the only sentence that
+//     disclaims the AUTHORITY of the read rather than describing its
+//     sourcing, and nothing else here does that job;
+//   - the sourcing-skew sentence is the one substantive claim in the
+//     paragraph, and this crossing makes it MORE load-bearing: the
+//     passport check does not ride, `route_gates` stays unread by the
+//     verdict, so a route a reader's own recorded passport is ineligible
+//     for is still evaluated and still shown. This sentence is the only
+//     place on the site that says an unmentioned nationality rule means
+//     undocumented rather than open — which is exactly the gap that
+//     ruling leaves;
+//   - the third sentence survives as a CLAUSE, because it is the action
+//     that follows from the second's claim and reads as a generic
+//     instruction when it stands alone. Joined by a dash, the reader
+//     gets the claim and its consequence in one thought. "specific" goes
+//     (redundant beside "your own passport's"); "Always" stays, because
+//     it is the word doing the work.
+export const READER_VERDICT_DISCLOSURE_PASSPORT =
+  "Not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned, that means undocumented, not confirmed open — so always check your own passport's rule before relying on this.";
+
+// The whole paragraph, for any surface that wants it in one piece. No
+// consumer today — the one surface that renders it renders the two
+// halves in two places — and it is kept rather than deleted because the
+// two halves are one disclosure and a caller that needs all of it should
+// not have to rebuild it by hand.
 export const READER_VERDICT_DISCLOSURE =
-  "This read is computed from this site's documented visa and residency rules, checked against the figures you entered on this device — the income and capital bars on residence routes in five countries, where a route states one this site can compare. Nothing else yet. Not a lawyer's opinion, and not a guarantee. Sourcing across this site skews toward information written for common, unrestricted passports: where a nationality rule isn't mentioned, that means undocumented, not confirmed open. Always check your own passport's specific rule before relying on this.";
+  `${READER_VERDICT_DISCLOSURE_SCOPE} ${READER_VERDICT_DISCLOSURE_PASSPORT}`;
 
 // RULED COPY, quoted verbatim and not this build's to reword: where a
 // route's per-person basis isn't on file, the reader's verdict declares
@@ -2524,7 +3494,13 @@ export function renderTopBar(activePage) {
   if (existingNotice) existingNotice.remove();
   const notice = document.createElement("p");
   notice.className = "site-under-construction";
-  notice.textContent = "This site is very much under construction. We appreciate your patience, traveler.";
+  // ONE WORD AND ITS COMMA, 2026-10-20, and nothing else in the sentence
+  // moves: ", traveler" out, 81 characters to 71. The wording above is
+  // the author's own and the comment at the head of this block is
+  // accurate — it was briefly suspected of having been reworded and the
+  // suspicion was wrong, so there is no discrepancy recorded here and
+  // none to look for.
+  notice.textContent = "This site is very much under construction. We appreciate your patience.";
   bar.insertAdjacentElement("afterend", notice);
 
   const btn = bar.querySelector("#theme-toggle");
@@ -3113,13 +4089,19 @@ export const NO_RESIDENCY_ROUTE_CLEARS_LABEL = "No residency route clears";
 // in `role="group"` with one combined `aria-label` (24.2's own
 // accessibility requirement) built mechanically from the two segments'
 // own real visible text, not fabricated new prose.
-export function verdictChipMarkup(color, label, companionDisclosure) {
+// `gapBand` COMES OFF bandVisual()'s OWN `gap` FLAG, never off a colour
+// comparison: the flag already exists at every call site, and reading the
+// band back out of a hex string is how a theme change silently unpicks a
+// contrast fix. It adds one class; the fill stays inline and per-band as
+// it always was. Every existing three-argument caller is unchanged.
+export function verdictChipMarkup(color, label, companionDisclosure, { gapBand = false } = {}) {
+  const gapClass = gapBand ? " verdict-chip-gap" : "";
   if (!companionDisclosure) {
-    return `<span class="verdict-chip" style="background:${color}">${escapeHtml(label)}</span>`;
+    return `<span class="verdict-chip${gapClass}" style="background:${color}">${escapeHtml(label)}</span>`;
   }
   const ariaLabel = `${label} ${NO_RESIDENCY_ROUTE_CLEARS_LABEL}.`;
   return (
-    `<span class="verdict-chip-split" role="group" aria-label="${escapeHtml(ariaLabel)}">` +
+    `<span class="verdict-chip-split${gapClass}" role="group" aria-label="${escapeHtml(ariaLabel)}">` +
     `<span class="verdict-chip-split-seg" style="background:${color}">${escapeHtml(label)}</span>` +
     `<span class="verdict-chip-split-seg" style="background:${eliminatedColor()}">${escapeHtml(NO_RESIDENCY_ROUTE_CLEARS_LABEL)}</span>` +
     `</span>`

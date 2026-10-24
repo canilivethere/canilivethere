@@ -1183,7 +1183,7 @@ function buildPassportSuspendedHtml(row, country) {
   const sentence = `Entry through ${country.name}'s ordinary visa channels is currently suspended for your passport. Verified ${row.last_verified_date}.`;
   let html = `<p class="passport-strip-line passport-strip-suspended" style="color:${eliminatedColor()};font-weight:600">${escapeHtml(sentence)}</p>`;
   if (row.document_conditional_note) {
-    html += `<p class="passport-strip-line passport-strip-note">A documented exception may apply — ${escapeHtml(row.document_conditional_note)} — this site doesn't evaluate it for you yet.</p>`;
+    html += `<p class="passport-strip-line passport-strip-note">${escapeHtml(row.document_conditional_note)}</p>`;
   }
   return html;
 }
@@ -1219,7 +1219,7 @@ function buildPassportStripHtml(store, nationality, nationalityRow, country) {
     const tierPhrase = entryTierPhrase(nationalityRow);
     lines.push(`<p class="passport-strip-line">Your passport: ${escapeHtml(tierPhrase)}. Verified ${escapeHtml(nationalityRow.last_verified_date)}.</p>`);
     if (nationalityRow.document_conditional_note) {
-      lines.push(`<p class="passport-strip-line passport-strip-note">A documented exception may apply — ${escapeHtml(nationalityRow.document_conditional_note)} — this site doesn't evaluate it for you yet.</p>`);
+      lines.push(`<p class="passport-strip-line passport-strip-note">${escapeHtml(nationalityRow.document_conditional_note)}</p>`);
     }
   }
 

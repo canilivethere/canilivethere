@@ -494,8 +494,24 @@ function roundDisplayValue(raw, unit) {
   return String(Math.round(n));
 }
 
+// The register's lookup goes AHEAD of the unit-append logic below, for
+// one reason: a sentence must never have a unit glued to it. Before this
+// change the [GAP] branch was first and a token value fell straight
+// through roundDisplayValue() and out raw — 117 slots on 26 pages
+// printing store vocabulary at a reader (measured, before and after).
+// readerStringFor() THROWS on a lower_snake value with no registered
+// string, so an unregistered token fails this build instead of shipping.
 function formatValue(fact) {
-  if (fact.value_raw === "[GAP]") return "Not yet researched";
+  const registered = readerStringFor(fact.value_raw);
+  if (registered) return registered;
+  // A sourced withdrawal never renders as "Not yet researched": those
+  // are two different facts and a reader acts differently on them. The set is evaluated ONCE, over the facts rows,
+  // by declaredGapFactKeys() — never re-derived here, and never on the
+  // route export, which carries no `group_role`. The other 172 [GAP]
+  // slots keep their current words, byte for byte.
+  if (fact.value_raw === "[GAP]") {
+    return DECLARED_GAP_KEYS.has(fact.fact_key) ? DECLARED_GAP_STRING : "Not yet researched";
+  }
   const raw = roundDisplayValue(String(fact.value_raw), fact.unit);
   if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) return `${raw} ${fact.unit}`;
   return raw;
@@ -507,6 +523,23 @@ function formatValue(fact) {
 const {
   PORTRAITS, CHAPTER_INTROS, READER_SENTENCES, READER_SENTENCE_POSITIONS,
 } = await import("../js/portraits.js");
+// The reader-string register — imported for exactly the reason the
+// portraits import states one line above, and from a module with zero
+// imports of its own so Node can read it without a DOM. Browser side,
+// js/app-shared.js and js/location.js import the SAME file: one source,
+// not two authored copies of the same string.
+const {
+  DECLARED_GAP_STRING,
+  declaredGapFactKeys, indexLineFor, readerStringFor, assertIndexCoverage,
+} = await import("../js/reader-strings.js");
+// Evaluated ONCE per build, over every fact row in every country file.
+const DECLARED_GAP_KEYS = declaredGapFactKeys(allFacts);
+// The forward control the keyed INDEX_LINE table owes: a thirteenth
+// `group_role_detail: "indexed"` row fails this build with its own
+// fact_key in the message, rather than shipping a bare multiple with
+// nothing under it. Runs once, over all 21 fact
+// files. Today it passes on 12 keys — 5 lines, 7 reasoned withholdings.
+assertIndexCoverage(allFacts);
 // READER_SENTENCE_SCOPE_LINE is deliberately NOT imported. It is the
 // lens-selected scope disclosure, and a static page has no lens by
 // definition — its topbar corner already says "Who's asking: nobody
@@ -703,10 +736,16 @@ for (const loc of locations) {
       const body = extra || `<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
       return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${body}</details>`;
     }
+    // The index line is the FIRST sub-line in the stack, immediately after
+    // the value it qualifies and inside the same <li>, which is what
+    // makes its "This bar" wording point at the figure directly above it
+    // at every viewport. `.index-line` is a hook with no CSS
+    // declarations of its own; it inherits `.fact-notes` entirely.
     const rows = list.map((f) => `
       <li class="fact-item">
         <div class="fact-label">${escapeHtml(f.fact_label)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(f))}</div>
+        <div class="fact-value">${escapeHtml(formatValue(f))}</div>${indexLineFor(f.fact_key) ? `
+        <div class="fact-notes index-line">${escapeHtml(indexLineFor(f.fact_key))}</div>` : ""}
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`).join("");
     // Head sits above the rows, below the chapter-intro line; foot sits

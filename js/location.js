@@ -26,6 +26,9 @@ import {
   PORTRAITS, CHAPTER_INTROS,
   READER_SENTENCES, READER_SENTENCE_SCOPE_LINE, READER_SENTENCE_POSITIONS,
 } from "./portraits.js";
+import {
+  STORE_VALUE_STRINGS, declaredGapFactKeys, indexLineFor, unregisteredStoreToken,
+} from "./reader-strings.js";
 import { siteUrl } from "./site-root.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
@@ -53,6 +56,45 @@ const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "red
 // chapter run. Content untouched — position only.
 const INTRO_SECTION = "overview";
 
+// THE declared-gap set, evaluated ONCE per page load inside main() (see
+// below) over every fact row the store holds, by the register's own
+// declaredGapFactKeys(). Both of this file's surfaces — the fact rows and
+// the route cards — consult this one set; neither restates the predicate,
+// and the route card joins by its row's own `threshold_fact_key` because
+// derived/visa-routes.jsonl carries no `group_role` column. Empty until
+// main() fills it, which is before anything
+// renders; an empty set means every [GAP] slot keeps today's words, which
+// is the safe direction.
+let declaredGapKeys = new Set();
+
+function isDeclaredGap(factKey) {
+  return declaredGapKeys.has(factKey);
+}
+
+// The index line: its own block-level sibling, FIRST in the sub-line
+// stack, immediately after the fact-value div and inside the same
+// <li class="fact-item">. `.index-line` is a hook with
+// no CSS declarations of its own; it inherits `.fact-notes` entirely.
+// Same table, same keys, as the prerendered twin.
+function indexLineHtml(factKey) {
+  const line = indexLineFor(factKey);
+  return line ? `<div class="fact-notes index-line">${escapeHtml(line)}</div>` : "";
+}
+
+// A row renders only when its value has a reader string, and until then
+// it is HELD FROM RENDER, NOT DROPPED. The build
+// throws on an unregistered store token (readerStringFor(), in the
+// register); a throw at a reader would be worse than the token, so this
+// side drops the row's markup and says so in the console instead.
+function heldFromRender(fact) {
+  if (!unregisteredStoreToken(fact.value_raw)) return false;
+  console.error(
+    `reader-strings: no reader string for store value "${fact.value_raw}" — row held from render`,
+    fact.fact_key || fact.fact_label || "(unkeyed row)",
+  );
+  return true;
+}
+
 async function main() {
   // Run together, not sequentially: the FX lookup is a best-effort
   // annotation (formatValue()/detectBareCurrency() degrade to showing no
@@ -66,6 +108,10 @@ async function main() {
   // what makes a prerendered location page open in the reader's own
   // perspective after hydration, which is the whole of A4 on this surface.
   applyReaderLens(store);
+  // One evaluation, two surfaces (see declaredGapKeys above). factsByKey
+  // holds every fact row in the store, one per fact_key, which is exactly
+  // the domain the predicate is defined over.
+  declaredGapKeys = declaredGapFactKeys([...store.factsByKey.values()]);
   renderFooter(store);
   const persona = getActivePersona();
 
@@ -821,11 +867,17 @@ function buildPortrait(loc) {
 // alongside per 23.3) — extracted here so the receipts panel below reuses
 // it instead of hand-copying a second markup shape for the same claim.
 function factItemHtml(f) {
+  if (heldFromRender(f)) return "";
+  // Addendum A §A.1: ONE boolean, two slots. The value slot and the chip are
+  // both fed from this local so they can never disagree about the row's state
+  // the way a phrase-keyed dedupe did.
+  const dg = isDeclaredGap(f.fact_key);
   return `
       <li class="fact-item">
         <div class="fact-label">${escapeHtml(f.fact_label)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true }))}</div>
-        <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)}</div>
+        <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: dg }))}</div>
+        ${indexLineHtml(f.fact_key)}
+        <div class="fact-meta">${confidenceBadge(f, { declaredGap: dg })} ${divergenceBadge(f)}</div>
         <div class="source-detail">${sourceDetailHtml(f)}</div>
         ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
       </li>`;
@@ -1094,12 +1146,19 @@ function buildIllegalRoutesHtml(facts) {
 // finding the overlap live rather than routing it as an open question
 // — named honestly as a judgment call in the build log, not a settled
 // design ruling.
-const INCOME_TYPE_LABEL = {
-  primary_accepted: "accepted as primary qualifying income",
-  supplementary_only: "accepted only as supplementary income",
-  explicitly_rejected: "explicitly not accepted",
-  not_stated_by_source: "not stated by the source",
-};
+// THE FOUR READER STRINGS THAT SAT HERE ARE GONE, and the comment above
+// is NOT about them — it is about the overview-then-detail rendering
+// order, a different and still-open judgement call, which is why it
+// stays. What sat here was a private strings table on one render path:
+// `INCOME_TYPE_LABEL`, four store values mapped to four reader
+// sentences, in no copy deck and gated by nobody, one of which (its
+// `supplementary_only` entry) contradicted the ratified wording for the
+// same store value. The four dead strings are deliberately NOT restated
+// here, not even as an example: a verbatim grep for them across js/ and
+// tools/ has to come back empty, and a comment quoting one would defeat
+// it. They are replaced by js/reader-strings.js — THE register, read by
+// this file, by js/app-shared.js, and by tools/prerender-locations.mjs.
+// The route-card path reads the same table as everything else.
 
 // Adapts a visa-routes.jsonl row into the fact-shaped object
 // formatValue()/confidenceBadge()/divergenceBadge()/sourceDetailHtml()
@@ -1115,7 +1174,47 @@ function routeAsFact(r) {
     value_num_high: r.value_num_high,
     confidence: r.confidence,
     source_count: r.source_count,
-    source_url: null, // visa-routes.jsonl carries source_ref (a filename), never a URL, same as every fact on file today
+    // THE OLD COMMENT HERE WAS FALSE AND COST EVERY ROUTE CARD ITS
+    // CITATION. It claimed visa-routes.jsonl "carries source_ref (a
+    // filename), never a URL". Measured on the shipped file: 100 of its
+    // 101 rows carry a real `source_url`, and `source_ref` is stripped on
+    // export precisely so `source_url` can be the public trust layer. The
+    // hard-coded null sent all 101 cards down sourceDetailHtml()'s
+    // no-link fallback, so a reader could read a threshold and never
+    // reach the page it came from.
+    //
+    // PASSED THROUGH FOR ':route:' ROWS ONLY, AND THE RESTRICTION IS THE
+    // WHOLE CORRECTNESS ARGUMENT, not caution. The view builds a
+    // ':route:' row around ONE fact row — the one whose group_role is
+    // 'threshold' — and takes that row's label, its value, its unit, its
+    // confidence, its date AND its source_url together. So on a ':route:'
+    // card the link certifies exactly the figure printed above it: one
+    // fact, one citation. That is the only claim this helper makes.
+    //
+    // A ':visit:' row is built the other way round: it has no threshold
+    // row at all, and its provenance fields are COALESCEd across up to
+    // four different companion facts (restricted/eligible nationality
+    // list, max duration, renewability) whose values the card never
+    // prints. Measured: 9 of the 42 ':visit:' rows carry more than one of
+    // those companions, and MA:visit:visa-free-entry--most-nationalities
+    // carries two genuinely DIFFERENT urls — the duration fact cites one
+    // site, the nationality fact another, and the coalesce silently picks
+    // the nationality one. Linking that under a bare de-slugged category
+    // name would tell a reader "here is the source for this" while
+    // pointing at a page that may not carry the thing they came to check.
+    // Those rows therefore keep the existing no-link wording, unchanged
+    // from what ships today; which fact a ':visit:' citation belongs to
+    // is a schema question routed to the data layer, not one to settle in
+    // a render helper.
+    //
+    // `|| null` is not decoration: one row (AR:route:digital-nomad-visa)
+    // omits the key entirely, and the fallback must be a missing-link
+    // state, never an empty href. That row is also the only ':route:' row
+    // whose threshold reads "[GAP]", and sourceDetailHtml() returns ""
+    // before it ever looks at a url, so today it renders no source line
+    // whatsoever — but the guard is what keeps that true if the threshold
+    // is ever filled in while the url is still absent.
+    source_url: isVisitRoute(r.route_key) ? null : (r.source_url || null),
     date: r.date,
     divergence_flag: r.divergence_flag,
   };
@@ -1297,11 +1396,20 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
         const v = r.accepts_passive_income === "[GAP]" ? "Not yet researched" : r.accepts_passive_income;
         notes.push(`<div class="fact-notes">Accepts passive income: <strong>${escapeHtml(v)}</strong></div>`);
       }
+      // THE REGISTER, not a private table, and no `|| raw` fallback: an
+      // unregistered store value is HELD FROM RENDER (the line is simply
+      // not emitted) rather than leaked as vocabulary, which is what the
+      // old `|| r.income_type_passive` tail did. The build-side throw is
+      // the loud half of the same rule.
       if (r.income_type_passive) {
-        notes.push(`<div class="fact-notes">Passive income treatment: <strong>${escapeHtml(INCOME_TYPE_LABEL[r.income_type_passive] || r.income_type_passive)}</strong></div>`);
+        const s = STORE_VALUE_STRINGS[r.income_type_passive];
+        if (s) notes.push(`<div class="fact-notes">Passive income treatment: <strong>${escapeHtml(s)}</strong></div>`);
+        else console.error(`reader-strings: no string for income_type_passive "${r.income_type_passive}" on ${r.route_key}`);
       }
       if (r.income_type_pension) {
-        notes.push(`<div class="fact-notes">Pension income treatment: <strong>${escapeHtml(INCOME_TYPE_LABEL[r.income_type_pension] || r.income_type_pension)}</strong></div>`);
+        const s = STORE_VALUE_STRINGS[r.income_type_pension];
+        if (s) notes.push(`<div class="fact-notes">Pension income treatment: <strong>${escapeHtml(s)}</strong></div>`);
+        else console.error(`reader-strings: no string for income_type_pension "${r.income_type_pension}" on ${r.route_key}`);
       }
       // age_gate "0" is the one real case on file (Thailand's Privilege
       // visa) and reads as this schema's own floor value, not a genuine
@@ -1354,13 +1462,34 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
       // never researched. Confidence/divergence/source-detail still
       // render: those provenance fields are real, computed values for
       // every ':visit:' row, not placeholders.
+      // Addendum A §A.2 RETIRES the earlier "front of the notes array"
+      // reading: on THIS template the notes array is not adjacent to the
+      // value — `.fact-meta` and `.source-detail` sit between them — so
+      // front-of-notes delivered the opposite of its own stated reason
+      // ("This bar" needs the line directly under its own row's value).
+      // Child order is now the same on every surface a reader meets:
+      // .fact-label → .fact-value → .fact-notes.index-line → .fact-meta
+      // → .source-detail → notes.
+      // HARD INVARIANT: the line goes BEFORE `.fact-meta`, never between
+      // `.fact-meta` and `.source-detail` — toggleSourceDetail() finds the
+      // panel as `.fact-meta`'s nextElementSibling, so that placement would
+      // silently kill the source toggle on every row that has one.
+      // Joined on this row's own `threshold_fact_key`: the same table every
+      // other surface reads, reached through the row's own pointer at the fact.
+      const indexLine = indexLineHtml(r.threshold_fact_key);
       const visit = isVisitRoute(r.route_key);
       const label = visit ? routeCategoryLabel(r.route_key) : r.threshold_label;
-      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact, { suppressGapText: true }))}</div>`;
+      // Addendum A §A.1: ONE boolean, two slots — load-bearing here above all,
+      // because formatValue() is keyed on `r.threshold_fact_key` while
+      // confidenceBadge() is handed the synthesised `asFact`. Two different
+      // inputs deciding one row's two slots is the defect class this removes.
+      const dg = isDeclaredGap(r.threshold_fact_key);
+      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact, { suppressGapText: true, declaredGap: dg }))}</div>`;
       return `
         <div class="fact-label">${escapeHtml(label)}</div>
         ${valueHtml}
-        <div class="fact-meta">${confidenceBadge(asFact)} ${divergenceBadge(asFact)}</div>
+        ${valueHtml ? indexLine : ""}
+        <div class="fact-meta">${confidenceBadge(asFact, { declaredGap: dg })} ${divergenceBadge(asFact)}</div>
         <div class="source-detail">${sourceDetailHtml(asFact)}</div>
         ${notes.join("")}
       `;
@@ -1510,13 +1639,19 @@ function buildSection(key, facts, extraHtml = "", locationId = null) {
       bodyHtml += `<div class="fact-item">`;
       // One label/value/meta block per threshold sub-category — every one
       // renders, none silently wins over another.
-      bodyHtml += thresholds.map((t) => `
+      bodyHtml += thresholds.map((t) => {
+        if (heldFromRender(t)) return "";
+        // Addendum A §A.1: ONE boolean, two slots.
+        const dg = isDeclaredGap(t.fact_key);
+        return `
         <div class="fact-label">${escapeHtml(t.fact_label)}${scopeTagHtml(t)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(t, { suppressGapText: true }))}</div>
-        <div class="fact-meta">${confidenceBadge(t)} ${divergenceBadge(t)}</div>
+        <div class="fact-value">${escapeHtml(formatValue(t, { suppressGapText: true, declaredGap: dg }))}</div>
+        ${indexLineHtml(t.fact_key)}
+        <div class="fact-meta">${confidenceBadge(t, { declaredGap: dg })} ${divergenceBadge(t)}</div>
         <div class="source-detail">${sourceDetailHtml(t)}</div>
         ${t.notes ? `<div class="fact-notes">${escapeHtml(t.notes)}</div>` : ""}
-      `).join(thresholds.length > 1 ? "<hr>" : "");
+      `;
+      }).join(thresholds.length > 1 ? "<hr>" : "");
       // Same for the two route-mechanics lines: when a role holds more than
       // one fact (e.g. Thailand's LTR "accepts passive income" differs by
       // sub-category), each one renders under its own fact_label instead of
@@ -1528,14 +1663,20 @@ function buildSection(key, facts, extraHtml = "", locationId = null) {
     bodyHtml += `</div>`;
   }
 
-  bodyHtml += `<ul class="fact-list">` + plain.map((f) => `
+  bodyHtml += `<ul class="fact-list">` + plain.map((f) => {
+    if (heldFromRender(f)) return "";
+    // Addendum A §A.1: ONE boolean, two slots.
+    const dg = isDeclaredGap(f.fact_key);
+    return `
     <li class="fact-item">
       <div class="fact-label">${escapeHtml(f.fact_label)}${scopeTagHtml(f)}</div>
-      <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true }))}</div>
-      <div class="fact-meta">${confidenceBadge(f)} ${divergenceBadge(f)}</div>
+      <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: dg }))}</div>
+      ${indexLineHtml(f.fact_key)}
+      <div class="fact-meta">${confidenceBadge(f, { declaredGap: dg })} ${divergenceBadge(f)}</div>
       <div class="source-detail">${sourceDetailHtml(f)}</div>
       ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
-    </li>`).join("") + `</ul>`;
+    </li>`;
+  }).join("") + `</ul>`;
 
   // v7 Part 14: reads this SAME section's own already-loaded `facts`
   // array (before the routeGroups/plain split above), since a

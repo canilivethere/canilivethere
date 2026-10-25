@@ -5,6 +5,11 @@
 import { topBottomCriteria } from "./data.js";
 import { siteUrl } from "./site-root.js";
 import { eliminatedColor, repaintRampSwatches } from "./colors.js";
+// THE reader-string register (js/reader-strings.js) — one table, every
+// render path. tools/prerender-locations.mjs imports the SAME file under
+// Node, so the static page and the hydrated page cannot disagree about a
+// reader string.
+import { STORE_VALUE_STRINGS, DECLARED_GAP_STRING } from "./reader-strings.js";
 
 export function escapeHtml(str) {
   if (str == null) return "";
@@ -3851,8 +3856,28 @@ export function glossaryWrap(text, store) {
 // confidenceBadge() for the same fact right alongside it (grepped, not
 // assumed) — flagged in the build report as a live fact worth re-checking
 // if a new call site is ever added without the badge.
-export function formatValue(fact, { suppressGapText = false } = {}) {
-  if (fact.value_raw === "[GAP]") return suppressGapText ? "—" : "Not yet researched";
+// `declaredGap` is passed by the caller, never re-derived here: the
+// predicate (value_raw "[GAP]" AND source_url AND group_role "threshold")
+// is evaluated ONCE on the facts rows by declaredGapFactKeys(), and both
+// surfaces consult that one set — the route export has no `group_role`
+// column, and a two-clause restatement there would hand an income
+// sentence to a [GAP] asset row. Where the set does
+// not hit, this branch is byte-unchanged on all 172 other [GAP] slots,
+// the suppressGapText "—" included.
+//
+// The register lookup sits ahead of the unit-append logic for the same
+// reason as in the prerender twin: a sentence must never have a unit
+// glued to it. This side does NOT throw on an unregistered token — a
+// throw at a reader is worse than the token. The row is held from render
+// by its caller (unregisteredStoreToken() in location.js) and the BUILD
+// is the thing that fails loud.
+export function formatValue(fact, { suppressGapText = false, declaredGap = false } = {}) {
+  if (fact.value_raw === "[GAP]") {
+    if (declaredGap) return DECLARED_GAP_STRING;
+    return suppressGapText ? "—" : "Not yet researched";
+  }
+  const registered = STORE_VALUE_STRINGS[fact.value_raw];
+  if (typeof registered === "string") return registered;
   const raw = formatNumbersInText(roundDisplayValue(String(fact.value_raw), fact.unit));
   // Only append the unit if value_raw doesn't already carry it as text —
   // some facts' own value_raw already spells out its unit inline (e.g.
@@ -3959,8 +3984,19 @@ export const BAND_LABEL = {
 // section already dedicates its own real estate to source name/date, so it
 // renders the same badge without the click affordance — `interactive:
 // false` — rather than leaving an inert, do-nothing tab stop there.
-export function confidenceBadge(fact, { interactive = true } = {}) {
+// `declaredGap` is contractual, and is the inverted twin of
+// formatValue()'s `suppressGapText`; the two belong in one reader's head:
+// `suppressGapText` makes the VALUE slot yield to this chip on an ordinary
+// [GAP] row; `declaredGap` makes THIS CHIP yield to the value slot on a
+// declared-gap row, where the sentence already states the absence in
+// words. The rule behind both: an absence is disclosed once, in the
+// verify-yourself words, and never as a chip as well. It keys on the row's
+// STATE, never on the phrase; the
+// caller hoists ONE boolean and feeds both slots from it, so the two can
+// never disagree. Defaults false: every other [GAP] row keeps this chip.
+export function confidenceBadge(fact, { interactive = true, declaredGap = false } = {}) {
   if (fact.value_raw === "[GAP]") {
+    if (declaredGap) return "";
     return `<span class="badge badge-gap">Not yet researched</span>`;
   }
   const bits = [];

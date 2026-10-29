@@ -6,8 +6,9 @@
 // is exercisable outside a browser and a later maintainer can change a
 // rule without reading a line of render code. Every reader-facing string
 // lives in the render half (own-numbers.js); this file returns reasons,
-// never sentences. Its one import is the four vocabulary lists (below):
-// no function here reads or writes the page, and none is called at load.
+// never sentences. Its imports are vocabulary only — the four
+// own-numbers lists and the store-value token names (below): no function
+// here reads or writes the page, and none is called at load.
 //
 // Zero facts authored here. Every number, threshold, unit, condition and
 // route name that reaches a reader comes verbatim out of
@@ -20,6 +21,12 @@ import {
   OWN_NUMBERS_INCOME_TYPES, OWN_NUMBERS_CURRENCIES,
   OWN_NUMBERS_PERIODS, OWN_NUMBERS_DURATION_BANDS,
 } from "./app-shared.js";
+// The store-value token vocabulary, from its one home. A second import,
+// and the header line above is updated to say so: the coarse passive gate
+// below has to COMPARE a stored value against two named tokens, and the
+// store's own vocabulary row forbids either runtime hardcoding a token.
+// So the literals are not retyped here.
+import { TOKENS } from "./reader-strings.js";
 
 // Gate 0. The countries the box reads: EVERY country this site covers,
 // as of the 21-country crossing (Cap, 2026-10-20). CR is Crete
@@ -376,13 +383,29 @@ function gate1(row, input) {
   if (value === undefined) {
     // The coarse-record allowance. Guarded by one
     // named constant so it strips in a single edit; scoped to the passive
-    // selection and to the two literal values, so a coarse field can
-    // never answer a question it was not asked. TH privilege's coarse
-    // value is neither "Yes" nor "No" and falls through here correctly.
+    // selection and to the TWO REGISTERED TOKENS, so a coarse field can
+    // never answer a question it was not asked.
+    //
+    // RETOKENED 2026-10-29. This gate used to compare against the bare
+    // literals "Yes" and "No", which were retired on this role in the
+    // data layer precisely because each meant three different things
+    // across three roles. The comparison is on the TOKEN, which is the
+    // ruled lookup — NEVER on `value_bool`, which cannot tell a negative
+    // from the several states that parse to a null boolean by design
+    // (`Not yet checked`, the three `N/A — …` forms), and which this
+    // export does not carry at all.
+    //
+    // THE SCOPE IS UNCHANGED, AND THAT IS THE POINT: the match still
+    // admits exactly two values, and every other value this column holds
+    // still falls through to `absent` exactly as before — the
+    // parenthetical forms ("Yes (pension income)"), the three `N/A — …`
+    // forms including TH Privilege's, and `Not yet checked`. Measured on
+    // the post-migration export: 6 accepted, 9 not-accepted, 9 falling
+    // through, 24 rows carrying the column.
     if (COARSE_PASSIVE_FALLBACK && input.income_type === "passive") {
       const coarse = row.accepts_passive_income;
-      if (coarse === "Yes") return { typeState: "coarse_yes", coarseValue: coarse };
-      if (coarse === "No") return { typeState: "coarse_no", coarseValue: coarse };
+      if (coarse === TOKENS.PASSIVE_ACCEPTED) return { typeState: "coarse_yes", coarseValue: coarse };
+      if (coarse === TOKENS.PASSIVE_NOT_ACCEPTED) return { typeState: "coarse_no", coarseValue: coarse };
     }
     return { typeState: "absent" };
   }

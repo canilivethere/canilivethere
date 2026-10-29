@@ -24,6 +24,7 @@
 // rather than left to go quietly stale.
 
 import { siteUrl } from "./site-root.js";
+import { makeApplicabilityGate } from "./fact-rows.js";
 
 const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
 
@@ -197,13 +198,28 @@ async function buildStore(basePath) {
   // factsByLocation: location_id -> [facts that apply], i.e. its own
   // location/sub-location facts PLUS its country's country-scoped facts
   // (this project's own data-model rule: country-level facts are inherited by locations).
+  //
+  // THE APPLICABILITY CLAUSE, js/fact-rows.js §11, applied at the ONE
+  // place this runtime decides what a page may show. Cap's ruling,
+  // 2026-10-29, verbatim: "a group blanks its descriptive rows on a page
+  // only if it carries an applicability row for another page in that
+  // country but not for this one." tools/prerender-locations.mjs applies
+  // the identical gate at the identical point, from the same module —
+  // served and hydrated cannot diverge on it. Nothing leaves the store:
+  // `allFacts` is untouched and so is derived/.
   const factsByLocation = new Map();
+  const blankedByApplicability = makeApplicabilityGate(allFacts, locations);
   for (const loc of locations) {
     const own = allFacts.filter((f) => f.location_id === loc.location_id);
     const inherited = allFacts.filter(
       (f) => f.scope === "country" && f.country_id === loc.country_id
     );
-    factsByLocation.set(loc.location_id, [...inherited, ...own]);
+    factsByLocation.set(
+      loc.location_id,
+      [...inherited, ...own].filter(
+        (f) => !blankedByApplicability(f, loc.location_id, loc.country_id)
+      ),
+    );
   }
 
   // The changeEventsByCountry / ByLocation indexes used to be built here.

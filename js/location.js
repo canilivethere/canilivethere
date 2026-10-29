@@ -28,6 +28,7 @@ import {
 } from "./portraits.js";
 import {
   STORE_VALUE_STRINGS, declaredGapFactKeys, indexLineFor,
+  roleValueString, heldValue,
 } from "./reader-strings.js";
 // THE shared fact-row module. Every emitter below that used to have a
 // hand-kept twin in tools/prerender-locations.mjs now comes from here,
@@ -1487,13 +1488,84 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
     const rowsHtml = group.map((r) => {
       const asFact = routeAsFact(r);
       const notes = [];
-      if (r.converts_to_pr) {
-        const v = r.converts_to_pr === "[GAP]" ? "Not yet researched" : r.converts_to_pr;
-        notes.push(`<div class="fact-notes">Converts to permanent residency: <strong>${escapeHtml(v)}</strong></div>`);
-      }
-      if (r.accepts_passive_income) {
-        const v = r.accepts_passive_income === "[GAP]" ? "Not yet researched" : r.accepts_passive_income;
-        notes.push(`<div class="fact-notes">Accepts passive income: <strong>${escapeHtml(v)}</strong></div>`);
+      // THE REGISTER, NOT A RAW PRINT — repaired 2026-10-29, and the
+      // defect it closes was reader-visible, not hypothetical. These two
+      // lines used to print the STORED VALUE verbatim inside
+      // `<strong>`, so a route card read "Converts to permanent
+      // residency: own-standalone-permanent-status", and
+      // "...: conditional-backstop: EU Long-Term Residence Directive
+      // 2003/109/EC" — store vocabulary on a reader's page, and in the
+      // second case a value the copy deck expressly REFUSED to gloss and
+      // which every other surface on this site already holds from
+      // render. The token retirement would have made it worse rather
+      // than better: the same two lines would have printed
+      // "converts-to-permanent-residency" at 18 route cards.
+      //
+      // THE COLUMN NAME IS THE ROLE. derived/visa-routes.jsonl is the
+      // route-shaped projection of the same fact rows, so its
+      // `converts_to_pr` and `accepts_passive_income` columns hold
+      // exactly the values those two group_roles hold, and they resolve
+      // under the register identically. One table, both surfaces — a
+      // private mapping here is the defect the register exists to end.
+      //
+      // NO FIELD-NAME PREFIX on a resolved value, which is the copy
+      // deck's own shape rule for these strings: each is a single flat
+      // sentence, no interpolation and no composition, and
+      // "Converts to permanent residency: This route converts to
+      // permanent residency." says it twice. The deck places the
+      // sentence in this notes array exactly as a standalone line. The
+      // [GAP] branch keeps its label, because "Not yet researched" is
+      // not a sentence and needs to say what is not researched.
+      //
+      // ONE OPEN CONFLICT, FLAGGED AND NOT SETTLED HERE. The ratified
+      // welcome-box spec describes this line WITH its prefix — "the
+      // site's own shipped line: Accepts passive income: {value}" — in
+      // the clause that makes the coarse passive record visible to a
+      // reader who is being gated by it. That description was written
+      // when {value} was a bare `Yes`, which means nothing standing
+      // alone, so the prefix was carrying the whole sentence. The
+      // retokening moves the meaning INTO the value, and the later copy
+      // ratification requires the sentence be flat and uncomposed, so
+      // the prefix is now redundant rather than load-bearing. Dropping
+      // it preserves what that clause is FOR (the coarse value is shown
+      // to the reader, in words) and contradicts how it is WORDED. That
+      // is a copy call above this module's pay grade: it is reported to
+      // the gate rather than decided here, and restoring the prefix is a
+      // one-line change at the two push() calls.
+      //
+      // A HELD VALUE EMITS NOTHING. `heldValue()` is §9's decision, the
+      // same one js/fact-rows.js applies to the fact-row surface, so a
+      // value ruled off the page in one place is not drawn in the other.
+      // This is a reader-visible CHANGE in the ruled direction: the
+      // `conditional-backstop:` and `Not yet checked` lines stop being
+      // drawn here, which is what the hold already required everywhere
+      // else.
+      //
+      // ORDER-COUPLED WITH THE DATA, stated so the crossing is planned
+      // rather than discovered: pre-retirement these two columns hold a
+      // bare `Yes`/`No` on 49 rows (converts_to_pr 18 + 16,
+      // accepts_passive_income 6 + 9), and a bare `Yes`/`No` is HELD. So
+      // this module and the retokened derived/ export have to cross
+      // TOGETHER. Measured by running this exact loop over both exports:
+      // 73 lines draw against the retokened rows, 24 against the
+      // un-retokened ones. Shipped alone, 49 of these lines go dark.
+      for (const [field, role, gapLabel] of [
+        ["converts_to_pr", "converts_to_pr", "Converts to permanent residency"],
+        ["accepts_passive_income", "accepts_passive_income", "Accepts passive income"],
+      ]) {
+        const raw = r[field];
+        if (!raw) continue;
+        if (raw === "[GAP]") {
+          notes.push(`<div class="fact-notes">${escapeHtml(gapLabel)}: <strong>Not yet researched</strong></div>`);
+          continue;
+        }
+        if (heldValue(raw, role)) continue;
+        const resolved = roleValueString(raw, role);
+        if (resolved && resolved.string) {
+          notes.push(`<div class="fact-notes">${escapeHtml(resolved.string)}</div>`);
+        } else {
+          console.error(`reader-strings: no string for ${field} "${raw}" on ${r.route_key}`);
+        }
       }
       // THE REGISTER, not a private table, and no `|| raw` fallback: an
       // unregistered store value is HELD FROM RENDER (the line is simply

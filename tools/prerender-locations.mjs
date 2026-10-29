@@ -51,7 +51,7 @@ import {
   escapeHtml, SECTION_TITLES, SECTION_ORDER, INTRO_SECTION, CHAPTER_GAP_LINE,
   sectionForFact, formatValue as formatValueShared, factRowHtml, factListHtml,
   sourceGroupDate, sourceFactLinesHtml, buildIllegalRoutesHtml,
-  factHeld, provenanceFacts,
+  factHeld, provenanceFacts, makeApplicabilityGate,
 } from "../js/fact-rows.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -115,11 +115,48 @@ for (const s of scores) {
   scoresByLocation.get(s.location_id).set(s.criterion_id, s);
 }
 
+//
+// THE APPLICABILITY CLAUSE, js/fact-rows.js §11, applied at the ONE place
+// this runtime decides what a page may show. Cap's ruling, 2026-10-29,
+// verbatim: "a group blanks its descriptive rows on a page only if it
+// carries an applicability row for another page in that country but not
+// for this one." js/data.js applies the identical gate at the identical
+// point, from the same module — served and hydrated cannot diverge on it.
+// Nothing leaves the store: `allFacts` is untouched and so is derived/.
 const factsByLocation = new Map();
+const blankedByApplicability = makeApplicabilityGate(allFacts, locations);
+// The blanking, stated as output rather than left to be inferred from a
+// page diff: every row the clause declines to draw, with its page, its
+// group and its own key. Printed by the build itself, so the count is
+// re-derived on every run and never carried as a remembered number.
+const applicabilityBlanked = [];
 for (const loc of locations) {
   const own = allFacts.filter((f) => f.location_id === loc.location_id);
   const inherited = allFacts.filter((f) => f.scope === "country" && f.country_id === loc.country_id);
-  factsByLocation.set(loc.location_id, [...inherited, ...own]);
+  const page = [];
+  for (const f of [...inherited, ...own]) {
+    if (blankedByApplicability(f, loc.location_id, loc.country_id)) {
+      applicabilityBlanked.push({
+        page: loc.location_id, group: f.group_key,
+        fact_key: f.fact_key, role: f.group_role, label: f.fact_label,
+      });
+    } else {
+      page.push(f);
+    }
+  }
+  factsByLocation.set(loc.location_id, page);
+}
+{
+  const byPage = new Map();
+  for (const r of applicabilityBlanked) {
+    if (!byPage.has(r.page)) byPage.set(r.page, []);
+    byPage.get(r.page).push(r);
+  }
+  console.log(`applicability clause: ${applicabilityBlanked.length} row(s) blanked across ${byPage.size} of ${locations.length} page(s)`);
+  for (const [page, rows] of [...byPage].sort()) {
+    console.log(`  ${page}: ${rows.length}`);
+    for (const r of rows) console.log(`     ${r.group}  ${r.fact_key}  (role ${r.role})`);
+  }
 }
 
 
@@ -374,6 +411,7 @@ const {
 // not two authored copies of the same string.
 const {
   declaredGapFactKeys, indexLineFor, assertIndexCoverage, assertValueCoverage,
+  assertTokenVocabulary,
 } = await import("../js/reader-strings.js");
 // Evaluated ONCE per build, over every fact row in every country file.
 const DECLARED_GAP_KEYS = declaredGapFactKeys(allFacts);
@@ -393,6 +431,22 @@ assertIndexCoverage(allFacts);
 // retires the Yes / No / Not yet checked tokens the count drops in the
 // build log instead of silently.
 const HELD_COUNTS = assertValueCoverage(allFacts);
+// THE VOCABULARY CROSS-CHECK, new 2026-10-29. assertValueCoverage() above
+// proves every stored value HAS a reader string. This proves the token
+// vocabulary that register holds is still the one the RULES LAYER
+// publishes — that the strings file has not become a second, free-running
+// copy of a table the store owns. It reads the published rules file for
+// one row, the same file and the same double-encoded `expression` shape
+// js/data.js already reads the FX table out of, and derives the governed
+// role list from the registered tokens' own `group_role` rather than from
+// a `governs_roles` field, which the public export of that row does not
+// carry.
+//
+// TOLERANT OF ABSENCE BY DESIGN: before the row crosses into derived/ it
+// is legitimately not there, and this build must not fail for that. It
+// reports instead, and only throws on a row that IS present and
+// disagrees.
+const TOKEN_VOCAB = assertTokenVocabulary(readJsonl(join(DERIVED, "rules.jsonl")));
 // READER_SENTENCE_SCOPE_LINE is deliberately NOT imported. It is the
 // lens-selected scope disclosure, and a static page has no lens by
 // definition — its topbar corner already says "Who's asking: nobody
@@ -792,6 +846,9 @@ console.log(`Prerendered ${written} location pages into ${outDir}`);
 // list is a data change, and the build log is where it should show up.
 const heldTotal = Object.values(HELD_COUNTS).reduce((a, b) => a + b, 0);
 console.log(`Held from render (rows kept in derived/, not drawn): ${heldTotal}`);
+console.log(TOKEN_VOCAB.checked
+  ? `Store-value token vocabulary: checked against the rules layer — ${TOKEN_VOCAB.tokenCount} tokens, roles ${TOKEN_VOCAB.governed.join(", ")}`
+  : `Store-value token vocabulary: NOT CHECKED — ${TOKEN_VOCAB.reason}`);
 for (const [k, n] of Object.entries(HELD_COUNTS).sort((a, b) => b[1] - a[1])) {
   console.log(`  ${String(n).padStart(3)}  ${k}`);
 }

@@ -160,6 +160,105 @@ export function declaredGapFactKeys(factRows) {
 // lead sentence minus its full stop, a space, the parenthetical
 // verbatim, a full stop. EXACT KEYS ARE TESTED BEFORE PREFIXES —
 // `Yes (illegal)` is the case that proves it necessary.
+// ---------------------------------------------------------------------
+// THE SIX RETIREMENT TOKENS. Added 2026-10-29, the token-retirement
+// crossing. Bare `Yes` and `No` were retired on three roles in the data
+// layer in favour of tokens that each mean one thing; this is the half of
+// that change a reader meets.
+//
+// VALUE-KEYED, and that is the ruling, not a preference: "the strings
+// table stays value-keyed and follows." Every token below is globally
+// unique across every live stored value, so the key alone carries the
+// meaning and no consumer needs the role to resolve it.
+//
+// THE SENTENCES ARE NOT AUTHORED HERE AND NOT EDITABLE HERE. All six are
+// transported verbatim from the ratified copy deck for these tokens,
+// 2026-10-29, kept in the project's editorial record outside this
+// repository — that record is the authority. Each is a single FLAT
+// string: no interpolation, no second field read, no composition. In
+// particular NOTHING here composes from `group_role_detail`, which is a
+// five-value machine classifier (`freehold_direct`,
+// `corporate_structure`, `leasehold`, `trust_freehold_equivalent`,
+// `use_right_non_title`) — composing from it would print store
+// vocabulary at a reader, the exact defect the register exists to end.
+//
+// THE DEICTIC DEPENDENCY, load-bearing and named by the deck rather than
+// left to be discovered: `tenure-form-available` and
+// `tenure-form-not-offered` say "this form of ownership", and the form
+// they point at is the row's OWN `fact_label`, which the schema contract
+// requires to name the form ("Tenure mechanism — direct freehold",
+// "… — fideicomiso bank trust"). The row shell in js/fact-rows.js puts
+// `.fact-label` directly above `.fact-value` in one `.fact-item`, at
+// every viewport, so the referent is always present. IF A SURFACE IS
+// EVER BUILT THAT RENDERS A `mechanism` VALUE WITHOUT ITS LABEL, THESE
+// TWO STRINGS LOSE THEIR REFERENT AND THE ROW MUST BE HELD, NOT
+// RENDERED. No labelless variant is invented here; a surface that needs
+// one goes back to the copy deck.
+//
+// ONE LITERAL PER SENTENCE, deliberately. Each string below is also the
+// `prefixes` lead for the parenthetical form of the same value on the
+// same role ("Yes (pension income)"), and the leads REFERENCE these
+// constants rather than repeating the text. A second copy of any of
+// these sentences — even in this file, even byte-identical today — is
+// the INCOME_TYPE_LABEL defect this register was built to end: two
+// wordings for one meaning, free to drift apart.
+const TOKEN = Object.freeze({
+  "converts-to-permanent-residency":      "This route converts to permanent residency.",
+  "no-conversion-to-permanent-residency": "This route does not convert to permanent residency.",
+  "passive-income-accepted":              "Passive income counts as qualifying proof on this route.",
+  "passive-income-not-accepted":          "Passive income does not count as qualifying proof on this route.",
+  "tenure-form-available":                "This form of ownership is available here.",
+  "tenure-form-not-offered":              "This form of ownership is not available here.",
+});
+
+// Which role each token is registered ON. Carried so the pairing can be
+// ASSERTED rather than assumed: a `tenure-form-available` that ever
+// appeared on `converts_to_pr` resolves to no string under that role and
+// is held as unregistered, instead of quietly printing a tenure sentence
+// about a visa. The store's own vocabulary row carries the same pairing
+// on each token entry, and assertTokenVocabulary() below checks this
+// table against it rather than trusting either copy.
+const TOKEN_ROLE = Object.freeze({
+  "converts-to-permanent-residency":      "converts_to_pr",
+  "no-conversion-to-permanent-residency": "converts_to_pr",
+  "passive-income-accepted":              "accepts_passive_income",
+  "passive-income-not-accepted":          "accepts_passive_income",
+  "tenure-form-available":                "mechanism",
+  "tenure-form-not-offered":              "mechanism",
+});
+
+// THE TOKEN NAMES, under names. Exported so that a consumer which has to
+// COMPARE a stored value against one of these tokens — the reader's own-
+// numbers gate does, because it asks a yes/no question of the data rather
+// than printing a sentence — references the vocabulary from its one home
+// instead of retyping the literal. The store's own vocabulary row forbids
+// either runtime hardcoding a token, and this is how that is honoured on
+// the browser side: the literal appears once, here, and
+// assertTokenVocabulary() checks it against the row.
+export const TOKENS = Object.freeze({
+  CONVERTS_TO_PR:          "converts-to-permanent-residency",
+  NO_CONVERSION_TO_PR:     "no-conversion-to-permanent-residency",
+  PASSIVE_ACCEPTED:        "passive-income-accepted",
+  PASSIVE_NOT_ACCEPTED:    "passive-income-not-accepted",
+  TENURE_FORM_AVAILABLE:   "tenure-form-available",
+  TENURE_FORM_NOT_OFFERED: "tenure-form-not-offered",
+});
+
+// The token -> sentence table, exposed value-keyed, for a surface that
+// holds a value with no fact row to carry its role (the route-card
+// fields in js/location.js are read off derived/visa-routes.jsonl, whose
+// columns ARE the role). Prefer roleValueString() through the role
+// where a role exists: it checks the pairing.
+export function tokenString(valueRaw) {
+  const s = TOKEN[String(valueRaw)];
+  return typeof s === "string" ? s : null;
+}
+
+export function tokenRole(valueRaw) {
+  const r = TOKEN_ROLE[String(valueRaw)];
+  return typeof r === "string" ? r : null;
+}
+
 const HELD = Object.freeze(["Yes", "No", "Not yet checked"]);
 
 export const ROLE_REGISTER = Object.freeze({
@@ -190,21 +289,27 @@ export const ROLE_REGISTER = Object.freeze({
   },
   mechanism: {
     closed: true,
-    exact: { "Yes (illegal)": "This form of ownership is offered here. It is against the law." },
+    exact: {
+      "tenure-form-available":  TOKEN["tenure-form-available"],
+      "tenure-form-not-offered": TOKEN["tenure-form-not-offered"],
+      "Yes (illegal)": "This form of ownership is offered here. It is against the law.",
+    },
     prefixes: [
-      { token: "Yes (", mode: "sentence", lead: "This form of ownership is available here." },
-      { token: "No (", mode: "sentence", lead: "This form of ownership is not available here." },
+      { token: "Yes (", mode: "sentence", lead: TOKEN["tenure-form-available"] },
+      { token: "No (", mode: "sentence", lead: TOKEN["tenure-form-not-offered"] },
     ],
     held: HELD,
   },
   converts_to_pr: {
     closed: true,
     exact: {
+      "converts-to-permanent-residency":      TOKEN["converts-to-permanent-residency"],
+      "no-conversion-to-permanent-residency": TOKEN["no-conversion-to-permanent-residency"],
       "own-standalone-permanent-status": "This route grants its own indefinite status instead. It does not feed the general permanent-residency track.",
     },
     prefixes: [
-      { token: "Yes (", mode: "sentence", lead: "This route converts to permanent residency." },
-      { token: "No (", mode: "sentence", lead: "This route does not convert to permanent residency." },
+      { token: "Yes (", mode: "sentence", lead: TOKEN["converts-to-permanent-residency"] },
+      { token: "No (", mode: "sentence", lead: TOKEN["no-conversion-to-permanent-residency"] },
       { token: "disputed: ", mode: "replace", lead: "Sources disagree. " },
     ],
     // The deck's §5.1, refused with two independent reasons either one
@@ -214,9 +319,13 @@ export const ROLE_REGISTER = Object.freeze({
   },
   accepts_passive_income: {
     closed: true,
+    exact: {
+      "passive-income-accepted":     TOKEN["passive-income-accepted"],
+      "passive-income-not-accepted": TOKEN["passive-income-not-accepted"],
+    },
     prefixes: [
-      { token: "Yes (", mode: "sentence", lead: "Passive income counts as qualifying proof on this route." },
-      { token: "No (", mode: "sentence", lead: "Passive income does not count as qualifying proof on this route." },
+      { token: "Yes (", mode: "sentence", lead: TOKEN["passive-income-accepted"] },
+      { token: "No (", mode: "sentence", lead: TOKEN["passive-income-not-accepted"] },
       { token: "N/A — ", mode: "replace", lead: "Not applicable here: " },
     ],
     held: HELD,
@@ -424,6 +533,94 @@ export function assertValueCoverage(factRows) {
     throw new Error(`reader-strings: ${bad.length} value(s) with no reader string reached the build:\n  ${bad.join("\n  ")}`);
   }
   return heldCounts;
+}
+
+// 1c. THE VOCABULARY CROSS-CHECK — the store's token row is the
+// authority for WHICH tokens exist and WHICH role each sits on, and this
+// file must not become a second, free-running copy of that. The row's own
+// consumption contract is explicit that neither runtime may hardcode a
+// token or a role list; the strings are unavoidably here (the row carries
+// no reader copy, by its own terms), so the pairing is what gets checked.
+//
+// TWO THINGS ABOUT THE PUBLIC FORM OF THAT ROW, both of which bite code
+// written to the vault form of it:
+//
+//   (a) `governs_roles` DOES NOT SHIP. The public export narrows the row
+//       to its fields, so a consumer reading `parsed.governs_roles` reads
+//       `undefined`. THE GOVERNED-ROLE LIST IS DERIVED FROM THE
+//       REGISTERED TOKENS' OWN `group_role` — which is the ruled answer,
+//       not a workaround, and yields exactly the three roles below.
+//   (b) `keyed_by` DOES NOT SHIP EITHER, so the lookup contract is
+//       carried by the shape alone: `tokens` is an object KEYED BY THE
+//       TOKEN, and it is indexed with the fact row's stored value.
+//       `value_bool` is carried on each entry and IS NOT THE SWITCH —
+//       the schema contract's clause is that a rule reading a companion
+//       row keys off the stored value's controlled tokens, never off
+//       `value_bool`, because these roles also carry states that parse to
+//       a null boolean by design and would collapse into each other.
+//       Nothing in this file reads `value_bool`, and nothing should.
+//
+// TOLERANT OF ABSENCE, STRICT ON DRIFT, and the asymmetry is deliberate.
+// The row reaches the public tree in a crossing; before that crossing the
+// published rules file legitimately has no such row, and a build that
+// threw on its absence would fail for a reason that is not a defect. So
+// an absent or unparseable row returns a stated reason and throws
+// nothing. A row that IS there and disagrees with this table throws: that
+// is real drift, and the whole point is to find it here rather than on a
+// page.
+export function assertTokenVocabulary(rulesRows) {
+  const rows = (rulesRows || []).filter(
+    (r) => r && r.rule_id === "visa-fit:_param:store_value_tokens");
+  if (!rows.length) return { checked: false, reason: "no store_value_tokens row in the rules layer" };
+  rows.sort((a, b) => (b.version || 0) - (a.version || 0));
+  let tokens;
+  try {
+    const parsed = JSON.parse(rows[0].expression);
+    tokens = parsed && parsed.tokens;
+  } catch (e) {
+    return { checked: false, reason: `store_value_tokens expression did not parse: ${e.message}` };
+  }
+  if (!tokens || typeof tokens !== "object") {
+    return { checked: false, reason: "store_value_tokens carries no `tokens` object" };
+  }
+  // (a), in code: the governed roles fall out of the tokens themselves.
+  const governed = [...new Set(Object.values(tokens)
+    .map((t) => t && t.group_role).filter(Boolean))].sort();
+  const problems = [];
+  for (const [token, entry] of Object.entries(tokens)) {
+    if (!(token in TOKEN)) { problems.push(`store token "${token}" has no reader string here`); continue; }
+    const role = entry && entry.group_role;
+    if (role !== TOKEN_ROLE[token]) {
+      problems.push(`token "${token}": store says role "${role}", this table says "${TOKEN_ROLE[token]}"`);
+    }
+    // The pairing has to hold through the real resolver too, not just
+    // through the two tables above.
+    const resolved = roleValueString(token, TOKEN_ROLE[token]);
+    if (!resolved || resolved.string !== TOKEN[token]) {
+      problems.push(`token "${token}" does not resolve to its own string through roleValueString()`);
+    }
+  }
+  for (const token of Object.keys(TOKEN)) {
+    if (!(token in tokens)) problems.push(`this table strings "${token}", which the store row does not register`);
+  }
+  // TOKENS is the name-to-literal map consumers compare against; it must
+  // not drift from the strings table beside it.
+  const named = new Set(Object.values(TOKENS));
+  for (const token of Object.keys(TOKEN)) {
+    if (!named.has(token)) problems.push(`token "${token}" has a string but no name in TOKENS`);
+  }
+  for (const literal of named) {
+    if (!(literal in TOKEN)) problems.push(`TOKENS names "${literal}", which has no reader string`);
+  }
+  for (const role of governed) {
+    const entry = entryFor(role);
+    if (!entry) { problems.push(`governed role "${role}" has no register entry`); continue; }
+    if (!entry.closed) problems.push(`governed role "${role}" is not closed, so an unstrung token could ship`);
+  }
+  if (problems.length) {
+    throw new Error(`reader-strings: token vocabulary drift against the store row:\n  ${problems.join("\n  ")}`);
+  }
+  return { checked: true, governed, tokenCount: Object.keys(tokens).length };
 }
 
 // 2. The indexed partition is total and disjoint.

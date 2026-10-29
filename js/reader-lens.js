@@ -45,6 +45,10 @@ import {
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 import { resolveVerdict } from "./data.js";
 import { bandVisual, indexToColor, isGapValue } from "./colors.js";
+// The store-value token vocabulary, from its one home — itemIncomeKinds()
+// below compares a stored value against two named tokens rather than
+// retyping the literals.
+import { TOKENS } from "./reader-strings.js";
 import {
   READ_SET, sliceRoutes, evaluateRow, isValidOwnNumbers, assertRouteBarFields, barForRow,
   // Added by the margin crossing: the reader's own figure is normalised
@@ -987,9 +991,17 @@ function itemIncomeKinds(row, input) {
   if (bar && bar.kind === "capital") return null;
   const accepted = ["pension", "passive", "remote_active", "local_active"]
     .filter((t) => row["income_type_" + t] === "primary_accepted");
-  if (!accepted.length && row.accepts_passive_income === "Yes") accepted.push("passive");
+  // RETOKENED 2026-10-29, same change and same reason as gate1()'s coarse
+  // allowance in own-numbers-data.js: the bare `Yes`/`No` this used to
+  // compare against were retired on this role, and the comparison is on
+  // the TOKEN — never on `value_bool`, which this export does not carry
+  // and which could not distinguish a negative from the `N/A — …` and
+  // `Not yet checked` states anyway. Narrow by design: every other value
+  // in the column still yields neither an accepted kind nor a refusal,
+  // which is the honest answer for a value that does not state one.
+  if (!accepted.length && row.accepts_passive_income === TOKENS.PASSIVE_ACCEPTED) accepted.push("passive");
   if (accepted.length) return { accepted, refuses_passive: false };
-  return { accepted: [], refuses_passive: row.accepts_passive_income === "No" };
+  return { accepted: [], refuses_passive: row.accepts_passive_income === TOKENS.PASSIVE_NOT_ACCEPTED };
 }
 
 function composeRouteItem(entry, input, fxRates) {

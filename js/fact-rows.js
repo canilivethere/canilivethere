@@ -606,3 +606,109 @@ export function factHeld(fact) {
 export function provenanceFacts(facts) {
   return facts.filter((f) => !factHeld(f));
 }
+
+// ---------------------------------------------------------------------
+// §11. THE APPLICABILITY CLAUSE — a group's descriptive rows do not
+// render on a page the group's own mechanism skipped.
+//
+// THE RULING, 2026-10-29, Cap, verbatim and the whole of the rule:
+//
+//   "a group blanks its descriptive rows on a page only if it carries an
+//    applicability row for another page in that country but not for this
+//    one."
+//
+// And the sentence that goes with it, his words: "Anything else is a
+// finding, not a reason to loosen the rule."
+//
+// WHAT IT FIXES, the one measured case. North Carolina SB 394 carries
+// three country-scoped descriptive rows — enactment status, regime shape
+// and the restricted-nationality list — and two location_applicability
+// rows: US-asheville reads `inside`, US-rincon reads `outside`. It
+// carries no row for US-chattanooga. So on a Tennessee page the three
+// rows rendered with nothing saying whether a North Carolina statute
+// reaches it, and the restricted-nationality list — the row that names
+// four passports — rendered hardest of all, forced open by G7. That is
+// a reader-visible claim about where a law bites, made by proximity, in
+// a group that elsewhere answers the question explicitly.
+//
+// WHY THE TRIGGER IS A SIBLING ROW AND NOT A MISSING ONE. The first
+// wording of this rule was "a group renders only on a page where its
+// applicability row says `inside`". Measured over the published export,
+// that silences sixteen property-regime groups in sixteen countries
+// which carry no applicability row anywhere — Thailand's Condominium Act
+// (7 rows x 3 pages), Indonesia's Basic Agrarian Law (10), Bulgaria's
+// accession clause (6 x 2), Portugal's Decreto-Lei (5 x 3), and twelve
+// more. A NATIONAL STATUTE NEEDS NO APPLICABILITY ROW: a country is not
+// inside or outside itself, and absence of the row is not absence of the
+// law. Requiring a SIBLING row in the same country is what separates
+// "this group uses the mechanism and skipped me" from "this group never
+// used the mechanism" — the first is a gap in the data about this page,
+// the second is a national rule stated once. Those sixteen groups are
+// untouched here and stay rendered in full.
+//
+// WHAT IT DOES NOT DO.
+//   - It does not read the applicability row's VALUE. An `outside`
+//     reading is an answer a reader wants ("the restricted zone does not
+//     reach Merida"), it is sourced, and it renders. Cap, explicitly.
+//     A `[GAP]` or `unconfirmed` reading also satisfies the clause:
+//     the group did not skip the page, and what that row should say is
+//     the data layer's question, not the renderer's.
+//   - It never blanks the applicability row itself. By the clause's own
+//     condition there is no such row on a blanked page, so this is a
+//     guard against a future shape, not a live case.
+//   - It touches no store. Rows stay in derived/ exactly as they are;
+//     this module declines to draw them on one page. Same discipline as
+//     §9 and §10.
+//   - A sub-national instrument with no applicability row ANYWHERE is
+//     not reached by this clause and is a data gap, not a render case.
+//     One is on file and carried forward unacted:
+//     MY:property-regime:state-level-price-threshold-system names a
+//     state-level instrument in its own key, carries no applicability
+//     row, and describes a sub-national law on Malaysia's only scored
+//     page with nothing saying whether it reaches Penang — structurally
+//     the Chattanooga defect, invisible because Penang is the only page.
+//     Owner: the property data layer. Not a renderer's to settle.
+//
+// WHERE IT IS APPLIED. At the ONE place each runtime decides what a page
+// may show — the factsByLocation assembly in js/data.js and in
+// tools/prerender-locations.mjs, three identical lines in each. Applied
+// there rather than inside a row emitter so that every surface built
+// from a page's fact list agrees: the chapter body, the Sources chapter
+// (§10's pair gate follows automatically — a blanked row must not leave
+// its label standing over a live source link and a `checked` stamp), the
+// score-receipts panel, and the red-flag scan. A row suppressed in the
+// body and still cited in Sources is the same leak wearing a different
+// hat.
+// ---------------------------------------------------------------------
+
+// The index both runtimes build once: which pages a group names, and
+// which pages a country has. `locations` is the published location list,
+// so an applicability row pointing at a place the site does not publish
+// is not a "sibling page" — there is no such page to be inside of.
+export function makeApplicabilityGate(allFacts, locations) {
+  const pagesByGroup = new Map();
+  const pagesByCountry = new Map();
+  for (const l of locations) {
+    if (!pagesByCountry.has(l.country_id)) pagesByCountry.set(l.country_id, new Set());
+    pagesByCountry.get(l.country_id).add(l.location_id);
+  }
+  for (const f of allFacts) {
+    if (f.group_role !== "location_applicability") continue;
+    if (!f.group_key || !f.location_id) continue;
+    if (!pagesByGroup.has(f.group_key)) pagesByGroup.set(f.group_key, new Set());
+    pagesByGroup.get(f.group_key).add(f.location_id);
+  }
+  // true => this row is blanked on this page by the clause.
+  return function blankedByApplicability(fact, locationId, countryId) {
+    if (!fact.group_key) return false;
+    if (fact.group_role === "location_applicability") return false;
+    const named = pagesByGroup.get(fact.group_key);
+    if (!named || named.has(locationId)) return false;
+    const inCountry = pagesByCountry.get(countryId);
+    if (!inCountry) return false;
+    for (const page of named) {
+      if (page !== locationId && inCountry.has(page)) return true;
+    }
+    return false;
+  };
+}

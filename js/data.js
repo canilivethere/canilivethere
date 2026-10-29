@@ -586,30 +586,9 @@ export function verdictHeadline(expectedText) {
 // authored as one of these six files, and the public export preserves the
 // bare filename. Falls back to a criterion_id-based guess only when
 // source_ref is a [GAP] marker (no real file behind it yet).
-const FILE_SECTION_MAP = [
-  ["red-flags.md", "redflags"],
-  ["visa-legal.md", "visa"],
-  ["property.md", "property"],
-  ["cost-of-living.md", "cost"],
-  ["community-network.md", "community"],
-  ["overview.md", "overview"],
-];
-
-const CRITERION_SECTION_FALLBACK = {
-  "visa-legal-pathway-ease": "visa",
-  "land-property-access": "property",
-  "cost-of-living-affordability": "cost",
-  "community-social-fabric": "community",
-  "room-for-others-group-viability": "community",
-};
-
-export function sectionForFact(fact) {
-  const ref = fact.source_ref || "";
-  for (const [needle, section] of FILE_SECTION_MAP) {
-    if (ref.includes(needle)) return section;
-  }
-  if (fact.criterion_id && CRITERION_SECTION_FALLBACK[fact.criterion_id]) {
-    return CRITERION_SECTION_FALLBACK[fact.criterion_id];
-  }
-  return "overview";
-}
+// MOVED to js/fact-rows.js, which tools/prerender-locations.mjs reads
+// under Node — the third hand-kept copy of this lookup (here,
+// js/location.js's import of it, and the prerenderer's own) is gone.
+// Re-exported from this file so every existing
+// `import { sectionForFact } from "./data.js"` keeps working unchanged.
+export { sectionForFact } from "./fact-rows.js";

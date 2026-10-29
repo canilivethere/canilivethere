@@ -106,38 +106,324 @@ export function declaredGapFactKeys(factRows) {
 }
 
 // ---------------------------------------------------------------------
-// The two assertions.
+// THE ROLE-KEYED HALF OF THE SAME REGISTER.
+//
+// Added 2026-10-28, inside the hydration crossing. WHY IT IS A SECOND
+// EXPORT AND NOT A SECOND TABLE, which is the thing the 2026-10-25
+// one-table ruling forbids: that ruling ended a DUPLICATE MAPPING OF THE
+// SAME VALUE living in a second FILE (the INCOME_TYPE_LABEL table inside
+// js/location.js, one of whose four strings contradicted the ratified
+// wording). Nothing below duplicates anything in STORE_VALUE_STRINGS,
+// and nothing below lives outside this file. One file, one authority,
+// one governance rule — which is what that ruling protects.
+//
+// WHY IT HAS TO BE KEYED ON THE ROLE. Measured on all 21
+// derived/facts/*.jsonl, 2026-10-28: `Yes` is a live value on FOUR
+// different roles and means four different things (mechanism:
+// "this tenure form is available"; converts_to_pr: "this route converts
+// to permanent residency"; accepts_passive_income: "passive income is
+// accepted as qualifying proof"; diligence_risk: undeterminable). `No`
+// collides across three, `Not yet checked` across four. A flat key
+// cannot carry four meanings, and 191 more bare Yes/No rows sit on facts
+// with NO role at all, which a flat `Yes` key would also rewrite —
+// silently and wrongly.
+//
+// WHAT CAP RULED, 2026-10-28 — paraphrased only where the ruling named
+// a seat: this crossing wires the ratified strings for the tokens that
+// already mean one thing, holds the Yes, No and Not yet checked values
+// from render, and fixes the guard. So the colliding tokens are not
+// strung at all. They are HELD — the row stays in derived/, the renderer
+// declines to draw it, and the tokens are retired in a later crossing.
+//
+// EVERY STRING BELOW IS TRANSPORTED VERBATIM from the ratified copy deck
+// for tenure and regime reader strings, 2026-10-28, which sources each
+// one line-by-line to the project's schema contract or to its
+// property-fit rules §3/§4. Both documents are kept in the project's own
+// editorial record, outside this repository, and that record is the
+// authority. None of it is authored here and none of it may be edited
+// here. Two rows of that deck are REFUSED BY THE DECK ITSELF and are
+// therefore `held`, not strung:
+// `converts_to_pr: conditional-backstop:` (meaning undefined in the
+// record, and its sourcing contradicted by the verification run of
+// 2026-10-24) and
+// `diligence_risk: Yes` (a free-text field storing an enum).
+//
+// `closed: true` means the role's vocabulary is controlled: a value that
+// resolves to no string and is not explicitly held FAILS — in the build
+// it throws, in the browser the row is held. That is the guard's new
+// test, and it is a table-membership test, not a shape test. Roles that
+// legitimately carry numbers or free text are `closed: false` and their
+// unmatched values fall through to ordinary formatting.
+//
+// `prefix` entries replace the named leading substring and keep the
+// remainder byte-for-byte. `sentence` mode is the deck's §3.3 rule: the
+// lead sentence minus its full stop, a space, the parenthetical
+// verbatim, a full stop. EXACT KEYS ARE TESTED BEFORE PREFIXES —
+// `Yes (illegal)` is the case that proves it necessary.
+const HELD = Object.freeze(["Yes", "No", "Not yet checked"]);
+
+export const ROLE_REGISTER = Object.freeze({
+  regime_shape: {
+    closed: true,
+    exact: {
+      "open-freehold": "A foreign buyer can hold full title here, on the same terms as a citizen.",
+      "geographic-band-substitute": "Inside a defined band, a foreign buyer needs a substitute vehicle. Outside it, direct title.",
+      "closed-except-single-vehicle": "A foreign buyer cannot hold freehold land here. One capped vehicle is the only way in.",
+      "nationality-gate": "Otherwise an open market. Citizenship alone decides whether a buyer is allowed in.",
+      "universal-locality-permit": "Certain named localities are gated for everyone here, citizens included. The restriction is about the place, not the buyer.",
+      "closed-except-personal-status": "There is no purchase route here for an ordinary foreign buyer, at any price. The only door is a personal legal status — ancestry or marriage — and it cannot be bought.",
+    },
+    prefixes: [{ token: "disputed: ", mode: "replace", lead: "Sources disagree. " }],
+    held: HELD,
+  },
+  mechanism_legality: {
+    closed: true,
+    exact: {
+      legitimate: "This way of holding property is lawful here.",
+      // Deliberately consistent with the illegal-routes block, which
+      // prints "Illegal" for this same token. Two surfaces, one word.
+      // No `prohibited-unenforced` token exists in the schema, so
+      // "enforced" is part of what the token asserts, not an addition.
+      "prohibited-enforced": "This way of holding property is illegal here, and the ban is enforced.",
+    },
+    held: HELD,
+  },
+  mechanism: {
+    closed: true,
+    exact: { "Yes (illegal)": "This form of ownership is offered here. It is against the law." },
+    prefixes: [
+      { token: "Yes (", mode: "sentence", lead: "This form of ownership is available here." },
+      { token: "No (", mode: "sentence", lead: "This form of ownership is not available here." },
+    ],
+    held: HELD,
+  },
+  converts_to_pr: {
+    closed: true,
+    exact: {
+      "own-standalone-permanent-status": "This route grants its own indefinite status instead. It does not feed the general permanent-residency track.",
+    },
+    prefixes: [
+      { token: "Yes (", mode: "sentence", lead: "This route converts to permanent residency." },
+      { token: "No (", mode: "sentence", lead: "This route does not convert to permanent residency." },
+      { token: "disputed: ", mode: "replace", lead: "Sources disagree. " },
+    ],
+    // The deck's §5.1, refused with two independent reasons either one
+    // sufficient. Held, not glossed and not shipped raw.
+    held: [...HELD, "conditional-backstop: "],
+    heldPrefixes: ["conditional-backstop: "],
+  },
+  accepts_passive_income: {
+    closed: true,
+    prefixes: [
+      { token: "Yes (", mode: "sentence", lead: "Passive income counts as qualifying proof on this route." },
+      { token: "No (", mode: "sentence", lead: "Passive income does not count as qualifying proof on this route." },
+      { token: "N/A — ", mode: "replace", lead: "Not applicable here: " },
+    ],
+    held: HELD,
+  },
+  location_applicability: {
+    closed: true,
+    exact: {
+      inside: "This location sits inside that zone.",
+      outside: "This location sits outside that zone.",
+      // The schema's "researched-but-unresolved", distinct from [GAP]
+      // (never researched). "We looked" carries exactly that and nothing
+      // more.
+      unconfirmed: "We looked, and could not confirm which side of that line this location falls on.",
+    },
+    held: HELD,
+  },
+  max_duration: {
+    // Numbers live here too, so the vocabulary is not closed.
+    closed: false,
+    exact: { "permanent-from-day-one": "Permanent from the day it is granted. There is no temporary stage before it." },
+    held: HELD,
+  },
+  renewability: {
+    closed: true,
+    exact: {
+      "renewable-indefinitely": "Renews indefinitely.",
+      "non-renewable": "Does not renew.",
+    },
+    prefixes: [{ token: "renewable-limited: ", mode: "replace", lead: "Renewable, with a limit: " }],
+    held: HELD,
+  },
+  enactment_status: {
+    closed: true,
+    exact: {
+      enacted: "This law is in force.",
+      repealed: "This law has been repealed.",
+      pending: "Not law yet. Still pending.",
+    },
+    held: HELD,
+  },
+  age_gate: {
+    // Real ages (50, 60, 40) and [GAP] both live here.
+    closed: false,
+    // The schema states the meaning outright: "`0` is a real, confirmed
+    // finding ('no age gate on this route')" (§8B.2). `suppressUnit`
+    // because the row stores unit "years" and "No minimum age on this
+    // route. years" is not a sentence.
+    exact: { 0: { string: "No minimum age on this route.", suppressUnit: true } },
+    held: HELD,
+  },
+  diligence_risk: {
+    // Free text by schema contract (type='descriptive'). Five of the
+    // twelve live rows do exactly that. Seven store `Yes`, which the
+    // deck refuses to gloss, because writing a sentence for it would
+    // author what the risk is and how bad it is. Held under the same
+    // rule as every other bare Yes.
+    closed: false,
+    held: HELD,
+  },
+  income_type_required: {
+    // Vocabulary already fully covered by STORE_VALUE_STRINGS above; the
+    // role is listed only to close it, so a fifth income-type token
+    // cannot ship unstrung.
+    closed: true,
+    held: HELD,
+  },
+});
+
+function entryFor(groupRole) {
+  return Object.prototype.hasOwnProperty.call(ROLE_REGISTER, groupRole) ? ROLE_REGISTER[groupRole] : null;
+}
+
+// Resolve one value under one role. Returns null when the role has no
+// opinion, `{ string, suppressUnit }` when it resolves, or
+// `{ held: true, reason }` when the register rules the row off the page.
+export function roleValueString(valueRaw, groupRole) {
+  const entry = entryFor(groupRole);
+  if (!entry) return null;
+  const v = String(valueRaw);
+  if ((entry.held || []).includes(v)) return { held: true, reason: "ruled-hold" };
+  for (const p of entry.heldPrefixes || []) {
+    if (v.startsWith(p)) return { held: true, reason: "ruled-hold" };
+  }
+  const exact = (entry.exact || {})[v];
+  if (typeof exact === "string") return { string: exact };
+  if (exact && typeof exact.string === "string") return { string: exact.string, suppressUnit: !!exact.suppressUnit };
+  for (const p of entry.prefixes || []) {
+    if (!v.startsWith(p.token)) continue;
+    if (p.mode === "replace") return { string: p.lead + v.slice(p.token.length) };
+    // `sentence`: the lead sentence minus its full stop, a space, the
+    // parenthetical verbatim, a full stop. The token ends at "(" and the
+    // remainder already carries its own closing bracket.
+    const rest = v.slice(p.token.length - 1);
+    return { string: `${p.lead.replace(/\.$/, "")} ${rest}.` };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------
+// The assertions.
 
 // 1. No unregistered store token can reach a reader. A row renders only
 //    when its value has a reader string, and until then it is HELD FROM
 //    RENDER, NOT DROPPED.
-const TOKEN = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/;
+//
+// THE GUARD, REPLACED 2026-10-28. It used to be a SHAPE test:
+//   const TOKEN = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/;
+// lower_snake with a mandatory underscore, which matched exactly the
+// four income-type tokens it was written against and NONE of
+// `open-freehold`, `legitimate`, `prohibited-enforced`, `inside`,
+// `outside`, `unconfirmed`, `enacted`, `repealed`,
+// `permanent-from-day-one`, `renewable-indefinitely`, `Yes` or `No`
+// (measured, every one of them). "No unregistered store token can reach
+// a reader" was therefore true only of snake_case tokens since the day
+// it shipped, and 117 raw-token slots on 26 pages went through it
+// unseen. Cap's clause, 2026-10-28: "The guard fails on any value with
+// no entry in the table, whatever it looks like."
+//
+// So the test is now TABLE MEMBERSHIP, in two layers:
+//   (a) the role's own register entry, when the role is `closed` — any
+//       value that resolves to no string and is not explicitly held
+//       fails, whatever it looks like, including a token nobody has
+//       seen before;
+//   (b) the original snake_case shape test, KEPT as a backstop for rows
+//       with no role at all (191 bare Yes/No rows and every ungrouped
+//       fact), so nothing this guard caught before stops being caught.
+// [GAP] is exempt at both layers: it is the gap marker, handled by
+// formatValue()'s own branch, and has been reader-facing by design for
+// as long as the site has existed.
+const SNAKE_TOKEN = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/;
 
-export function readerStringFor(valueRaw) {
-  if (!TOKEN.test(String(valueRaw))) return null;          // not a token
+// null = render it. Otherwise the reason it is held:
+//   "ruled-hold"   — the register says this value does not render
+//                    (Yes / No / Not yet checked / a refused token)
+//   "unregistered" — controlled vocabulary with no reader string
+export function heldValue(valueRaw, groupRole) {
+  const v = String(valueRaw);
+  if (v === "[GAP]") return null;
+  const resolved = roleValueString(v, groupRole);
+  if (resolved && resolved.held) return resolved.reason;
+  if (resolved && resolved.string) return null;
+  // The flat table is consulted before the closed-role test, not after:
+  // `income_type_required`'s four values live there, ratified 2026-10-25,
+  // and the role is listed in the register only to CLOSE it so a fifth
+  // income-type token cannot ship unstrung.
+  if (STORE_VALUE_STRINGS[String(valueRaw)]) return null;
+  const entry = entryFor(groupRole);
+  if (entry && entry.closed) return "unregistered";
   // Truthiness, not `typeof === "string"`, and deliberately kept that
-  // way: a registered-but-EMPTY string throws here instead of shipping a
-  // blank value slot to a reader. Loud-and-slightly-mislabelled beats
-  // silent-and-blank at a publication boundary. Do not "tighten" to a type
-  // test. unregisteredStoreToken() keeps the same test for the same reason.
-  const s = STORE_VALUE_STRINGS[valueRaw];
-  if (s) return s;
-  throw new Error(`reader-strings: no string for store value "${valueRaw}"`);
+  // way: a registered-but-EMPTY string is held here and throws in the
+  // build, rather than shipping a blank value slot.
+  if (SNAKE_TOKEN.test(v) && !STORE_VALUE_STRINGS[v]) return "unregistered";
+  return null;
 }
 
-// The browser half of the same rule, non-throwing on purpose. In the
-// build, an unregistered token throws and fails the build -- nothing
-// ships. In the browser a throw at a reader is worse than the token, so
-// location.js and app-shared.js HOLD THE ROW FROM RENDER and
-// console.error the key. A render path cannot hold a row it only learns
-// about by catching an exception mid-template, so the test is its own
-// function. Build fails loud; the reader sees neither the token nor an
-// error.
-export function unregisteredStoreToken(valueRaw) {
-  // Same truthiness test as readerStringFor(), deliberately: a
-  // registered-but-empty string is held from render here and throws in the
-  // build, rather than shipping a blank value slot.
-  return TOKEN.test(String(valueRaw)) && !STORE_VALUE_STRINGS[valueRaw];
+// Kept as its own export: every existing caller asks this exact
+// question, and a held-by-rule row is NOT an unregistered token — it is
+// a deliberate, ruled omission and must not be console.error'd as a
+// defect.
+export function unregisteredStoreToken(valueRaw, groupRole) {
+  return heldValue(valueRaw, groupRole) === "unregistered";
+}
+
+// The build half, unchanged in contract: throws, so an unregistered
+// token fails the build instead of shipping. It now takes the role
+// alongside the value, and returns null both for "not a token" and for
+// "ruled held" — the caller (formatValue) never reaches it for a held
+// row, because the row is held before any markup is emitted.
+export function readerStringFor(valueRaw, groupRole) {
+  const resolved = roleValueString(valueRaw, groupRole);
+  if (resolved && resolved.string) return resolved.string;
+  if (resolved && resolved.held) return null;
+  const v = String(valueRaw);
+  if (v === "[GAP]") return null;
+  if (STORE_VALUE_STRINGS[v]) return STORE_VALUE_STRINGS[v];
+  const entry = entryFor(groupRole);
+  if (entry && entry.closed) {
+    throw new Error(`reader-strings: no string for store value "${v}" on role "${groupRole}"`);
+  }
+  if (!SNAKE_TOKEN.test(v)) return null;                   // not a token
+  const s = STORE_VALUE_STRINGS[v];
+  if (s) return s;
+  throw new Error(`reader-strings: no string for store value "${v}"`);
+}
+
+// 1b. The build-time sweep. Runs once over every fact row in every
+// country file, BEFORE a page is written, so an unstrung controlled
+// value fails the build with its own fact_key in the message rather
+// than disappearing silently from 38 pages. A ruled hold is not a
+// failure and is counted, not thrown on — the count is what the build
+// log reports, and a hold count that drops to zero unannounced is how
+// you would notice that token retirement landing.
+export function assertValueCoverage(factRows) {
+  const bad = [];
+  const heldCounts = {};
+  for (const f of factRows) {
+    const reason = heldValue(f.value_raw, f.group_role);
+    if (reason === "unregistered") bad.push(`${f.fact_key} [${f.group_role || "no role"}] = ${JSON.stringify(f.value_raw)}`);
+    else if (reason) {
+      const k = `${f.group_role || "no role"}:${f.value_raw}`;
+      heldCounts[k] = (heldCounts[k] || 0) + 1;
+    }
+  }
+  if (bad.length) {
+    throw new Error(`reader-strings: ${bad.length} value(s) with no reader string reached the build:\n  ${bad.join("\n  ")}`);
+  }
+  return heldCounts;
 }
 
 // 2. The indexed partition is total and disjoint.

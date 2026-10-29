@@ -9,16 +9,23 @@ import { eliminatedColor, repaintRampSwatches } from "./colors.js";
 // render path. tools/prerender-locations.mjs imports the SAME file under
 // Node, so the static page and the hydrated page cannot disagree about a
 // reader string.
-import { STORE_VALUE_STRINGS, DECLARED_GAP_STRING } from "./reader-strings.js";
+// This file no longer reads the register directly: formatValue(), its
+// only consumer here, moved to js/fact-rows.js, which consults
+// js/reader-strings.js on both sides of the build. One lookup, one
+// place.
+// THE shared fact-row module (js/fact-rows.js) — one implementation of
+// every emitter tools/prerender-locations.mjs and js/location.js used to
+// hand-copy between them. escapeHtml(), formatNumbersInText(),
+// roundDisplayValue() and formatValue() USED TO BE DEFINED IN THIS FILE
+// and are now re-exported from there, so every existing
+// `import { ... } from "./app-shared.js"` in js/ keeps working unchanged
+// while the static build reads the same code under Node.
+import {
+  escapeHtml, formatNumbersInText, roundDisplayValue,
+  formatValue as formatValueShared,
+} from "./fact-rows.js";
+export { escapeHtml, formatNumbersInText, roundDisplayValue };
 
-export function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 // Author-written paragraph breaks in a stored free-text field (today: a
 // change event's `detail`, on the location pages and the Corrections
@@ -3611,9 +3618,7 @@ export function renderFooter(store) {
 // the real readability problem starts at 5+ digits). Already-formatted
 // runs ("50,000") are naturally left alone, since the comma splits them
 // into shorter digit groups this regex doesn't re-match.
-export function formatNumbersInText(text) {
-  return text.replace(/\d{5,}/g, (run) => Number(run).toLocaleString("en-US"));
-}
+// MOVED to js/fact-rows.js and re-exported at the top of this file.
 
 // Display precision, the ruled convention: display rounds physical
 // measurements (heights, distances, areas) to whole numbers. Rates, index
@@ -3643,15 +3648,9 @@ export function formatNumbersInText(text) {
 // this (same hand-kept-in-sync class as its formatValue/sectionForFact).
 // Change one, change both, or the static page and the hydrated page
 // disagree.
-const PHYSICAL_DISPLAY_UNITS = new Set(["metres", "meters", "m", "km", "km²", "hectares"]);
-
-export function roundDisplayValue(raw, unit) {
-  const head = String(unit == null ? "" : unit).trim().toLowerCase().split(/\s+/)[0];
-  if (!PHYSICAL_DISPLAY_UNITS.has(head)) return raw;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
-  return String(Math.round(n));
-}
+// MOVED to js/fact-rows.js and re-exported at the top of this file.
+// THE DUPLICATION CLASS THIS COMMENT USED TO NAME IS CLOSED: there is no
+// longer a hand-kept copy in tools/prerender-locations.mjs to change.
 
 // Some
 // fact rows on file (pet-import especially) are one dense run-on
@@ -3871,43 +3870,34 @@ export function glossaryWrap(text, store) {
 // throw at a reader is worse than the token. The row is held from render
 // by its caller (unregisteredStoreToken() in location.js) and the BUILD
 // is the thing that fails loud.
+// THE BODY OF THIS FUNCTION MOVED TO js/fact-rows.js, where
+// tools/prerender-locations.mjs reads the identical implementation under
+// Node. What stays here is the one genuinely environment-specific part:
+// the USD approximation needs a live rate table fetched over the network,
+// which the static build has no business doing. It is injected rather
+// than branched on, so the shared function has no idea which environment
+// it is in — Node passes nothing and gets no approximation, which is
+// exactly what the static page does today.
+//
+// The deliberate exclusions below are unchanged: anything already
+// carrying a parenthetical/manual approx or a "~" is skipped (either
+// hand-converted already, or too free-text to parse safely), and USD and
+// EUR are excluded as conversion targets.
 export function formatValue(fact, { suppressGapText = false, declaredGap = false } = {}) {
-  if (fact.value_raw === "[GAP]") {
-    if (declaredGap) return DECLARED_GAP_STRING;
-    return suppressGapText ? "—" : "Not yet researched";
-  }
-  const registered = STORE_VALUE_STRINGS[fact.value_raw];
-  if (typeof registered === "string") return registered;
-  const raw = formatNumbersInText(roundDisplayValue(String(fact.value_raw), fact.unit));
-  // Only append the unit if value_raw doesn't already carry it as text —
-  // some facts' own value_raw already spells out its unit inline (e.g.
-  // "50km coast / 100km border", "49% of building"), and appending the
-  // bare unit again on top of that duplicates it visibly ("...building %").
-  let out = raw;
-  if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) {
-    out = `${raw} ${fact.unit}`;
-  }
-  // Bug fix (caught by a real-data dry run, not just a read of
-  // the code): detectBareCurrency() only inspected fact.unit for an
-  // existing manual approximation, but at least one real fact on file
-  // (ID:bpjs-kesehatan-monthly-cost-where-eligible) carries its own
-  // "(~$3-10)" approximation inside value_raw itself, with a perfectly
-  // bare unit ("IDR/month"). Without this second check, the moment that
-  // fact (or any future one shaped like it) gains value_num_low/high, a
-  // reader would see two different, disagreeing USD guesses stapled
-  // together ("(~$3-10) (≈$2-$8)") -- exactly the collision this
-  // function's own comment says it exists to prevent. Checking raw here
-  // (not fact.value_raw) is equivalent and cheaper: formatNumbersInText()
-  // never adds or removes "(" or "~".
-  const fxCode = detectBareCurrency(fact.unit);
-  if (fxCode && !raw.includes("(") && !raw.includes("~")) {
-    const low = usdApprox(fact.value_num_low, fxCode);
-    const high = Number.isFinite(fact.value_num_high) && fact.value_num_high !== fact.value_num_low
-      ? usdApprox(fact.value_num_high, fxCode)
-      : null;
-    if (low) out += high ? ` (≈$${low}–$${high})` : ` (≈$${low})`;
-  }
-  return out;
+  return formatValueShared(fact, {
+    suppressGapText,
+    declaredGap,
+    usdApprox: (f) => {
+      const fxCode = detectBareCurrency(f.unit);
+      if (!fxCode) return null;
+      const low = usdApprox(f.value_num_low, fxCode);
+      const high = Number.isFinite(f.value_num_high) && f.value_num_high !== f.value_num_low
+        ? usdApprox(f.value_num_high, fxCode)
+        : null;
+      if (!low) return null;
+      return high ? ` (\u2248$${low}\u2013$${high})` : ` (\u2248$${low})`;
+    },
+  });
 }
 
 // Exported (not just module-local) so the map's plain-text hover tooltip

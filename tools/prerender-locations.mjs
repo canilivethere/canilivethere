@@ -33,6 +33,26 @@
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+// THE shared fact-row module — the same browser ES module js/location.js
+// loads, read here under Node. Every emitter imported below USED TO BE A
+// HAND-KEPT COPY in this file, under a comment that read "change one,
+// change both". That contract was broken 12 times in 21 commits since
+// 2026-05-01, which is why the whole hydration crossing exists. The
+// import is the replacement for the comment: there is now one
+// implementation and no way to change one side only.
+//
+// It works because js/fact-rows.js imports nothing but
+// js/reader-strings.js, and neither touches `document`, `window` or
+// `fetch` — the same condition js/portraits.js and js/reader-strings.js
+// already meet for the two dynamic imports further down this file. No
+// bundler, no build step, no transpile: the file Node reads here is the
+// byte-identical file the browser is served.
+import {
+  escapeHtml, SECTION_TITLES, SECTION_ORDER, INTRO_SECTION, CHAPTER_GAP_LINE,
+  sectionForFact, formatValue as formatValueShared, factRowHtml, factListHtml,
+  sourceGroupDate, sourceFactLinesHtml, buildIllegalRoutesHtml,
+  factHeld, provenanceFacts,
+} from "../js/fact-rows.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -47,99 +67,23 @@ function readJsonl(path) {
     .map((l) => JSON.parse(l));
 }
 
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 // The hand-kept copy of js/app-shared.js's escapeParagraphs() stood here.
 // Its only caller was the change-event detail block, which is gone, and a
 // change event's `detail` was the one multi-paragraph stored field either
 // emitter rendered. The original still lives in app-shared.js.
 
-// --- Date semantics: a hard rule, not a style choice -------------------
-// A fact's `date` is when the figure was true or the rule took effect —
-// it never moves on a recheck. The check date is a separate field,
-// `last_verified_date`, and it is SPARSE (165 of 2,196 public rows carry
-// one). Absent is therefore the default case, and nothing below may say
-// "checked" from `date`. Hand-synced with the identical block in
-// js/location.js — same duplication class this file's header comment
-// already names for generalIndex()/sectionForFact().
-const ISO_DATE_RE = /^\d{4}-\d{2}(-\d{2})?$/;
-
-// One date value as a chip that names its own subject.
-// `dated X` is the same string the inline source pull-down renders
-// (sourceDetailHtml(), js/app-shared.js), so both surfaces name this field
-// pair with the same two words instead of two vocabularies for one pair.
-// `Not stated` is the date field's only null-marker — an exact stored
-// string — and it is glossed rather than printed raw: "dated Not stated"
-// is not a sentence, and a bare "Not stated" chip sitting beside the word
-// "source" reads as "the source is not stated", which is false, since
-// every one of those rows carries a live link. Same move, and the same
-// class of copy, as this chapter's "Source noted — no link available yet".
-function dateChip(value) {
-  return value === "Not stated"
-    ? `<span class="scope-tag">date not stated</span>`
-    : `<span class="scope-tag">dated ${escapeHtml(value)}</span>`;
-}
-
-// One fact's own dates: its effective date, plus the check date only
-// where one really exists.
-function factDateTags(f) {
-  const parts = [];
-  if (f.date) parts.push(dateChip(f.date));
-  if (f.last_verified_date) parts.push(`<span class="scope-tag">checked ${escapeHtml(f.last_verified_date)}</span>`);
-  return parts.join(" ");
-}
-
-// The group-level date claim for a URL group. URL grouping is kept. This
-// prints on the row's TRAILING attribution line beside the link, never
-// above the facts, and only ever states something true of EVERY fact in
-// the group:
-//   - all dates and check dates identical -> that one date (+ check),
-//     and no per-fact breakdown is needed;
-//   - dates identical, check dates differ -> the shared date alone, with
-//     no check claim, because no check claim is true of all of them;
-//   - dates differ, all real ISO dates -> a span, earliest to latest;
-//   - dates differ and any is not a plain ISO date ("Not stated",
-//     "2026-06-02 (passed)") -> no date at all; a span across a non-date
-//     would be nonsense. The per-fact lines carry the truth.
-// Position is load-bearing: printed BELOW the per-fact lines, a span can
-// only be read as a summary of what the reader has just read. Printed
-// above them, in the same chip style a single fact's date uses, it reads
-// as one figure's validity period, which it is not.
-function sourceGroupDate(groupFacts) {
-  const dates = [...new Set(groupFacts.map((f) => f.date || ""))];
-  const checks = [...new Set(groupFacts.map((f) => f.last_verified_date || ""))];
-  if (dates.length === 1 && checks.length === 1) {
-    return { uniform: true, html: factDateTags(groupFacts[0]) };
-  }
-  if (dates.length === 1) {
-    return { uniform: false, html: dates[0] ? dateChip(dates[0]) : "" };
-  }
-  if (dates.every((d) => ISO_DATE_RE.test(d))) {
-    const sorted = dates.slice().sort();
-    return {
-      uniform: false,
-      html: `<span class="scope-tag">dated ${escapeHtml(sorted[0])} to ${escapeHtml(sorted[sorted.length - 1])}</span>`,
-    };
-  }
-  return { uniform: false, html: "" };
-}
-
-// The per-fact breakdown, rendered whenever a group's facts do not share
-// one date: every fact named with its OWN date, in data order (no
-// re-sort — string-sorting mixed date shapes is exactly the bug this
-// avoids). The span on the attribution line below is therefore a summary
-// of the set, not a claim about this list's order, and nothing on the
-// page says otherwise.
-function sourceFactLinesHtml(groupFacts) {
-  return `<ul class="source-facts">${groupFacts.map((f) => `<li class="source-fact"><span class="source-fact-label">${escapeHtml(f.fact_label)}</span> ${factDateTags(f)}</li>`).join("")}</ul>`;
-}
+// --- Date semantics ---------------------------------------------------
+// dateChip(), factDateTags(), sourceGroupDate() and sourceFactLinesHtml()
+// were hand-synced copies of js/location.js's. They now live once, in
+// js/fact-rows.js, imported above. The rule they implement is stated
+// there in full: a fact's `date` is when the figure was true or the rule
+// took effect and never moves on a recheck; `last_verified_date` is a
+// separate, SPARSE field (165 of 2,196 public rows carry one), so absent
+// is the default case and nothing may say "checked" from `date`.
+//
+// This page passes no `badgeHtml` to sourceFactLinesHtml(): the static
+// surface renders no confidence badges at all, which is unchanged.
 
 const WEIGHT_NUMERIC = { High: 3, "Medium-High": 2, Medium: 1 };
 
@@ -248,80 +192,13 @@ function buildFitHeadline(loc, country, value) {
 const FIT_INDEX_DEFAULT_WEIGHTING_LINE =
   "This is the site's default weighting — you haven't told it what matters most to you, so nothing here is reweighted for you yet.";
 
-// sectionForFact — same lookup as js/data.js, duplicated for the same
-// Node-vs-browser reason as generalIndex() above.
-const FILE_SECTION_MAP = [
-  ["red-flags.md", "redflags"],
-  ["visa-legal.md", "visa"],
-  ["property.md", "property"],
-  ["cost-of-living.md", "cost"],
-  ["community-network.md", "community"],
-  ["overview.md", "overview"],
-];
-const CRITERION_SECTION_FALLBACK = {
-  "visa-legal-pathway-ease": "visa",
-  "land-property-access": "property",
-  "cost-of-living-affordability": "cost",
-  "community-social-fabric": "community",
-  "room-for-others-group-viability": "community",
-};
-function sectionForFact(fact) {
-  const ref = fact.source_ref || "";
-  for (const [needle, section] of FILE_SECTION_MAP) {
-    if (ref.includes(needle)) return section;
-  }
-  if (fact.criterion_id && CRITERION_SECTION_FALLBACK[fact.criterion_id]) {
-    return CRITERION_SECTION_FALLBACK[fact.criterion_id];
-  }
-  return "overview";
-}
+// sectionForFact(), FILE_SECTION_MAP and CRITERION_SECTION_FALLBACK
+// moved to js/fact-rows.js — they were a third copy of the same lookup
+// (js/data.js held the second).
 
-// v7 Part 14 / v8 Part 3: illegal-but-practiced routes — the Node-side
-// twin of js/location.js's buildIllegalRoutesHtml() (same reason this file
-// already duplicates generalIndex()/sectionForFact() rather than sharing
-// them: this script runs in Node, that one in the browser). Field-
-// mapping judgment call and empty-state discipline are identical to that
-// function's own comment — see it for the full reasoning, not re-argued
-// here. That includes the consequence line: it renders only when the
-// published data carries a consequence, and nothing at all when it does
-// not. The former fixed consequence-gap string ("...isn't researched
-// yet.") was removed there and is removed here for the same reason — with
-// `notes` out of the published export it asserted a research gap over
-// consequences that had in fact been researched. Renders nothing until a
-// real prohibited-enforced fact exists in derived/.
-function buildIllegalRoutesHtml(facts) {
-  const illegalFacts = facts.filter(
-    (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
-  );
-  if (!illegalFacts.length) return "";
-  const rows = illegalFacts.map((legalityFact) => {
-    const groupFacts = facts.filter((f) => f.group_key === legalityFact.group_key);
-    const mechanismFact = groupFacts.find(
-      (f) => f.group_role === "mechanism" && f.group_role_detail === legalityFact.group_role_detail
-    );
-    const practice = mechanismFact ? mechanismFact.fact_label : legalityFact.fact_label;
-    const consequence = (mechanismFact && mechanismFact.notes) || legalityFact.notes || "";
-    const lawfulAlternatives = groupFacts.filter((f) => {
-      if (f.group_role !== "mechanism" || f.group_role_detail === legalityFact.group_role_detail) return false;
-      const sibling = groupFacts.find(
-        (g) => g.group_role === "mechanism_legality" && g.group_role_detail === f.group_role_detail
-      );
-      return sibling && sibling.value_raw === "legitimate";
-    });
-    const insteadHtml = lawfulAlternatives.length
-      ? `<div class="fact-notes">Lawful alternative in this same section: ${lawfulAlternatives.map((a) => escapeHtml(a.fact_label)).join(", ")}.</div>`
-      : `<div class="fact-notes">No lawful alternative is recorded in this section yet — a gap, not a claim that none exists.</div>`;
-    return `
-      <div class="illegal-route-row">
-        <div class="fact-label">${escapeHtml(practice)}</div>
-        <div class="fact-value"><strong>Illegal</strong></div>
-        ${consequence ? `<div class="fact-notes">${escapeHtml(consequence)}</div>` : ""}
-        ${insteadHtml}
-      </div>
-    `;
-  }).join("");
-  return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
-}
+// buildIllegalRoutesHtml() (v7 Part 14 / v8 Part 3) moved to
+// js/fact-rows.js. The two copies were byte-identical before the move.
+
 
 // --- What a visa route asks you to PRODUCE ----------------------------
 // The Node-side twin of the `documentation_shape` block inside
@@ -458,63 +335,30 @@ function buildRouteDocShapesHtml(country) {
   `;
 }
 
-const SECTION_TITLES = {
-  overview: "Overview", visa: "Visa & residency", property: "Property",
-  cost: "Cost of living", community: "Community", redflags: "Red flags",
-};
-// Chapter order: verdict, intro, visa, cost of living,
-// property, community, red flags, score breakdown, sources. Cost of
-// living now precedes property. Must stay identical to js/location.js's
-// own SECTION_ORDER/INTRO_SECTION so the prerendered and hydrated pages
-// agree — same hand-kept-in-sync duplication class as sectionForFact().
-const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "redflags"];
-// The overview chapter is folded into the intro: it renders with the
-// portrait block, second on the page after the verdict, not down in the
-// chapter run. Content untouched — position only.
-const INTRO_SECTION = "overview";
+// SECTION_TITLES, SECTION_ORDER and INTRO_SECTION are imported from
+// js/fact-rows.js — one definition, both emitters, no "must stay
+// identical" comment to break.
 
-// Hand-kept-in-sync copy of js/app-shared.js's roundDisplayValue() — same
-// duplication class as formatValue()/sectionForFact() below. The ruled
-// display-precision convention: physical
-// measurements (heights, distances, areas) round to whole numbers, half up;
-// rates, index scores, prices and percentages keep their decimals; the exact
-// figure stays in the store and the source. Classified on the FIRST WORD of
-// `unit`, exact match against metres and meters, m, km, km², hectares, with the
-// magnitude guard kept so a small physical value cannot display as nothing.
-// °C keeps its decimals. The rule in full and the reasoning: the comment on
-// the app-shared.js original.
-// Change one copy, change both.
-const PHYSICAL_DISPLAY_UNITS = new Set(["metres", "meters", "m", "km", "km²", "hectares"]);
-
-function roundDisplayValue(raw, unit) {
-  const head = String(unit == null ? "" : unit).trim().toLowerCase().split(/\s+/)[0];
-  if (!PHYSICAL_DISPLAY_UNITS.has(head)) return raw;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || Math.abs(n) < 100) return raw;
-  return String(Math.round(n));
-}
-
-// The register's lookup goes AHEAD of the unit-append logic below, for
-// one reason: a sentence must never have a unit glued to it. Before this
-// change the [GAP] branch was first and a token value fell straight
-// through roundDisplayValue() and out raw — 117 slots on 26 pages
-// printing store vocabulary at a reader (measured, before and after).
-// readerStringFor() THROWS on a lower_snake value with no registered
-// string, so an unregistered token fails this build instead of shipping.
+// roundDisplayValue() and formatValue() moved to js/fact-rows.js, which
+// js/app-shared.js now re-exports to the browser side. The hand-kept
+// copies here were the single largest drift surface in the file.
+//
+// ONE REAL CHANGE OF OUTPUT COMES WITH THE SHARING, and it is named
+// rather than discovered later: the shared formatValue() applies
+// formatNumbersInText(), which comma-groups digit runs of 5 or more.
+// This file never did, so the static page printed "90119 ALL/month"
+// where the hydrated page printed "90,119 ALL/month" — a live
+// served/hydrated divergence of exactly the class this crossing closes,
+// shut in the honest direction by giving the served page the comma it
+// was missing. The containment check normalises digit-group commas on
+// both sides, so it scores this as neither a loss nor a gain.
+//
+// No USD approximation is passed: a static build has no business
+// fetching a live rate table, and this page has never shown one. The
+// approximation is an injected function in the shared implementation,
+// not a branch, so this file states its absence by simply not passing it.
 function formatValue(fact) {
-  const registered = readerStringFor(fact.value_raw);
-  if (registered) return registered;
-  // A sourced withdrawal never renders as "Not yet researched": those
-  // are two different facts and a reader acts differently on them. The set is evaluated ONCE, over the facts rows,
-  // by declaredGapFactKeys() — never re-derived here, and never on the
-  // route export, which carries no `group_role`. The other 172 [GAP]
-  // slots keep their current words, byte for byte.
-  if (fact.value_raw === "[GAP]") {
-    return DECLARED_GAP_KEYS.has(fact.fact_key) ? DECLARED_GAP_STRING : "Not yet researched";
-  }
-  const raw = roundDisplayValue(String(fact.value_raw), fact.unit);
-  if (fact.unit && !raw.toLowerCase().includes(String(fact.unit).toLowerCase())) return `${raw} ${fact.unit}`;
-  return raw;
+  return formatValueShared(fact, { declaredGap: DECLARED_GAP_KEYS.has(fact.fact_key) });
 }
 
 // Portrait copy — imported from the same module the live JS build uses,
@@ -529,8 +373,7 @@ const {
 // js/app-shared.js and js/location.js import the SAME file: one source,
 // not two authored copies of the same string.
 const {
-  DECLARED_GAP_STRING,
-  declaredGapFactKeys, indexLineFor, readerStringFor, assertIndexCoverage,
+  declaredGapFactKeys, indexLineFor, assertIndexCoverage, assertValueCoverage,
 } = await import("../js/reader-strings.js");
 // Evaluated ONCE per build, over every fact row in every country file.
 const DECLARED_GAP_KEYS = declaredGapFactKeys(allFacts);
@@ -540,6 +383,16 @@ const DECLARED_GAP_KEYS = declaredGapFactKeys(allFacts);
 // nothing under it. Runs once, over all 21 fact
 // files. Today it passes on 12 keys — 5 lines, 7 reasoned withholdings.
 assertIndexCoverage(allFacts);
+// THE VALUE-COVERAGE SWEEP, new 2026-10-28. The old guard was a SHAPE
+// test (lower_snake with a mandatory underscore) that matched none of
+// the tenure/regime tokens and so never fired on them; the replacement
+// is a table-membership test, and this is where it runs over the whole
+// store rather than one page at a time. An unstrung controlled value
+// fails this build with its own fact_key in the message. A RULED HOLD is
+// not a failure — it is counted and printed, so the day the data layer
+// retires the Yes / No / Not yet checked tokens the count drops in the
+// build log instead of silently.
+const HELD_COUNTS = assertValueCoverage(allFacts);
 // READER_SENTENCE_SCOPE_LINE is deliberately NOT imported. It is the
 // lens-selected scope disclosure, and a static page has no lens by
 // definition — its topbar corner already says "Who's asking: nobody
@@ -733,7 +586,7 @@ for (const loc of locations) {
       }
       // A chapter with no facts but real extra content is not a gap, and
       // must not claim to be one.
-      const body = extra || `<p class="fact-notes">Not yet researched — a gap, not a claim that nothing is true here.</p>`;
+      const body = extra || `<p class="fact-notes">${escapeHtml(CHAPTER_GAP_LINE)}</p>`;
       return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${body}</details>`;
     }
     // The index line is the FIRST sub-line in the stack, immediately after
@@ -741,13 +594,32 @@ for (const loc of locations) {
     // makes its "This bar" wording point at the figure directly above it
     // at every viewport. `.index-line` is a hook with no CSS
     // declarations of its own; it inherits `.fact-notes` entirely.
-    const rows = list.map((f) => `
-      <li class="fact-item">
-        <div class="fact-label">${escapeHtml(f.fact_label)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(f))}</div>${indexLineFor(f.fact_key) ? `
-        <div class="fact-notes index-line">${escapeHtml(indexLineFor(f.fact_key))}</div>` : ""}
-        ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
-      </li>`).join("");
+    // ONE EMITTER, ONE ORDERING RULE, BOTH RENDERERS — the spec's G4:
+    // "tools/prerender-locations.mjs applies G1 and G2 identically.
+    // Order divergence between served and hydrated is a new defect of
+    // the class this box closes, and reader-walk cannot see it (it
+    // compares by key, order-insensitive) — so it has to be got right by
+    // construction, not caught afterwards."
+    //
+    // `open: true` is the ONE parameter this surface sets differently,
+    // and it is the same deliberate divergence this file's own header
+    // already argues for chapters: a static page renders everything open
+    // so a crawler that does not execute a click still meets it, and a
+    // no-JS human is not asked to hunt. Shape, order, summary text and
+    // row count are byte-identical to the hydrated page; only the `open`
+    // attribute differs, from one argument in one place.
+    const rows = factListHtml(list, (f) => (factHeld(f) ? "" : factRowHtml({
+      label: escapeHtml(f.fact_label),
+      value: escapeHtml(formatValue(f)),
+      // The index line is the FIRST sub-line in the stack, immediately
+      // after the value it qualifies and inside the same row, which is
+      // what makes its "This bar" wording point at the figure directly
+      // above it at every viewport. `.index-line` is a hook with no CSS
+      // declarations of its own; it inherits `.fact-notes` entirely.
+      indexLine: indexLineFor(f.fact_key)
+        ? `<div class="fact-notes index-line">${escapeHtml(indexLineFor(f.fact_key))}</div>` : "",
+      notes: f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : "",
+    })), { open: true });
     // Head sits above the rows, below the chapter-intro line; foot sits
     // last in the chapter, closing it. `extra` keeps its existing
     // position between them — this file has always emitted it after the
@@ -757,7 +629,10 @@ for (const loc of locations) {
     // emit the same thing.
     const head = readerSentencesHtml(loc.location_id, key, "head");
     const foot = readerSentencesHtml(loc.location_id, key, "foot");
-    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${head}<ul class="fact-list">${rows}</ul>${buildIllegalRoutesHtml(list)}${extra}${foot}</details>`;
+    // The `<ul class="fact-list">` wrappers are factListHtml()'s now: a
+    // group's rows live inside their own list inside their own
+    // `<details class="fact-group">`, and loose rows get their own.
+    return `<details class="${cls}" open id="sec-${key}"><summary>${title}</summary>${intro}${head}${rows}${buildIllegalRoutesHtml(list)}${extra}${foot}</details>`;
   };
 
   const introChapterHtml = chapterHtml(INTRO_SECTION);
@@ -768,7 +643,14 @@ for (const loc of locations) {
   // duplication class this file's own header comment already names for
   // generalIndex()/sectionForFact(). Linked sources stay fully itemized;
   // unlinked sources collapse to one honest, count-stated line.
-  const sourcedFacts = facts.filter((f) => f.value_raw !== "[GAP]" && (f.source_url || f.source_ref));
+  // THE PAIR GATE, §10 of js/fact-rows.js, and the one place this file
+  // applies it: provenanceFacts() drops every fact whose claim row §9
+  // holds from render, so a held row cannot leave its label standing in
+  // the Sources chapter over a source link and a date stamp with no
+  // answer under them. One implementation, both renderers — the test is
+  // NOT restated here. [GAP] rows are never held, so the chapter's own
+  // [GAP] exclusion below is unaffected by it.
+  const sourcedFacts = provenanceFacts(facts).filter((f) => f.value_raw !== "[GAP]" && (f.source_url || f.source_ref));
   const linkedSeen = new Map();
   const unlinkedSeen = new Map();
   for (const f of sourcedFacts) {
@@ -904,3 +786,12 @@ ${THEME_SCRIPT}
 }
 
 console.log(`Prerendered ${written} location pages into ${outDir}`);
+// The ruled holds, printed rather than silent: these are rows that EXIST
+// in derived/ and that this build deliberately does not draw, pending
+// the retirement of those tokens. A hold that disappears from this
+// list is a data change, and the build log is where it should show up.
+const heldTotal = Object.values(HELD_COUNTS).reduce((a, b) => a + b, 0);
+console.log(`Held from render (rows kept in derived/, not drawn): ${heldTotal}`);
+for (const [k, n] of Object.entries(HELD_COUNTS).sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${String(n).padStart(3)}  ${k}`);
+}

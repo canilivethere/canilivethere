@@ -27,8 +27,21 @@ import {
   READER_SENTENCES, READER_SENTENCE_SCOPE_LINE, READER_SENTENCE_POSITIONS,
 } from "./portraits.js";
 import {
-  STORE_VALUE_STRINGS, declaredGapFactKeys, indexLineFor, unregisteredStoreToken,
+  STORE_VALUE_STRINGS, declaredGapFactKeys, indexLineFor,
 } from "./reader-strings.js";
+// THE shared fact-row module. Every emitter below that used to have a
+// hand-kept twin in tools/prerender-locations.mjs now comes from here,
+// so the static page and the hydrated page cannot disagree about row
+// shape, chapter order, dates, the illegal-routes block, or the route
+// grouping the grouping spec sets out. The old contract was a comment in
+// the other file reading "change one, change both"; it was broken 12
+// times in 21 commits. This import is the replacement for that comment.
+import {
+  SECTION_TITLES, SECTION_ORDER, INTRO_SECTION, CHAPTER_GAP_LINE,
+  factRowHtml, factListHtml, sourceGroupDate,
+  sourceFactLinesHtml, buildIllegalRoutesHtml, factHeld, orderGroupFacts,
+  provenanceFacts,
+} from "./fact-rows.js";
 import { siteUrl } from "./site-root.js";
 import { ISO_COUNTRY_NAMES } from "./iso-names.js";
 
@@ -37,24 +50,8 @@ renderTopBar("location");
 wireChapterNav();
 main().then(openHashTargetIfClosedDetails);
 
-const SECTION_TITLES = {
-  overview: "Overview",
-  visa: "Visa & residency",
-  property: "Property",
-  cost: "Cost of living",
-  community: "Community",
-  redflags: "Red flags",
-};
-// Chapter order: verdict, intro, visa, cost of living,
-// property, community, red flags, score breakdown, sources. Cost of
-// living now precedes property. Must stay identical to
-// tools/prerender-locations.mjs's own copy of these two constants so the
-// prerendered and hydrated pages agree.
-const SECTION_ORDER = ["overview", "visa", "cost", "property", "community", "redflags"];
-// The overview chapter is folded into the intro: it renders with the
-// portrait block, second on the page after the verdict, not down in the
-// chapter run. Content untouched — position only.
-const INTRO_SECTION = "overview";
+// SECTION_TITLES, SECTION_ORDER and INTRO_SECTION moved to
+// js/fact-rows.js — one definition, both emitters.
 
 // THE declared-gap set, evaluated ONCE per page load inside main() (see
 // below) over every fact row the store holds, by the register's own
@@ -87,11 +84,21 @@ function indexLineHtml(factKey) {
 // register); a throw at a reader would be worse than the token, so this
 // side drops the row's markup and says so in the console instead.
 function heldFromRender(fact) {
-  if (!unregisteredStoreToken(fact.value_raw)) return false;
-  console.error(
-    `reader-strings: no reader string for store value "${fact.value_raw}" — row held from render`,
-    fact.fact_key || fact.fact_label || "(unkeyed row)",
-  );
+  const reason = factHeld(fact);
+  if (!reason) return false;
+  // A RULED HOLD IS NOT A DEFECT and must not be logged as one. Cap,
+  // 2026-10-28: the Yes / No / Not yet checked roles are "HELD FROM
+  // RENDER, NOT DROPPED FROM THE STORE — the rows stay in derived/, the
+  // module declines to draw them", pending the retirement of those
+  // tokens in the data layer.
+  // Only an unregistered controlled value is a defect worth a reader's
+  // console.
+  if (reason === "unregistered") {
+    console.error(
+      `reader-strings: no reader string for store value "${fact.value_raw}" — row held from render`,
+      fact.fact_key || fact.fact_label || "(unkeyed row)",
+    );
+  }
   return true;
 }
 
@@ -112,6 +119,10 @@ async function main() {
   // holds every fact row in the store, one per fact_key, which is exactly
   // the domain the predicate is defined over.
   declaredGapKeys = declaredGapFactKeys([...store.factsByKey.values()]);
+  // Same one pass, same single source: the route-card label join (see
+  // indexRouteCategoryLabels) reads the facts layer's own researched
+  // labels so no card has to show a title-cased slug.
+  indexRouteCategoryLabels([...store.factsByKey.values()]);
   renderFooter(store);
   const persona = getActivePersona();
 
@@ -202,9 +213,16 @@ async function main() {
   // Partitioned once here instead of buildSourcesSection() and
   // buildVerifyYourself() each independently scanning `facts` for the same
   // value_raw === "[GAP]" condition.
+  // THE PAIR GATE, §10 of js/fact-rows.js, and the one place this file
+  // applies it: provenanceFacts() drops every fact whose claim row
+  // heldFromRender() above declines to draw, so a held row cannot leave
+  // its label standing in the Sources chapter over a source link and a
+  // date stamp with no answer under them. One implementation, both
+  // renderers — the test is NOT restated here. A [GAP] row is never
+  // held, so gapFacts and buildVerifyYourself() are untouched by it.
   const gapFacts = [];
   const sourcedFacts = [];
-  for (const f of facts) {
+  for (const f of provenanceFacts(facts)) {
     (f.value_raw === "[GAP]" ? gapFacts : sourcedFacts).push(f);
   }
   root.appendChild(buildSourcesSection(sourcedFacts));
@@ -866,21 +884,26 @@ function buildPortrait(loc) {
 // sourceDetailHtml() + notes, suppressGapText since a badge sits right
 // alongside per 23.3) — extracted here so the receipts panel below reuses
 // it instead of hand-copying a second markup shape for the same claim.
-function factItemHtml(f) {
+function factItemHtml(f, { scopeTag = false } = {}) {
   if (heldFromRender(f)) return "";
   // Addendum A §A.1: ONE boolean, two slots. The value slot and the chip are
   // both fed from this local so they can never disagree about the row's state
   // the way a phrase-keyed dedupe did.
   const dg = isDeclaredGap(f.fact_key);
-  return `
-      <li class="fact-item">
-        <div class="fact-label">${escapeHtml(f.fact_label)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: dg }))}</div>
-        ${indexLineHtml(f.fact_key)}
-        <div class="fact-meta">${confidenceBadge(f, { declaredGap: dg })} ${divergenceBadge(f)}</div>
-        <div class="source-detail">${sourceDetailHtml(f)}</div>
-        ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
-      </li>`;
+  // THE SHELL IS THE SHARED MODULE'S, and it is what enforces G3 (one
+  // fact, one `.fact-item`). The per-surface extras below — scope tag,
+  // confidence and divergence badges, the source pull-down — are this
+  // page's own and stay here for now; Cap scoped them to a later
+  // crossing. The static twin passes none of them.
+  return factRowHtml({
+    label: escapeHtml(f.fact_label),
+    labelExtra: scopeTag ? scopeTagHtml(f) : "",
+    value: escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: dg })),
+    indexLine: indexLineHtml(f.fact_key),
+    meta: `<div class="fact-meta">${confidenceBadge(f, { declaredGap: dg })} ${divergenceBadge(f)}</div>`,
+    sourceDetail: `<div class="source-detail">${sourceDetailHtml(f)}</div>`,
+    notes: f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : "",
+  });
 }
 
 // Part 23.7: the score-receipts panel's own content, lazy-built on first
@@ -1066,54 +1089,8 @@ function buildSectionNav() {
 // consequences that HAD been researched and were simply no longer
 // published. Silence is the honest empty state here, matching the same
 // absent-note discipline the plain fact rows already use.
-function buildIllegalRoutesHtml(facts) {
-  const illegalFacts = facts.filter(
-    (f) => f.group_role === "mechanism_legality" && f.value_raw === "prohibited-enforced"
-  );
-  if (!illegalFacts.length) return "";
-
-  const rows = illegalFacts.map((legalityFact) => {
-    const groupFacts = facts.filter((f) => f.group_key === legalityFact.group_key);
-    const mechanismFact = groupFacts.find(
-      (f) => f.group_role === "mechanism" && f.group_role_detail === legalityFact.group_role_detail
-    );
-    // (a) the practice, plain language, verbatim from the researched
-    // fact, never softened or dramatized — never authored here.
-    const practice = mechanismFact ? mechanismFact.fact_label : legalityFact.fact_label;
-    // (c) the real, sourced consequence if researched. If it isn't in the
-    // published data, this line renders nothing at all — say nothing rather
-    // than say something false. Never a severity invented to fill the gap.
-    const consequence = (mechanismFact && mechanismFact.notes) || legalityFact.notes || "";
-    // v5 why+instead: a sibling `mechanism` fact in the same group whose
-    // own legality sibling reads "legitimate" is a real lawful
-    // alternative already rendered elsewhere in this same chapter (the
-    // plain fact list above) — named and pointed to, never invented when
-    // none exists.
-    const lawfulAlternatives = groupFacts.filter((f) => {
-      if (f.group_role !== "mechanism" || f.group_role_detail === legalityFact.group_role_detail) return false;
-      const sibling = groupFacts.find(
-        (g) => g.group_role === "mechanism_legality" && g.group_role_detail === f.group_role_detail
-      );
-      return sibling && sibling.value_raw === "legitimate";
-    });
-    const insteadHtml = lawfulAlternatives.length
-      ? `<div class="fact-notes">Lawful alternative in this same section: ${lawfulAlternatives.map((a) => escapeHtml(a.fact_label)).join(", ")}.</div>`
-      : `<div class="fact-notes">No lawful alternative is recorded in this section yet — a gap, not a claim that none exists.</div>`;
-    return `
-      <div class="illegal-route-row">
-        <div class="fact-label">${escapeHtml(practice)}</div>
-        <div class="fact-value"><strong>Illegal</strong></div>
-        ${consequence ? `<div class="fact-notes">${escapeHtml(consequence)}</div>` : ""}
-        ${insteadHtml}
-      </div>
-    `;
-  }).join("");
-
-  // Heading + label strings ("Illegal but sometimes practiced", "Illegal")
-  // are fixed template copy, ruled by v7 Part 14 item 2/3 (confirmed in
-  // Part 17) — transported verbatim here, not reworded.
-  return `<div class="illegal-routes"><h3>Illegal but sometimes practiced</h3>${rows}</div>`;
-}
+// buildIllegalRoutesHtml() MOVED to js/fact-rows.js, byte-identical in
+// both files before the move. Imported above.
 
 // "Your realistic paths in" per location — the
 // website-brief's own §4 spec for this chapter ("Visa & residency
@@ -1246,12 +1223,132 @@ function isVisitRoute(routeKey) {
 // hyphen in the source slug (the source's own way of joining two distinct
 // clauses, e.g. "visa-free-entry--most-nationalities") renders as an
 // en-dash-joined pair of phrases rather than one run-on phrase.
-function routeCategoryLabel(routeKey) {
+function deslugRouteCategory(routeKey) {
   const slug = routeKey.split(":visit:")[1] || routeKey;
   return slug
     .split("--")
     .map((clause) => clause.split("-").map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(" "))
     .join(" – ");
+}
+
+// ---------------------------------------------------------------------
+// THE RELABEL REPAIR, 2026-10-28, Cap's word inside the hydration
+// crossing: "Relabels are fixed inside this crossing."
+//
+// The de-slug above is a mechanical transform and it shows. Title-casing
+// a slug word-by-word mangles every acronym and every non-English name in
+// it, and those strings reached a reader's eye on the "Visa routes at a
+// glance" cards: `Eu Eea Freedom Of Movement Tier`,
+// `Schengen Annex Ii Visa Exempt Tier Remaining`, `Voa E Voa Tier`,
+// `Ca4 Freedom Of Movement Tier`, `Permiso De Ingreso Y Permanencia Pip`.
+//
+// The fix is a JOIN, not an authored string, and that distinction is the
+// whole point: this seat writes no facts and no reader vocabulary. Every
+// one of these route groups already has researched labels in the facts
+// layer, under a `group_key` that is byte-identical to the route's own
+// `route_key`. The label is lifted from there:
+//
+//   1. the head clause of any NON-nationality-list fact in the group —
+//      "EU/EEA freedom-of-movement tier -- max duration (unconditional
+//      base term)" yields "EU/EEA freedom-of-movement tier";
+//   2. failing that, the tail clause of an `eligible_nationality_list`
+//      fact — "Eligible-nationality list — 30-day Visa Exemption Scheme"
+//      yields "30-day Visa Exemption Scheme", which is the scheme's own
+//      researched name;
+//   3. failing that, the de-slug, unchanged.
+//
+// A `restricted_nationality_list` label is deliberately NOT used as a
+// card title, though it is often the only text left. A restriction is
+// not a name: that tier's label would become "visa required in advance,
+// 30-day cap" on a card whose subject is the general tourist entry
+// route, which states a condition where a reader expects a route name.
+// Choosing per-row which restricted labels read as names and which do
+// not would be this seat authoring reader vocabulary, so it does not.
+// Eight groups therefore still show a de-slug —
+// ave-electronic-authorization, calling-visa-restricted,
+// category-b-consular-visa, category-c-consulted-visa,
+// china-india-visa-required, general-tourist-entry,
+// permiso-de-ingreso-y-permanencia-pip, visitante-turismo-v-tu-required
+// — and two of those eight read badly ("Permiso De Ingreso Y Permanencia
+// Pip", "Visitante Turismo V Tu Required Tier"). That is a DATA gap (no
+// researched label on the group), raised as a task row, not something to
+// invent here.
+//
+// TWO INDEXES, AND THE SECOND ONE IS WHERE THE TRAP IS. A country whose
+// own facts never carry the group gets nothing from a route-key index —
+// five of the Schengen pages were in exactly that position, and the
+// category slug after `:visit:` is identical across the countries that
+// share an entry regime, so the obvious move is to index on the slug and
+// let whichever country documented it supply the label for all of them.
+// That is right for 20 of the 21 slugs with a label, and wrong for one.
+// `visa-exempt-general-tier` carries FOUR different researched labels —
+// "general visa-exempt tourist entry (FMM), up to 180 days" (Mexico),
+// "general visa-exempt tourist entry (PIP), 90 days", "general
+// visa-exempt tourist entry, 90 days", "visa-exempt general tier (90
+// days/180)" — because the regime really does differ by country. A
+// slug index would have printed Mexico's 180-day FMM label on another
+// country's card: a wrong fact on a reader's screen, authored by a
+// convenience. So a slug only enters the shared index when every country
+// using it agrees on one label; a conflicted slug is dropped from it
+// entirely and falls back to the de-slug.
+const SEP_FIRST = /\s(?:--|—|-)\s/;
+const NATIONALITY_LIST_ROLES = new Set(["eligible_nationality_list", "restricted_nationality_list"]);
+let routeLabelByGroup = new Map();
+let routeLabelBySlug = new Map();
+// group_key -> the facts layer's own rows for that group. Built in the
+// SAME single pass as the label index below, for the ':visit:' card join
+// (see buildVisaRoutesHtml). No second data source, no per-card scan.
+let routeFactsByGroup = new Map();
+
+const visitSlug = (groupKey) => (groupKey.includes(":visit:") ? groupKey.split(":visit:")[1] : null);
+
+// Built once per page load from the same `store.factsByKey` every other
+// surface reads, in the same place declaredGapKeys is built — one pass,
+// no second data source, no per-card scan.
+function indexRouteCategoryLabels(facts) {
+  const heads = new Map(), tails = new Map();
+  routeFactsByGroup = new Map();
+  // slug -> Set of distinct labels, so a disagreement is visible rather
+  // than resolved by whichever row happened to be read first.
+  const bySlug = new Map();
+  const remember = (slug, label) => {
+    if (!slug) return;
+    if (!bySlug.has(slug)) bySlug.set(slug, new Set());
+    bySlug.get(slug).add(label);
+  };
+  for (const f of facts) {
+    const gk = f.group_key;
+    if (!gk || !f.fact_label) continue;
+    if (!routeFactsByGroup.has(gk)) routeFactsByGroup.set(gk, []);
+    routeFactsByGroup.get(gk).push(f);
+    if (f.group_role === "eligible_nationality_list") {
+      const s = f.fact_label.replace(/^(?:Eligible|Restricted)-nationality list\b/, "").trim();
+      if (s === f.fact_label) continue;
+      const m = SEP_FIRST.exec(" " + s);
+      let out = m && m.index === 0 ? s.slice(m[0].length - 1).trim() : s;
+      if (out.startsWith("(") && out.endsWith(")")) out = out.slice(1, -1).trim();
+      if (!out) continue;
+      if (!tails.has(gk)) tails.set(gk, out);
+      remember(visitSlug(gk), out);
+    } else if (!NATIONALITY_LIST_ROLES.has(f.group_role)) {
+      const m = SEP_FIRST.exec(f.fact_label);
+      const out = (m ? f.fact_label.slice(0, m.index) : f.fact_label).trim();
+      if (!out) continue;
+      if (!heads.has(gk)) heads.set(gk, out);
+      remember(visitSlug(gk), out);
+    }
+  }
+  routeLabelByGroup = new Map([...tails, ...heads]);
+  routeLabelBySlug = new Map();
+  for (const [slug, labels] of bySlug) {
+    if (labels.size === 1) routeLabelBySlug.set(slug, [...labels][0]);
+  }
+}
+
+function routeCategoryLabel(routeKey) {
+  return routeLabelByGroup.get(routeKey)
+    || routeLabelBySlug.get(visitSlug(routeKey))
+    || deslugRouteCategory(routeKey);
 }
 
 // Part 25.6: the entry-tier display phrases, all five ruled tokens
@@ -1367,9 +1464,11 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
   if (!rows.length) return "";
   // Grouped by route_key so a route documented as several sub-thresholds
   // (Thailand's LTR categories, its O-A/O-X tiers) renders as one card
-  // with each threshold as its own row — mirrors the existing
-  // fact-group route-card idiom above exactly, applied to this data
-  // source instead.
+  // with each threshold as its own `.fact-item` row.
+  // (THE PREVIOUS SENTENCE HERE — "mirrors the existing fact-group
+  // route-card idiom above exactly" — was stale in shipped source: that
+  // idiom was deleted on 2026-10-28 and no longer exists. Caught in
+  // design review, §4.5.)
   const byRoute = new Map();
   for (const r of rows) {
     if (!byRoute.has(r.route_key)) byRoute.set(r.route_key, []);
@@ -1484,22 +1583,108 @@ function buildVisaRoutesHtml(store, country, nationalityRow = null) {
       // confidenceBadge() is handed the synthesised `asFact`. Two different
       // inputs deciding one row's two slots is the defect class this removes.
       const dg = isDeclaredGap(r.threshold_fact_key);
-      const valueHtml = visit ? "" : `<div class="fact-value">${escapeHtml(formatValue(asFact, { suppressGapText: true, declaredGap: dg }))}</div>`;
-      return `
-        <div class="fact-label">${escapeHtml(label)}</div>
-        ${valueHtml}
-        ${valueHtml ? indexLine : ""}
-        <div class="fact-meta">${confidenceBadge(asFact, { declaredGap: dg })} ${divergenceBadge(asFact)}</div>
-        <div class="source-detail">${sourceDetailHtml(asFact)}</div>
-        ${notes.join("")}
-      `;
-    }).join("<hr>");
-    return `<div class="fact-item">${rowsHtml}${passportGateLineHtml(nationalityRow, routeKey)}</div>`;
+      const valueHtml = visit ? null : escapeHtml(formatValue(asFact, { suppressGapText: true, declaredGap: dg }));
+      // D4, design spec §3: THE `<div class="fact-item">` WRAPPER IS GONE.
+      // It held several route rows inside ONE `.fact-item`, separated by
+      // `<hr>`s that render inside a grid `.fact-item` as a ~5px centred
+      // dash. Measured: 3 cards held more than one row (EG
+      // real-estate-investment-residency x3, MY de-rantau x2, MY mm2h
+      // x2), so 4 rows were invisible to every counter in this repo —
+      // including the reader walk, which keys a row on its first
+      // `.fact-label`. Egypt's three real-estate tiers were the worked
+      // example and they are now three rows. factRowHtml() makes the
+      // old shape unemittable rather than merely discouraged.
+      return factRowHtml({
+        label: escapeHtml(label),
+        value: valueHtml,
+        indexLine: valueHtml ? indexLine : "",
+        meta: `<div class="fact-meta">${confidenceBadge(asFact, { declaredGap: dg })} ${divergenceBadge(asFact)}</div>`,
+        sourceDetail: `<div class="source-detail">${sourceDetailHtml(asFact)}</div>`,
+        notes: notes.join(""),
+      });
+    });
+
+    // ----------------------------------------------------------------
+    // ':visit:' CARDS — the join Cap ordered, 2026-10-28: "join each
+    // visit card's own facts in; a card with nothing under it is listed
+    // as research, not hidden."
+    //
+    // Measured on derived/visa-routes.jsonl: 42 of the 97 route cards
+    // are ':visit:' rows — 100% of them — and in the no-lens state each
+    // one rendered a name, a confidence badge and NOTHING ELSE. On
+    // GT-antigua that was four of seven cards, one of them carrying a
+    // bare "Speculative" badge under a route name with no claim beneath
+    // it: disclosure attached to nothing. They sat under a heading
+    // promising routes "compared side by side" with nothing to compare.
+    //
+    // THE FIX IS A JOIN, NOT A VOCABULARY, and not the design spec's
+    // interim suppress option, which Cap refused by name. Every one of
+    // the 42 has facts in the facts layer under a `group_key`
+    // byte-identical to its own `route_key` — measured this session: 42
+    // of 42, carrying
+    // `eligible_nationality_list` (28), `restricted_nationality_list`
+    // (14), `max_duration` (9) and `renewability` (3). Those rows' VALUE
+    // is the answer a reader came for (which passports, how long), and
+    // the card never showed it.
+    //
+    // Rendered COMPACT here — label and value, in G2's role order, each
+    // its own `.fact-item` — and in full, with confidence badge and
+    // source panel, in the chapter below. That is the summary/detail
+    // pair the design spec's §3 asks for: a card that is shorter and
+    // comparative, and a labelled door to the same route's evidence. The
+    // coalesced
+    // route-level confidence badge is NOT rendered on a joined visit
+    // card: `routeAsFact()`'s own comment records that a ':visit:' row's
+    // provenance is COALESCEd across up to four different companion
+    // facts whose values the card never printed, and each joined fact
+    // now carries its own badge downstairs. One badge generalised over
+    // four claims, beside the four claims themselves, states something
+    // nobody measured.
+    const visitFacts = isVisitRoute(routeKey)
+      ? orderGroupFacts(routeKey, (routeFactsByGroup.get(routeKey) || []))
+      : [];
+    const gate = passportGateLineHtml(nationalityRow, routeKey);
+    let cardHtml;
+    if (visitFacts.length) {
+      const joined = visitFacts.map((f) => (heldFromRender(f) ? "" : factRowHtml({
+        label: escapeHtml(f.fact_label),
+        value: escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: isDeclaredGap(f.fact_key) })),
+      }))).filter(Boolean);
+      // Same singleton rule factListHtml() applies in the chapters: a
+      // `<details>` over ONE row is a door to nothing, and the single
+      // fact's own researched label already names the scheme ("Eligible-
+      // nationality list — 30-day Visa Exemption Scheme"). Measured:
+      // 33 of the 42 ':visit:' routes hold exactly one joined fact and
+      // render as a plain row; 6 hold two and 3 hold three, and those
+      // nine get the block.
+      if (joined.length > 1) {
+        cardHtml = `<details class="fact-group" open><summary>${escapeHtml(routeCategoryLabel(routeKey))} <span class="fact-group-count">${joined.length}</span></summary><ul class="fact-list">${joined.join("")}</ul>${gate}</details>`;
+      } else if (joined.length === 1) {
+        cardHtml = `<ul class="fact-list">${joined[0]}</ul>${gate}`;
+      } else {
+        cardHtml = "";
+      }
+    }
+    if (cardHtml === undefined) cardHtml = `<ul class="fact-list">${rowsHtml.join("")}</ul>${gate}`;
+    if (!cardHtml) {
+      // LISTED AS RESEARCH, NOT HIDDEN — Cap's words. A route with no
+      // value and no joined fact still names itself and says plainly
+      // that nothing is on file behind it, in the site's own existing
+      // ratified gap wording. No confidence badge: a badge with no claim
+      // under it is disclosure attached to nothing.
+      // Fires on 0 of 97 cards today (all 42 ':visit:' rows have facts);
+      // it exists so the day one does not, the route is still listed.
+      cardHtml = `<ul class="fact-list">${factRowHtml({
+        label: escapeHtml(isVisitRoute(routeKey) ? routeCategoryLabel(routeKey) : (group[0].threshold_label || routeKey)),
+        notes: `<div class="fact-notes">${escapeHtml(CHAPTER_GAP_LINE)}</div>`,
+      })}</ul>${gate}`;
+    }
+    return cardHtml;
   }).join("");
   return `
     <h3>Visa routes at a glance</h3>
     <p class="fact-notes">Every documented route into ${escapeHtml(country.name)}, compared side by side — the general figures, not read against anyone in particular. Only the verdict above is read for whoever this page is shown for, where there is one. The full write-up for each, with sourced notes, is right below.</p>
-    <div class="fact-list">${cards}</div>
+    ${cards}
   `;
 }
 
@@ -1603,89 +1788,85 @@ function buildSection(key, facts, extraHtml = "", locationId = null) {
     return details;
   }
 
-  // Group visa-route facts (group_key) into route cards; everything else
-  // renders as a plain fact item. Mechanical grouping only (schema §2's
-  // visa_route view), no interpretation of what a route "means". Facts are
-  // accumulated per group_role as an array, never assigned to a single
-  // slot: a route can legitimately hold several distinct facts sharing one
-  // role (e.g. one "threshold" fact per named sub-category, like Thailand's
-  // five LTR categories or its two O-A/O-X tiers) — collapsing them to one
-  // would silently render a combination the data never actually states.
-  const routeGroups = new Map();
-  const plain = [];
-  for (const f of facts) {
-    if (f.group_key) {
-      if (!routeGroups.has(f.group_key)) routeGroups.set(f.group_key, new Map());
-      const byRole = routeGroups.get(f.group_key);
-      if (!byRole.has(f.group_role)) byRole.set(f.group_role, []);
-      byRole.get(f.group_role).push(f);
-    } else {
-      plain.push(f);
-    }
-  }
-
+  // THE 2026-10-28 HYDRATION REPAIR, AND WHAT 2026-10-28 LANE 3c ADDS.
+  //
+  // Until that repair, EVERY fact carrying a `group_key` was swept into a
+  // route card, and the card rendered exactly three of the twenty roles
+  // on file — `threshold`, `converts_to_pr`, `accepts_passive_income`.
+  // The other seventeen reached no reader at all once JavaScript ran:
+  // measured across derived/facts/, 461 grouped facts of which 327 carry
+  // a role the card never rendered — `eligible_nationality_list` (31)
+  // and `restricted_nationality_list` (17), the rows whose VALUE is the
+  // list of countries; `mechanism_legality` (32), `mechanism` (35) and
+  // `regime_shape` (25), the freehold/tenure layer; `age_gate` (34);
+  // `income_type_required` (53), which is where the "Rules this kind of
+  // income out." refusal sentence lives; `max_duration` (29),
+  // `renewability` (8), `documentation_shape` (16), `diligence_risk`
+  // (12), `transaction_cost_load` (9) and the rest. The served page
+  // renders every one of them as an ordinary labelled row. The
+  // interactive page dropped them, so a reader with JavaScript on was
+  // shown a THINNER page than a reader with it off — and the
+  // hard-constraint layer was the heaviest loss, the worst possible
+  // class to lose. A second, quieter dropper sat below it: a group whose
+  // facts included no `threshold` row was skipped entirely by
+  // `continue`, taking every other fact in it with it.
+  //
+  // So the wrapper went, and nothing was lost by its going. What WAS
+  // lost, and is restored here, is PROXIMITY — which this stylesheet
+  // already treats as a visual property in its own words, at
+  // `.source-fact`: "Grouping is carried by proximity alone." The
+  // grouping spec measured the damage across all 21
+  // derived/facts/*.jsonl: 126 groups,
+  // 36 singletons, 90 multi-fact groups, of which 85 rendered
+  // NON-CONTIGUOUS with 3,452 unrelated rows sitting inside group spans
+  // site-wide. A route's own parts ended up ten rows apart.
+  //
+  // factListHtml() is that spec, built in js/fact-rows.js and applied
+  // identically by tools/prerender-locations.mjs: G1 anchored contiguity
+  // (a group renders in full where its first member already sat), G2 the
+  // reader's question order inside it WITH THE REFUSAL SECOND, G3 one
+  // fact one `.fact-item`, G5 the group as a `<details class="fact-group">`
+  // whose summary is the lead row's own researched label verbatim, G6 the
+  // row count, G7 a block containing a stated refusal does not collapse.
+  //
+  // `.fact-item` carries no card chrome in css/style.css — it is a
+  // dotted-underline grid row, declared at line 1717:
+  // `border-bottom: 1px dotted var(--line); padding: 0.6rem 0; display:
+  // grid; grid-template-columns: 1fr; gap: 0.15rem;` — and no other rule
+  // in the file adds a box, background or radius to it. (THE EARLIER
+  // CITATION HERE WAS WRONG and is corrected: line 1699 sits inside the
+  // `.illegal-routes` comment block and says "Never route-card chrome
+  // (Part 14 item 1) — deliberately not built on `.fact-list`/
+  // `.fact-item`", which is a rule about a DIFFERENT element that
+  // distinguishes it FROM `.fact-item`. The conclusion was right, the
+  // citation was not. Caught in design review, 2026-10-28.)
   const readerHeadHtml = readerSentencesHtml(locationId, key, "head");
   let bodyHtml = introHtml + readerHeadHtml + extraHtml;
-  if (routeGroups.size) {
-    bodyHtml += `<div class="fact-list">`;
-    for (const [, byRole] of routeGroups) {
-      const thresholds = byRole.get("threshold") || [];
-      // No threshold fact in this group: nothing to anchor a card on.
-      // Not rendered here — a data-layer coverage gap (route-card
-      // extraction), not something this render pass authors a fix for.
-      if (!thresholds.length) continue;
-      const convertsToPr = byRole.get("converts_to_pr") || [];
-      const acceptsPassive = byRole.get("accepts_passive_income") || [];
-      bodyHtml += `<div class="fact-item">`;
-      // One label/value/meta block per threshold sub-category — every one
-      // renders, none silently wins over another.
-      bodyHtml += thresholds.map((t) => {
-        if (heldFromRender(t)) return "";
-        // Addendum A §A.1: ONE boolean, two slots.
-        const dg = isDeclaredGap(t.fact_key);
-        return `
-        <div class="fact-label">${escapeHtml(t.fact_label)}${scopeTagHtml(t)}</div>
-        <div class="fact-value">${escapeHtml(formatValue(t, { suppressGapText: true, declaredGap: dg }))}</div>
-        ${indexLineHtml(t.fact_key)}
-        <div class="fact-meta">${confidenceBadge(t, { declaredGap: dg })} ${divergenceBadge(t)}</div>
-        <div class="source-detail">${sourceDetailHtml(t)}</div>
-        ${t.notes ? `<div class="fact-notes">${escapeHtml(t.notes)}</div>` : ""}
-      `;
-      }).join(thresholds.length > 1 ? "<hr>" : "");
-      // Same for the two route-mechanics lines: when a role holds more than
-      // one fact (e.g. Thailand's LTR "accepts passive income" differs by
-      // sub-category), each one renders under its own fact_label instead of
-      // one generic prefix standing in for facts that disagree.
-      bodyHtml += convertsToPr.map((c) => `<div class="fact-notes">${convertsToPr.length > 1 ? escapeHtml(c.fact_label) : "Converts to permanent residency"}: <strong>${escapeHtml(c.value_raw)}</strong></div>`).join("");
-      bodyHtml += acceptsPassive.map((a) => `<div class="fact-notes">${acceptsPassive.length > 1 ? escapeHtml(a.fact_label) : "Accepts passive income"}: <strong>${escapeHtml(a.value_raw)}</strong></div>`).join("");
-      bodyHtml += `</div>`;
-    }
-    bodyHtml += `</div>`;
-  }
+  // The two route-mechanics note lines ("Converts to permanent residency:
+  // …", "Accepts passive income: …") used to be stapled under the
+  // threshold inside the card, re-labelled with a generic prefix instead
+  // of the fact's own label. They go with the card, and nothing is lost:
+  // both roles render as ordinary rows below, under their OWN
+  // `fact_label`, with their own confidence badge and source panel —
+  // which is what the served page does and strictly more than the note
+  // line carried.
 
-  bodyHtml += `<ul class="fact-list">` + plain.map((f) => {
-    if (heldFromRender(f)) return "";
-    // Addendum A §A.1: ONE boolean, two slots.
-    const dg = isDeclaredGap(f.fact_key);
-    return `
-    <li class="fact-item">
-      <div class="fact-label">${escapeHtml(f.fact_label)}${scopeTagHtml(f)}</div>
-      <div class="fact-value">${escapeHtml(formatValue(f, { suppressGapText: true, declaredGap: dg }))}</div>
-      ${indexLineHtml(f.fact_key)}
-      <div class="fact-meta">${confidenceBadge(f, { declaredGap: dg })} ${divergenceBadge(f)}</div>
-      <div class="source-detail">${sourceDetailHtml(f)}</div>
-      ${f.notes ? `<div class="fact-notes">${escapeHtml(f.notes)}</div>` : ""}
-    </li>`;
-  }).join("") + `</ul>`;
+  // One emitter, one ordering rule, both renderers. The `<ul>` wrappers
+  // are factListHtml()'s, because a group's rows live inside their own
+  // list inside their own `<details>`.
+  bodyHtml += factListHtml(facts, (f) => factItemHtml(f, { scopeTag: true }));
 
   // v7 Part 14: reads this SAME section's own already-loaded `facts`
-  // array (before the routeGroups/plain split above), since a
-  // `mechanism_legality` fact carries a group_key and would otherwise
-  // only ever reach the routeGroups branch — which silently drops any
-  // group with no `threshold` role fact (see the comment above), meaning
-  // it would never render at all without this dedicated pass. Renders
-  // nothing (empty string) until a real prohibited-enforced fact exists
-  // in this section's facts.
+  // array. It needed its own pass when a `mechanism_legality` fact could
+  // only ever reach the route-card branch, which silently dropped any
+  // group with no `threshold` role fact; since 2026-10-28 that branch is
+  // gone and every fact reaches the plain rows above, so this pass is no
+  // longer the only thing standing between a prohibited-mechanism fact
+  // and the reader. It stays because it renders a DIFFERENT thing — the
+  // plain-words illegal-route block, not the row — and the twin in
+  // tools/prerender-locations.mjs emits it too. Renders nothing (empty
+  // string) until a real prohibited-enforced fact exists in this
+  // section's facts.
   bodyHtml += buildIllegalRoutesHtml(facts);
 
   // Last inside the chapter, below the fact rows: Cap's foot position. The
@@ -1705,89 +1886,20 @@ function buildSection(key, facts, extraHtml = "", locationId = null) {
 // each, dedup'd by URL exactly as before; unlinked sources collapse to
 // ONE honest, count-stated line — never suppressed outright, since "on
 // file but unlinked" is still real evidence.
-// --- Date semantics: a hard rule, not a style choice -------------------
-// A fact's `date` is when the figure was true or the rule took effect —
-// it never moves on a recheck. The check date is a separate field,
-// `last_verified_date`, and it is SPARSE (165 of 2,196 public rows carry
-// one). Absent is therefore the default case, and nothing below may say
-// "checked" from `date`. Hand-synced with the identical block in
-// tools/prerender-locations.mjs, so the prerendered and hydrated pages
-// say the same thing about the same fact.
-const ISO_DATE_RE = /^\d{4}-\d{2}(-\d{2})?$/;
-
-// One date value as a chip that names its own subject.
-// `dated X` is the same string the inline source pull-down renders
-// (sourceDetailHtml(), app-shared.js), so both surfaces name this field
-// pair with the same two words instead of two vocabularies for one pair.
-// `Not stated` is the date field's only null-marker — an exact stored
-// string — and it is glossed rather than printed raw: "dated Not stated"
-// is not a sentence, and a bare "Not stated" chip sitting beside the word
-// "source" reads as "the source is not stated", which is false, since
-// every one of those rows carries a live link. Same move, and the same
-// class of copy, as this chapter's "Source noted — no link available yet".
-function dateChip(value) {
-  return value === "Not stated"
-    ? `<span class="scope-tag">date not stated</span>`
-    : `<span class="scope-tag">dated ${escapeHtml(value)}</span>`;
-}
-
-// One fact's own dates: its effective date, plus the check date only
-// where one really exists.
-function factDateTags(f) {
-  const parts = [];
-  if (f.date) parts.push(dateChip(f.date));
-  if (f.last_verified_date) parts.push(`<span class="scope-tag">checked ${escapeHtml(f.last_verified_date)}</span>`);
-  return parts.join(" ");
-}
-
-// The group-level date claim for a URL group. URL grouping is kept. This
-// prints on the row's TRAILING attribution line beside the link, never
-// above the facts, and only ever states something true of EVERY fact in
-// the group:
-//   - all dates and check dates identical -> that one date (+ check),
-//     and no per-fact breakdown is needed;
-//   - dates identical, check dates differ -> the shared date alone, with
-//     no check claim, because no check claim is true of all of them;
-//   - dates differ, all real ISO dates -> a span, earliest to latest;
-//   - dates differ and any is not a plain ISO date ("Not stated",
-//     "2026-06-02 (passed)") -> no date at all; a span across a non-date
-//     would be nonsense. The per-fact lines carry the truth.
-// Position is load-bearing: printed BELOW the per-fact lines, a span can
-// only be read as a summary of what the reader has just read. Printed
-// above them, in the same chip style a single fact's date uses, it reads
-// as one figure's validity period, which it is not.
-function sourceGroupDate(groupFacts) {
-  const dates = [...new Set(groupFacts.map((f) => f.date || ""))];
-  const checks = [...new Set(groupFacts.map((f) => f.last_verified_date || ""))];
-  if (dates.length === 1 && checks.length === 1) {
-    return { uniform: true, html: factDateTags(groupFacts[0]) };
-  }
-  if (dates.length === 1) {
-    return { uniform: false, html: dates[0] ? dateChip(dates[0]) : "" };
-  }
-  if (dates.every((d) => ISO_DATE_RE.test(d))) {
-    const sorted = dates.slice().sort();
-    return {
-      uniform: false,
-      html: `<span class="scope-tag">dated ${escapeHtml(sorted[0])} to ${escapeHtml(sorted[sorted.length - 1])}</span>`,
-    };
-  }
-  return { uniform: false, html: "" };
-}
-
-// The per-fact breakdown, rendered whenever a group's facts do not share
-// one date: every fact named with its OWN date, in data order (no
-// re-sort — string-sorting mixed date shapes is exactly the bug this
-// avoids). The span on the attribution line below is therefore a summary
-// of the set, not a claim about this list's order, and nothing on the
-// page says otherwise. The confidence badge rides down here with its own
-// fact too: one badge for the group would be the first fact's,
-// generalised over claims that don't share it.
-function sourceFactLinesHtml(groupFacts) {
-  return `<ul class="source-facts">${groupFacts.map((f) => `
-            <li class="source-fact"><span class="source-fact-label">${escapeHtml(f.fact_label)}</span> ${confidenceBadge(f, { interactive: false })} ${factDateTags(f)}</li>`).join("")}
-          </ul>`;
-}
+// --- Date semantics ---------------------------------------------------
+// dateChip(), factDateTags(), sourceGroupDate() and sourceFactLinesHtml()
+// MOVED to js/fact-rows.js, which states the rule in full: a fact's
+// `date` is when the figure was true or the rule took effect and never
+// moves on a recheck; `last_verified_date` is a separate, sparse field,
+// so nothing may say "checked" from `date`. Hand-synced copies in
+// tools/prerender-locations.mjs are gone with them.
+//
+// The one difference between the two surfaces is a SLOT, not a fork: the
+// hydrated per-fact source line rides a confidence badge with each fact,
+// because one badge for the group would be the first fact's generalised
+// over claims that do not share it. The static page has no badge and
+// passes nothing. See the `badgeHtml` argument below.
+const SOURCE_FACT_BADGE = { badgeHtml: (f) => confidenceBadge(f, { interactive: false }) };
 
 function buildSourcesSection(sourcedFacts) {
   const details = document.createElement("details");
@@ -1840,7 +1952,7 @@ function buildSourcesSection(sourcedFacts) {
     // meets a fact label at the top of every row without exception.
     return `
         <li class="fact-item">
-          ${sourceFactLinesHtml(groupFacts)}
+          ${sourceFactLinesHtml(groupFacts, SOURCE_FACT_BADGE)}
           <div class="fact-value">${sourceLine(f)}${dateHtml ? ` ${dateHtml}` : ""}</div>
         </li>`;
   }).join("");

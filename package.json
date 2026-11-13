@@ -2,8 +2,15 @@
   "name": "canilivethere",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "license": "SEE LICENSE IN LICENSE",
-  "description": "Developer tooling for the CanILiveThere site. The site itself is backend-free and ships NO JavaScript dependencies: every page is plain HTML, CSS and browser ES modules, and nothing under node_modules/ is ever served to a reader. This file exists for one reason -- so the site can be opened in a real rendered browser DOM before publication, instead of being reviewed by reading its source. See the 'Inspecting a rendered page' section of README.md.",
+  "description": "Developer tooling for the CanILiveThere site. The site itself is backend-free and ships NO JavaScript dependencies: every page is plain HTML, CSS and browser ES modules, and nothing under node_modules/ is ever served to a reader. This file exists for developer tooling only: the store tests (npm test, Node's built-in runner, no dependencies), the live-site smoke test (npm run smoke), and a real rendered browser DOM so the site can be opened before publication instead of being reviewed by reading its source. See the 'Inspecting a rendered page' section of README.md.",
+  "scripts": {
+    "test": "node --test --no-warnings \"tests/*.test.mjs\"",
+    "smoke": "node tools/smoke.mjs",
+    "baseline": "node --no-warnings tools/write-baseline.mjs",
+    "fixture-report": "node --no-warnings tools/fixture-report.mjs"
+  },
   "devDependencies": {
     "playwright": "1.63.0"
   }

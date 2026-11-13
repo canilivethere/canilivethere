@@ -2,3 +2,6 @@
 exclude:
   - CLAUDE.md
   - CLAUDE.local.md
+# Dot-folders Jekyll would otherwise skip, served on purpose.
+include:
+  - .well-known

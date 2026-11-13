@@ -8,6 +8,6 @@ test("change rule: a changed figure carries a changed date and a source", (t) =>
   if (!base) { t.skip("no base revision to compare against"); return; }
   const removed = [];
   const failures = changeRuleFailures(base, { removed });
-  if (removed.length) t.diagnostic(`${removed.length} row(s) removed against ${base.slice(0, 7)}: ${removed.slice(0, 10).join(", ")}`);
-  assert.deepEqual(failures, [], `against ${base.slice(0, 7)}:\n  ${failures.join("\n  ")}`);
+  if (removed.length) t.diagnostic(`${removed.length} row(s) removed against ${base.length === 40 ? base.slice(0, 7) : base}: ${removed.slice(0, 10).join(", ")}`);
+  assert.deepEqual(failures, [], `against ${base.length === 40 ? base.slice(0, 7) : base}:\n  ${failures.join("\n  ")}`);
 });

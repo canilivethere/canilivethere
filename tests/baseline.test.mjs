@@ -22,5 +22,5 @@ test("baseline: may only shrink against the base revision", (t) => {
     const was = new Set(before[k] || []);
     for (const id of ids) if (!was.has(id)) grown.push(`${k}: ${id}`);
   }
-  assert.deepEqual(grown, [], `baseline grew against ${base.slice(0, 7)}:\n  ${grown.slice(0, 20).join("\n  ")}`);
+  assert.deepEqual(grown, [], `baseline grew against ${base.length === 40 ? base.slice(0, 7) : base}:\n  ${grown.slice(0, 20).join("\n  ")}`);
 });

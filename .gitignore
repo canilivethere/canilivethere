@@ -29,3 +29,6 @@ node_modules/
 # PLAYWRIGHT_BROWSERS_PATH=0 and the download lands beside the code.
 .cache/ms-playwright/
 ms-playwright/
+
+# Local Claude Code memory: imports private working notes. Never publishable.
+CLAUDE.local.md

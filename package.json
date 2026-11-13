@@ -8,8 +8,7 @@
   "scripts": {
     "test": "node --test --no-warnings \"tests/*.test.mjs\"",
     "smoke": "node tools/smoke.mjs",
-    "baseline": "node --no-warnings tools/write-baseline.mjs",
-    "fixture-report": "node --no-warnings tools/fixture-report.mjs"
+    "baseline": "node --no-warnings tools/write-baseline.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

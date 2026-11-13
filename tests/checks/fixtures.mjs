@@ -94,17 +94,3 @@ export function verdictFailures(store) {
   return verdictComparison(store).mismatches.map((m) => `verdict:${m.tag}:engine-${m.ratio >= 1 ? "clears" : "short"}`);
 }
 
-// Report, not a test: each criterion fixture's expected value against the
-// place's current score. A persona's value may differ from the general
-// score by design; the list is for the maintainer to read.
-export function fixtureScoreComparison(store) {
-  const score = new Map(store.scores.map((s) => [`${s.location_id}:${s.criterion_id}`, s]));
-  const rows = [];
-  for (const f of store.fixtures) {
-    if (f.criterion_id == null) continue;
-    const s = score.get(`${f.location_id}:${f.criterion_id}`);
-    const current = !s ? "no score row" : s.status !== "scored" || s.score == null ? `gap (${s.status})` : String(s.score);
-    rows.push({ fixture_id: f.fixture_id, persona: f.persona_id, location: f.location_id, criterion: f.criterion_id, expected: String(f.expected), current, captured: f.captured_date, scored: s?.scored_date ?? null, match: current === String(f.expected) });
-  }
-  return rows;
-}

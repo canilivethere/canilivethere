@@ -11,7 +11,7 @@ This repo is public, and every pushed commit is published. Tracked files, commit
 ## Commands (from the repo root)
 
 - **Build:** `node tools/prerender-locations.mjs` writes `l/<location_id>.html` from `derived/`. Re-run it after any change to `derived/` or `js/portraits.js`, and commit the output. It has no dependencies.
-- **Test:** there is no test suite yet. These are the instruments that exist:
+- **Test:** `npm test` runs the store checks (schema, traceability, change rule, reader fixtures) with no dependencies. Known failures are in `tests/baseline.json`, which may only shrink; `npm run baseline` rewrites it. `npm run smoke` checks every tracked file against the live site, and `--base` points it elsewhere. `npm run fixture-report` lists fixtures against current scores. Other instruments:
   - `node tools/generate-ramp.mjs --check` re-derives the map colours and exits nonzero on drift. `--self-test` runs the reference vectors.
   - `node tools/reader-walk.mjs` renders every page and the eight test readers in headless Chromium. It reports and never fails.
   - `node tools/value-containment.mjs --repo . --out <dir outside the repo>` reports any value lost between the served page and the hydrated page.

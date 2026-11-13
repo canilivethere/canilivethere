@@ -1,0 +1,4 @@
+# Files kept off the published site. Pages runs Jekyll on this repo.
+exclude:
+  - CLAUDE.md
+  - CLAUDE.local.md
